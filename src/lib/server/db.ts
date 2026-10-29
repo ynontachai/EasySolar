@@ -8,11 +8,18 @@ const globalDatabase = globalThis as typeof globalThis & {
 };
 
 export function isDatabaseConfigured() {
-  return Boolean(process.env.DATABASE_URL ?? process.env.POSTGRES_URL);
+  return Boolean(
+    process.env.DATABASE_URL ??
+      process.env.POSTGRES_URL ??
+      process.env.SUPABASE_POSTGRES_URL,
+  );
 }
 
 export function getDb(): SqlClient {
-  const databaseUrl = process.env.DATABASE_URL ?? process.env.POSTGRES_URL;
+  const databaseUrl =
+    process.env.DATABASE_URL ??
+    process.env.POSTGRES_URL ??
+    process.env.SUPABASE_POSTGRES_URL;
 
   if (!databaseUrl) {
     throw new Error("DATABASE_NOT_CONFIGURED");

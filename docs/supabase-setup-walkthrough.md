@@ -61,7 +61,7 @@ EasySolar ใช้ `postgres` และ AWS S3 SDK อยู่แล้ว จ
 
 ถ้ามี Supabase project อยู่แล้ว ให้เชื่อม project เดิมแทนการสร้างซ้ำ และตรวจว่า Vercel sync variables ครบ
 
-Integration ควรสร้างอย่างน้อย `POSTGRES_URL`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_URL` และ `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ใน Vercel
+เมื่อใช้ custom prefix `SUPABASE` Integration จะสร้างค่าฐานข้อมูลเป็น `SUPABASE_POSTGRES_URL` พร้อม `SUPABASE_SECRET_KEY`, `NEXT_PUBLIC_SUPABASE_URL` และ `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` ใน Vercel
 
 ## Step 2 — ตั้ง Database connection สำหรับ Vercel
 
@@ -70,7 +70,7 @@ Integration ควรสร้างอย่างน้อย `POSTGRES_URL`, 
 3. ตรวจว่า URI ใช้ port `6543`
 4. ตรวจว่า connection string บังคับ SSL เช่น `sslmode=require`
 5. ใน Vercel ตั้ง `DATABASE_POOL_MAX=1` สำหรับ Preview และ Production
-6. ถ้า integration มี `POSTGRES_URL` แล้ว ไม่ต้องสร้าง `DATABASE_URL` ซ้ำ เพราะ EasySolar fallback ไปใช้ `POSTGRES_URL`
+6. ไม่ต้องสร้าง `DATABASE_URL` ซ้ำ เพราะ EasySolar fallback ไปใช้ `POSTGRES_URL` หรือ `SUPABASE_POSTGRES_URL` จาก integration
 
 ใช้ direct connection สำหรับ migration, backup และงาน admin เท่านั้น แอปบน Vercel ต้องใช้ transaction pooler
 
@@ -205,6 +205,7 @@ Application role (`account_admin`, `reviewer`, `super_admin`) ไม่ใช่
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | Vercel integration | Browser client ภายใต้ RLS |
 | `SUPABASE_SECRET_KEY` | No | Vercel integration | Trusted admin/server operations |
 | `POSTGRES_URL` | No | Vercel integration | Vercel runtime database connection |
+| `SUPABASE_POSTGRES_URL` | No | Vercel integration with custom prefix | Vercel runtime database connection |
 | `DATABASE_POOL_MAX` | No | Manual: `1` | จำกัด connection ต่อ instance |
 | `S3_ACCESS_KEY_ID` | No | Supabase Storage S3 | Server-side object access |
 | `S3_SECRET_ACCESS_KEY` | No | Supabase Storage S3 | Server-side object access |
