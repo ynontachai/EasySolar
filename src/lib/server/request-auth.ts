@@ -1,5 +1,6 @@
 import "server-only";
 import { timingSafeEqual } from "node:crypto";
+import { requireAdminPrincipal } from "./admin-auth";
 import { HttpError } from "./http-error";
 
 function hasMatchingBearerToken(request: Request, expectedToken?: string) {
@@ -18,10 +19,8 @@ function hasMatchingBearerToken(request: Request, expectedToken?: string) {
   );
 }
 
-export function requireAdminRequest(request: Request) {
-  if (!hasMatchingBearerToken(request, process.env.EASYSOLAR_ADMIN_TOKEN)) {
-    throw new HttpError(401, "ADMIN_AUTH_REQUIRED", "ต้องยืนยันสิทธิ์ผู้ดูแลระบบ");
-  }
+export async function requireAdminRequest() {
+  return requireAdminPrincipal(["account_admin", "reviewer", "super_admin"]);
 }
 
 export function requireScannerRequest(request: Request) {

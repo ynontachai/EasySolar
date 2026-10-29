@@ -24,7 +24,11 @@ export function getDatasheetRuntimeCapabilities(): DatasheetRuntimeCapabilities 
       process.env.S3_REGION &&
       credentialsAreComplete,
   );
-  const adminAuth = Boolean(process.env.EASYSOLAR_ADMIN_TOKEN);
+  const adminAuth = Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+      (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+  );
   const isTrustedDev =
     process.env.FILE_SCAN_MODE === "trusted-dev" &&
     process.env.NODE_ENV !== "production";

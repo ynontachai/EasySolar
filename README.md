@@ -13,7 +13,7 @@ Open `http://localhost:3000`.
 
 ## Datasheet storage
 
-The Datasheet intake foundation requires PostgreSQL plus private S3-compatible storage. Apply `db/migrations/0001_initial.sql` followed by `0002_datasheet_assets.sql`, then configure the variables documented in `.env.example`.
+The Datasheet intake foundation requires PostgreSQL plus private S3-compatible storage. Link the Supabase CLI and apply the timestamped migrations under `supabase/migrations/`, then configure the variables documented in `.env.example`.
 
 The storage bucket must allow browser `PUT` requests from the application origin with these headers:
 
@@ -22,7 +22,7 @@ The storage bucket must allow browser `PUT` requests from the application origin
 - `x-amz-meta-assetid`
 - `x-amz-meta-sha256hex`
 
-`FILE_SCAN_MODE=external` keeps uploaded files unavailable until the authenticated scanner callback reports `clean`. `trusted-dev` may be used only in non-production development. The bootstrap admin bearer token is not a substitute for production identity/RBAC.
+`FILE_SCAN_MODE=external` keeps uploaded files unavailable until the authenticated scanner callback reports `clean`. `trusted-dev` may be used only in non-production development. Admin pages use an invite-only Supabase Auth session plus application roles; the scanner token is never an Admin login credential.
 
 ## Verify
 
@@ -39,7 +39,10 @@ npm run build
 - `/equipment` — catalog scaffold
 - `/checker` — working server-authoritative sizing flow
 - `/solar-value` — consumer assessment scope and delivery roadmap
-- `/admin/equipment` — verification workflow scaffold
+- `/solar-value/new` — five-step consumer assessment with versioned tariff assumptions
+- `/admin/login` — invite-only Admin sign-in
+- `/admin/catalog` — role-scoped SKU creation and list
+- `/admin/equipment` — role-scoped Datasheet verification workflow
 - `/api/health` — health and engine version
 - `/api/v1/admin/datasheets/upload-intents` — authenticated signed upload intent
 - `/api/v1/admin/datasheets/{assetId}/finalize` — object integrity verification

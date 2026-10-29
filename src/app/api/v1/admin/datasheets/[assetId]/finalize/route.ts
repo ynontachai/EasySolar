@@ -18,9 +18,9 @@ interface RouteContext {
   params: Promise<{ assetId: string }>;
 }
 
-export async function POST(request: Request, context: RouteContext) {
+export async function POST(_request: Request, context: RouteContext) {
   try {
-    requireAdminRequest(request);
+    await requireAdminRequest();
     const { assetId: rawAssetId } = await context.params;
     const assetId = assetIdSchema.safeParse(rawAssetId);
 

@@ -62,7 +62,6 @@ export function DatasheetUploadPanel({ capabilities }: DatasheetUploadPanelProps
     const form = event.currentTarget;
     const formData = new FormData(form);
     const file = formData.get("datasheet");
-    const adminToken = String(formData.get("adminToken") ?? "");
 
     if (!(file instanceof File) || file.size === 0) {
       setPhase("error");
@@ -85,7 +84,6 @@ export function DatasheetUploadPanel({ capabilities }: DatasheetUploadPanelProps
     try {
       setPhase("hashing");
       const checksum = await createFileChecksums(file);
-      const authorization = { Authorization: `Bearer ${adminToken}` };
 
       const intentResponse = await fetch("/api/v1/admin/datasheets/upload-intents", {
         body: JSON.stringify({
@@ -101,7 +99,7 @@ export function DatasheetUploadPanel({ capabilities }: DatasheetUploadPanelProps
           sha256Hex: checksum.hex,
           sizeBytes: file.size,
         }),
-        headers: { "content-type": "application/json", ...authorization },
+        headers: { "content-type": "application/json" },
         method: "POST",
       });
       const intent = await readApiResponse<UploadIntentResponse>(intentResponse);
@@ -120,7 +118,7 @@ export function DatasheetUploadPanel({ capabilities }: DatasheetUploadPanelProps
       setPhase("finalizing");
       const finalizeResponse = await fetch(
         `/api/v1/admin/datasheets/${intent.assetId}/finalize`,
-        { headers: authorization, method: "POST" },
+        { method: "POST" },
       );
       const finalized = await readApiResponse<{ message: string; state: string }>(
         finalizeResponse,
@@ -169,7 +167,7 @@ export function DatasheetUploadPanel({ capabilities }: DatasheetUploadPanelProps
           <ul>
             {!capabilities.database ? <li>DATABASE_URL</li> : null}
             {!capabilities.storage ? <li>S3_BUCKET และ S3_REGION</li> : null}
-            {!capabilities.adminAuth ? <li>EASYSOLAR_ADMIN_TOKEN</li> : null}
+            {!capabilities.adminAuth ? <li>Supabase Auth public URL/key</li> : null}
           </ul>
         </div>
       ) : (
@@ -213,11 +211,6 @@ export function DatasheetUploadPanel({ capabilities }: DatasheetUploadPanelProps
               type="file"
             />
             <small>PDF เท่านั้น · ไม่เกิน {formatMegabytes(MAX_DATASHEET_SIZE_BYTES)}</small>
-          </label>
-          <label className="datasheet-intake__token">
-            <span>Admin upload token</span>
-            <input autoComplete="off" name="adminToken" required type="password" />
-            <small>ใช้ยืนยัน request เท่านั้น ระบบไม่จัดเก็บ token ใน browser</small>
           </label>
           <div className="datasheet-intake__action">
             <div aria-live="polite">

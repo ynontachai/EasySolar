@@ -30,6 +30,11 @@ import {
   type AssessmentPeriodKey,
   type SolarAssessmentDraft,
 } from "@/domain/assessment/schema";
+import {
+  createTariffInsight,
+  exportCompensationPolicy,
+  residentialTariffPolicy,
+} from "@/domain/assessment/tariff-policy";
 
 const draftStorageKey = "easysolar:assessment-draft:v1";
 
@@ -163,6 +168,7 @@ export function SolarAssessmentForm() {
     const parsed = solarAssessmentDraftSchema.safeParse(draft);
     return parsed.success ? summarizeAssessmentDraft(parsed.data) : null;
   }, [draft]);
+  const tariffInsight = useMemo(() => createTariffInsight(draft), [draft]);
 
   function updateDraft(nextDraft: SolarAssessmentDraft) {
     setDraft(nextDraft);
@@ -238,13 +244,30 @@ export function SolarAssessmentForm() {
           </div>
         </div>
 
+        <div className="assessment-policy-result">
+          <div>
+            <span>มูลค่าไฟที่ใช้เองช่วงมีแสง</span>
+            <strong>
+              {tariffInsight.estimatedDaylightSelfUseValueBahtPerKwh === null
+                ? "ต้องมีหน่วย kWh ครบ"
+                : `≈ ${formatNumber(tariffInsight.estimatedDaylightSelfUseValueBahtPerKwh, 2)} บาท/kWh`}
+            </strong>
+            <small>รวม Ft และ VAT แบบประมาณการ · ไม่รวมค่าบริการรายเดือน</small>
+          </div>
+          <div>
+            <span>อัตรารับซื้อที่ใช้ในแบบประเมิน</span>
+            <strong>{formatNumber(tariffInsight.exportValueBahtPerKwh, 2)} บาท/kWh</strong>
+            <small>{draft.exportIntent === "none" ? "คุณเลือกไม่ขายคืน" : "Owner-defined assumption"}</small>
+          </div>
+        </div>
+
         <div className="assessment-complete__notice">
           <Info size={20} aria-hidden="true" />
           <div>
-            <strong>ผล Energy Fit จะเปิดหลังเชื่อม Calculation Policy</strong>
+            <strong>Tariff policy พร้อมแล้ว แต่ยังไม่ใช่ ROI</strong>
             <p>
-              ต้องมี Tariff, Ft, Solar Yield และ Export Policy ที่มีวันที่และแหล่งอ้างอิงก่อน
-              เพื่อไม่แสดงตัวเลขที่ดูแม่นยำเกินข้อมูลจริง
+              ตัวเลขนี้เปรียบเทียบมูลค่าพลังงานที่ใช้เองกับการส่งออก โดยยังไม่รวม
+              Solar Yield, เงาหลังคา, ขนาดระบบ และค่าติดตั้ง
             </p>
           </div>
         </div>
@@ -343,7 +366,9 @@ export function SolarAssessmentForm() {
           {currentStep === 3 && (
             <PolicyStep draft={draft} onChange={updateDraft} />
           )}
-          {currentStep === 4 && <ReviewStep draft={draft} summary={summary} />}
+          {currentStep === 4 && (
+            <ReviewStep draft={draft} summary={summary} tariffInsight={tariffInsight} />
+          )}
 
           {errors.length > 0 && (
             <div className="assessment-errors" role="alert">
@@ -620,6 +645,19 @@ function PolicyStep({ draft, onChange }: StepProps) {
             </label>
           ))}
         </div>
+        <div className="tariff-policy-card">
+          <span>POLICY · {residentialTariffPolicy.effectiveFrom}</span>
+          <strong>
+            TOU Peak {residentialTariffPolicy.tou.peakBahtPerKwh} · Off-Peak {residentialTariffPolicy.tou.offPeakBahtPerKwh} บาท/kWh
+          </strong>
+          <p>{residentialTariffPolicy.tou.schedule.peak}</p>
+          <small>
+            Ft {residentialTariffPolicy.ft.bahtPerKwh} บาท/kWh · ราคายังไม่รวม VAT
+          </small>
+          <a href={residentialTariffPolicy.sourceUrl} rel="noreferrer" target="_blank">
+            แหล่งข้อมูล PEA
+          </a>
+        </div>
       </fieldset>
 
       <fieldset className="choice-group">
@@ -644,6 +682,11 @@ function PolicyStep({ draft, onChange }: StepProps) {
             </label>
           ))}
         </div>
+        <div className="tariff-policy-card tariff-policy-card--export">
+          <span>EXPORT ASSUMPTION</span>
+          <strong>{exportCompensationPolicy.bahtPerKwh.toFixed(2)} บาท/kWh</strong>
+          <p>{exportCompensationPolicy.sourceLabel}</p>
+        </div>
       </fieldset>
     </div>
   );
@@ -652,9 +695,11 @@ function PolicyStep({ draft, onChange }: StepProps) {
 function ReviewStep({
   draft,
   summary,
+  tariffInsight,
 }: {
   draft: SolarAssessmentDraft;
   summary: ReturnType<typeof summarizeAssessmentDraft> | null;
+  tariffInsight: ReturnType<typeof createTariffInsight>;
 }) {
   return (
     <div className="assessment-step assessment-review">
@@ -686,12 +731,24 @@ function ReviewStep({
           <dt>การขายไฟคืน</dt>
           <dd>{exportLabels[draft.exportIntent]}</dd>
         </div>
+        <div>
+          <dt>มูลค่าไฟที่ Solar ใช้ทดแทนช่วงมีแสง</dt>
+          <dd>
+            {tariffInsight.estimatedDaylightSelfUseValueBahtPerKwh === null
+              ? "ต้องมี kWh ครบเพื่อประเมิน"
+              : `≈ ${formatNumber(tariffInsight.estimatedDaylightSelfUseValueBahtPerKwh, 2)} บาท/kWh`}
+          </dd>
+        </div>
+        <div>
+          <dt>อัตรารับซื้อที่ใช้</dt>
+          <dd>{formatNumber(tariffInsight.exportValueBahtPerKwh, 2)} บาท/kWh</dd>
+        </div>
       </dl>
       <div className="review-boundary">
         <Info size={20} aria-hidden="true" />
         <p>
-          ขั้นตอนนี้ยืนยันเฉพาะข้อมูลนำเข้า ระบบยังไม่คำนวณ ROI, Payback หรือคำว่า “คุ้ม”
-          จนกว่าจะมีต้นทุนติดตั้งและนโยบายอ้างอิงครบ
+          ระบบใช้โครงสร้างค่าไฟ PEA มีผลตั้งแต่ ก.ย. 2569 และ Ft งวด ก.ย.–ธ.ค. 2569
+          เป็น snapshot สำหรับประเมินเบื้องต้น ไม่ใช่ใบเสนอราคาหรือผลตอบแทนรับประกัน
         </p>
       </div>
     </div>

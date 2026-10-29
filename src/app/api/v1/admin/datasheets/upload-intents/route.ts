@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       );
     }
 
-    requireAdminRequest(request);
+    await requireAdminRequest();
     const parsed = datasheetUploadIntentSchema.safeParse(
       await parseJsonRequest(request),
     );

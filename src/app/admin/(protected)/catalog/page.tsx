@@ -1,0 +1,77 @@
+import type { Metadata } from "next";
+import { connection } from "next/server";
+import { Boxes, Search } from "lucide-react";
+import { AdminSkuForm } from "@/components/admin-sku-form";
+import { requireAdminPage } from "@/lib/server/admin-auth";
+import {
+  listCatalogProductOptions,
+  listCatalogSkus,
+  listOrganizationsForPrincipal,
+} from "@/lib/server/catalog-admin-repository";
+
+export const metadata: Metadata = { title: "Products and SKU" };
+
+function formatUpdatedAt(value: Date) {
+  return new Intl.DateTimeFormat("th-TH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Bangkok",
+  }).format(value);
+}
+
+export default async function AdminCatalogPage() {
+  await connection();
+  const principal = await requireAdminPage(["account_admin", "reviewer", "super_admin"]);
+  const [organizations, products, skus] = await Promise.all([
+    listOrganizationsForPrincipal(principal),
+    listCatalogProductOptions(),
+    listCatalogSkus(principal),
+  ]);
+  const canCreate = principal.roles.some(
+    (role) => role.code === "account_admin" || role.code === "super_admin",
+  );
+
+  return (
+    <main className="admin-catalog-page">
+      <header className="admin-page-header">
+        <div>
+          <p className="eyebrow eyebrow--dark">CATALOG · VARIANTS</p>
+          <h1>สินค้าและ SKU</h1>
+          <p>แยกรหัสขายออกจาก Datasheet เพื่อให้ข้อมูลราคาในอนาคตไม่เปลี่ยนผลวิศวกรรม</p>
+        </div>
+        <span>{skus.length} SKU</span>
+      </header>
+
+      {canCreate ? <AdminSkuForm organizations={organizations} products={products} /> : null}
+
+      <section className="admin-sku-list" aria-labelledby="sku-list-title">
+        <div className="admin-sku-list__head">
+          <div><Boxes size={20} /><h2 id="sku-list-title">SKU ทั้งหมดในขอบเขตของคุณ</h2></div>
+          <label><Search size={16} /><span className="sr-only">ค้นหา SKU</span><input disabled placeholder="Search ใน slice ถัดไป" /></label>
+        </div>
+        {skus.length === 0 ? (
+          <div className="admin-sku-empty">
+            <Boxes size={28} />
+            <strong>ยังไม่มี SKU</strong>
+            <p>{canCreate ? "เลือก Product Model ด้านบนเพื่อสร้างรายการแรก" : "ยังไม่มีรายการให้ตรวจใน organization นี้"}</p>
+          </div>
+        ) : (
+          <div className="admin-sku-table" role="table" aria-label="รายการ SKU">
+            <div className="admin-sku-table__header" role="row">
+              <span role="columnheader">SKU</span><span role="columnheader">Product Model</span><span role="columnheader">Organization</span><span role="columnheader">สถานะ</span><span role="columnheader">อัปเดต</span>
+            </div>
+            {skus.map((sku) => (
+              <article className="admin-sku-row" key={sku.id} role="row">
+                <div role="cell"><strong>{sku.sku}</strong><small>{sku.variantLabel}</small></div>
+                <div role="cell"><strong>{sku.manufacturer}</strong><small>{sku.exactModel} · {sku.category === "pv_module" ? "PV Module" : "Inverter"}</small></div>
+                <span role="cell">{sku.organizationName}</span>
+                <span className="admin-status" role="cell">{sku.status}</span>
+                <time role="cell">{formatUpdatedAt(sku.updatedAt)}</time>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}

@@ -11,7 +11,7 @@
 - Vercel Preview เชื่อมฐานข้อมูลผ่าน transaction pooler
 - private bucket ชื่อ `easysolar-private`
 - Datasheet upload/download ผ่าน S3-compatible adapter เดิม
-- รายการงานชัดเจนสำหรับแทน `EASYSOLAR_ADMIN_TOKEN` ด้วย Supabase Auth และ RLS
+- Supabase Auth แบบ invite-only พร้อม role `account_admin`, `reviewer`, `super_admin`
 
 รอบแรกยังไม่เปิด production data และยังไม่เปิด public signup
 
@@ -76,17 +76,7 @@ EasySolar ใช้ `postgres` และ AWS S3 SDK อยู่แล้ว จ
 
 ## Step 3 — นำ migration เดิมเข้า Supabase CLI
 
-โปรเจกต์มี migration เดิมสองไฟล์:
-
-- `db/migrations/0001_initial.sql`
-- `db/migrations/0002_datasheet_assets.sql`
-
-ก่อน push ให้ย้ายเนื้อหาไปเป็น migration แบบ timestamp ภายใต้ `supabase/migrations/` โดยรักษาลำดับเดิม เช่น:
-
-```text
-supabase/migrations/202610290001_initial.sql
-supabase/migrations/202610290002_datasheet_assets.sql
-```
+Migration ที่ใช้งานจริงอยู่ใน `supabase/migrations/` และต้อง apply ตามลำดับ timestamp ห้ามย้อนกลับไปใช้ไฟล์ bootstrap ใน `db/migrations/` กับ remote project
 
 จากเครื่องพัฒนา:
 
@@ -106,9 +96,7 @@ npx supabase migration list
 - ห้ามแก้ migration ที่เคย apply แล้ว ให้สร้าง migration ใหม่
 - ใช้ seed เฉพาะ development/staging และห้ามใส่ข้อมูลลูกค้าจริง
 
-หลัง push ให้เปิด Table Editor และตรวจ `manufacturer`, `product_model`, `datasheet_revision`, `asset` และ `datasheet_asset`
-
-Migration ปัจจุบันยังไม่มี RLS policy จึงห้ามเปิด Data API ให้ client ใช้ schema นี้ในรอบ bootstrap ให้ปิด automatic exposure/revoke grants หรือเพิ่ม security migration ที่เปิด RLS โดยไม่มี client policy ก่อนนำข้อมูลจริงเข้า จากนั้นค่อยเพิ่ม grants + policies ที่ผ่านการทดสอบในรอบ A0
+หลัง push ให้เปิด Table Editor และตรวจ `manufacturer`, `product_model`, `datasheet_revision`, `asset`, `datasheet_asset`, `organization`, `user_profile`, `role_assignment`, `product_variant` และ `audit_event` ตาราง Admin เปิด RLS แล้ว และสิทธิ์จริงยังถูกตรวจซ้ำที่ trusted server action
 
 ## Step 4 — สร้าง private Storage bucket
 
@@ -143,20 +131,41 @@ x-amz-meta-sha256hex
 
 Supabase Storage S3 ยังไม่รองรับ S3 object versioning EasySolar จึงต้องใช้ immutable object key และสร้าง Datasheet revision ใหม่ทุกครั้ง ห้าม overwrite ไฟล์ที่ publish แล้ว
 
-## Step 5 — ตั้งค่าชั่วคราวสำหรับ Datasheet intake
+## Step 5 — เปิด Admin Auth และสร้าง Super Admin คนแรก
 
-ก่อน Auth/RBAC พร้อม ให้ใช้ bootstrap token เฉพาะ Preview:
+1. ใน Supabase Auth ปิด public sign-up และสร้าง/Invite user ด้วยอีเมลของเจ้าของระบบ
+2. ตั้ง Email Template ของ invite ให้พาไปที่
+   `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite&next=/admin/set-password`
+3. เพิ่ม Production URL และ Preview URL ที่ใช้ทดสอบใน Auth URL Configuration
+4. เมื่อ user ถูกสร้างแล้ว ให้รัน SQL ต่อไปนี้ใน SQL Editor โดยแทนค่าอีเมลจริง:
 
-```text
-EASYSOLAR_ADMIN_TOKEN=<random secret>
-EASYSOLAR_SCANNER_TOKEN=<different random secret>
-FILE_SCAN_MODE=external
-APP_ENVIRONMENT=staging
+```sql
+insert into public.role_assignment (user_id, role_code, organization_id)
+select id, 'super_admin', null
+from auth.users
+where lower(email) = lower('<SUPER_ADMIN_EMAIL>')
+on conflict do nothing;
 ```
 
-ห้ามใช้ token เดียวกันสำหรับ Admin และ Scanner และห้ามเปิด `trusted-dev` บน Production
+5. เปิด `/admin/login` ตั้งรหัสผ่านผ่าน invite แล้วตรวจว่าเห็น role `Super Admin`
 
-จากนั้น redeploy Preview แล้วตรวจ `/admin/equipment` ว่าสถานะ Database, Storage และ Admin auth เป็น ready
+สำหรับ Account Admin ให้สร้าง user ใน Auth ก่อน แล้วรัน:
+
+```sql
+insert into public.organization_member (organization_id, user_id, status)
+select '00000000-0000-4000-8000-000000000001', id, 'active'
+from auth.users
+where lower(email) = lower('<ACCOUNT_ADMIN_EMAIL>')
+on conflict (organization_id, user_id) do nothing;
+
+insert into public.role_assignment (user_id, role_code, organization_id)
+select id, 'account_admin', '00000000-0000-4000-8000-000000000001'
+from auth.users
+where lower(email) = lower('<ACCOUNT_ADMIN_EMAIL>')
+on conflict do nothing;
+```
+
+Admin session ใช้ Supabase cookie Auth; ไม่มีช่อง token ใน browser อีกต่อไป ส่วน `EASYSOLAR_SCANNER_TOKEN` ยังเป็น machine-to-machine credential แยกต่างหาก
 
 ## Step 6 — ทดสอบแบบ end-to-end
 
@@ -181,19 +190,19 @@ Release gate ของรอบนี้:
 - Vercel Preview health check ผ่าน
 - ไม่มี secret ใน Git history, browser bundle หรือ application logs
 
-## Step 7 — แทน bootstrap token ด้วย Supabase Auth/RBAC
+## Step 7 — ตรวจ Supabase Auth/RBAC ที่ติดตั้งแล้ว
 
-ทำเป็น implementation slice A0 ก่อนเปิด Admin ให้ผู้ใช้จริง:
+Slice A0 ติดตั้ง cookie-based Auth, identity tables, role scope, RLS, protected Admin routes และ audit สำหรับการสร้าง SKU แล้ว ก่อนเปิดใช้งานจริงให้ทดสอบว่า:
 
-1. ติดตั้ง `@supabase/supabase-js` และ `@supabase/ssr`
-2. ใช้ cookie-based session สำหรับ Next.js App Router
-3. สร้าง identity/organization/role migrations ตาม Admin Catalog Operations Plan
-4. เปิด RLS และกำหนด grants สำหรับทุก table/view ที่ Data API มองเห็น
-5. ใช้ Custom Access Token Auth Hook ใส่ coarse role/scope claims
-6. ให้ database permission functions และ RLS เป็นผู้ตัดสินสิทธิ์จริง
-7. invite ผู้ใช้จาก trusted server หรือ Supabase Dashboard เท่านั้น
-8. ลบช่องกรอก `EASYSOLAR_ADMIN_TOKEN` และถอด token ออกจาก Production
-9. เปิด step-up authentication สำหรับการ assign Super Admin, recall และ emergency access
+1. ผู้ที่ไม่ login ถูกส่งไป `/admin/login`
+2. ผู้ไม่มี role ถูกส่งไป `/admin/access-pending`
+3. Account Admin สร้าง SKU ได้เฉพาะ organization ของตน
+4. Reviewer อ่านได้แต่สร้าง SKU ไม่ได้
+5. Super Admin เห็นทุก organization
+6. SKU ซ้ำถูกปฏิเสธและการสร้างสำเร็จมี `audit_event`
+7. Datasheet upload ใช้ session เดียวกันและไม่มี browser token
+
+Custom claims และ step-up authentication สำหรับงานเสี่ยงสูงเป็น hardening slice ถัดไป; permission source of truth ปัจจุบันยังอยู่ใน Postgres และ trusted server action
 
 Application role (`account_admin`, `reviewer`, `super_admin`) ไม่ใช่ Supabase organization role และต้องเก็บในตารางของ EasySolar เอง
 
@@ -209,7 +218,6 @@ Application role (`account_admin`, `reviewer`, `super_admin`) ไม่ใช่
 | `DATABASE_POOL_MAX` | No | Manual: `1` | จำกัด connection ต่อ instance |
 | `S3_ACCESS_KEY_ID` | No | Supabase Storage S3 | Server-side object access |
 | `S3_SECRET_ACCESS_KEY` | No | Supabase Storage S3 | Server-side object access |
-| `EASYSOLAR_ADMIN_TOKEN` | No | Temporary manual secret | Bootstrap only; remove in A0 |
 | `EASYSOLAR_SCANNER_TOKEN` | No | Scanner integration | Scanner callback auth |
 
 ## จุดที่ต้องหยุดและขออนุมัติ
