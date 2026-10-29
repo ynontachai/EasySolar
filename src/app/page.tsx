@@ -1,0 +1,136 @@
+import Link from "next/link";
+import {
+  ArrowRight,
+  BookOpenCheck,
+  FileCheck2,
+  Gauge,
+  Search,
+} from "lucide-react";
+import { SiteFooter } from "@/components/site-footer";
+import { SiteHeader } from "@/components/site-header";
+import { SolarCircuitVisual } from "@/components/solar-circuit-visual";
+
+const checks = [
+  {
+    number: "01",
+    title: "แรงดันตามอุณหภูมิ",
+    detail: "Cold Voc, hot/cold Vmp และช่วงเริ่มทำงาน แสดงสูตรและค่าที่ใช้ทุกครั้ง",
+    icon: Gauge,
+  },
+  {
+    number: "02",
+    title: "กระแสแยกทุก MPPT",
+    detail: "ไม่เหมารวมพอร์ตกับ tracker และไม่ถือว่ากระแสเกินยอมรับได้โดยไม่มีหลักฐาน",
+    icon: FileCheck2,
+  },
+  {
+    number: "03",
+    title: "ย้อนกลับถึง Datasheet",
+    detail: "ล็อก exact model, revision, แหล่งข้อมูล และเวอร์ชัน engine ไว้กับผลคำนวณ",
+    icon: BookOpenCheck,
+  },
+];
+
+export default function HomePage() {
+  return (
+    <main>
+      <section className="hero">
+        <SiteHeader inverse />
+        <div className="hero__grid" aria-hidden="true" />
+        <div className="hero__orb" aria-hidden="true" />
+        <div className="hero__content">
+          <p className="eyebrow">PV EQUIPMENT INTELLIGENCE · THAILAND</p>
+          <h1>
+            ออกแบบ String
+            <br />
+            ด้วยเหตุผล <em>ไม่ใช่เดา</em>
+          </h1>
+          <p className="hero__lead">
+            ตรวจ PV–Inverter compatibility แบบอธิบายได้ พร้อม revision,
+            สมมติฐาน และข้อจำกัดที่วิศวกรตรวจทานต่อได้
+          </p>
+          <div className="hero__actions">
+            <Link className="button button--sun" href="/checker">
+              เริ่มตรวจสอบอุปกรณ์
+              <ArrowRight size={18} aria-hidden="true" />
+            </Link>
+            <Link className="text-link text-link--light" href="/equipment">
+              <Search size={17} aria-hidden="true" />
+              ค้นหา Datasheet
+            </Link>
+          </div>
+        </div>
+        <SolarCircuitVisual />
+        <div className="hero__footnote">
+          <span>ENGINEERING TRUST FIRST</span>
+          <span>PRELIMINARY DC-SIDE SIZING</span>
+        </div>
+      </section>
+
+      <section className="trust-strip" aria-label="หลักการของผลิตภัณฑ์">
+        <p>ผลคำนวณไม่เปลี่ยนตามสต็อกหรือสปอนเซอร์</p>
+        <span>Deterministic</span>
+        <span>Traceable</span>
+        <span>Reviewable</span>
+      </section>
+
+      <section className="checks-section">
+        <div className="section-heading">
+          <p className="eyebrow eyebrow--dark">ตรวจให้ครบก่อนสรุป</p>
+          <h2>ทุกคำว่า “ผ่าน” ต้องมีที่มา</h2>
+          <p>
+            ระบบแสดง Pass, Fail หรือ Incomplete เป็นรายกฎ
+            และจะไม่เปลี่ยนข้อมูลที่ขาดให้กลายเป็นไฟเขียว
+          </p>
+        </div>
+        <div className="checks-list">
+          {checks.map((check) => {
+            const Icon = check.icon;
+            return (
+              <article className="check-row" key={check.number}>
+                <span className="check-row__number">{check.number}</span>
+                <Icon className="check-row__icon" aria-hidden="true" />
+                <h3>{check.title}</h3>
+                <p>{check.detail}</p>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="workflow-section">
+        <div className="workflow-section__visual" aria-hidden="true">
+          <div className="workflow-line" />
+          <span className="workflow-node workflow-node--one">PV</span>
+          <span className="workflow-node workflow-node--two">MPPT</span>
+          <span className="workflow-node workflow-node--three">REPORT</span>
+        </div>
+        <div className="workflow-section__copy">
+          <p className="eyebrow eyebrow--dark">FROM SOURCE TO REPORT</p>
+          <h2>เลือกอุปกรณ์ → ตั้งเงื่อนไข → ตรวจทุกกฎ → ออกรายงาน</h2>
+          <p>
+            ผลลัพธ์เก็บ snapshot ของสเปกและ engine version
+            เพื่อให้การคำนวณเดิมตรวจย้อนหลังได้ แม้ catalog จะมี revision ใหม่
+          </p>
+          <Link className="text-link" href="/checker">
+            เปิด Engineering Workspace
+            <ArrowRight size={18} aria-hidden="true" />
+          </Link>
+        </div>
+      </section>
+
+      <section className="final-cta">
+        <p className="eyebrow">START WITH A TRACEABLE ANSWER</p>
+        <h2>เปลี่ยนสเปกสองแผ่น ให้เป็นคำตอบที่ตรวจสอบได้</h2>
+        <Link className="button button--sun" href="/checker">
+          ทดลอง Checker
+          <ArrowRight size={18} aria-hidden="true" />
+        </Link>
+        <small>
+          Preliminary only — ต้องให้วิศวกรและคู่มือผู้ผลิตตรวจทานก่อนนำไปติดตั้ง
+        </small>
+      </section>
+      <SiteFooter />
+    </main>
+  );
+}
