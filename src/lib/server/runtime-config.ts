@@ -11,7 +11,11 @@ export interface StorageRuntimeConfig {
 }
 
 export function getDatasheetRuntimeCapabilities(): DatasheetRuntimeCapabilities {
-  const database = Boolean(process.env.DATABASE_URL);
+  const database = Boolean(
+    process.env.DATABASE_URL ??
+      process.env.POSTGRES_URL ??
+      process.env.SUPABASE_POSTGRES_URL,
+  );
   const hasAccessKey = Boolean(process.env.S3_ACCESS_KEY_ID);
   const hasSecretKey = Boolean(process.env.S3_SECRET_ACCESS_KEY);
   const credentialsAreComplete = hasAccessKey === hasSecretKey;
