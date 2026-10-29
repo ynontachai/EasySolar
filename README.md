@@ -53,4 +53,4 @@ npm run build
 - Do not silently fill missing safety-critical values.
 - Do not rewrite historical calculations when a datasheet or rule changes.
 
-Read [product blueprint](docs/product-blueprint.md), [journey–feature alignment](docs/journey-feature-map.md), [data and file architecture](docs/data-architecture-plan.md), [requirements contract](docs/requirements-contract.md), [UX handoff](docs/ux-handoff.md), [architecture](docs/architecture.md), and the first PostgreSQL migration in `db/migrations/0001_initial.sql` before implementing persistence.
+Read [product blueprint](docs/product-blueprint.md), [journey–feature alignment](docs/journey-feature-map.md), [data and file architecture](docs/data-architecture-plan.md), [admin catalog operations](docs/admin-catalog-operations-plan.md), [Supabase setup walkthrough](docs/supabase-setup-walkthrough.md), [requirements contract](docs/requirements-contract.md), [UX handoff](docs/ux-handoff.md), [architecture](docs/architecture.md), and the first PostgreSQL migration in `db/migrations/0001_initial.sql` before implementing persistence.

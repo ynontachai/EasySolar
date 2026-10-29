@@ -107,7 +107,8 @@ Do not put customer names, email addresses, original filenames or guessable sequ
 - Server-side encryption at rest and TLS in transit
 - Signed URL TTL 5–15 minutes
 - Audit upload, quarantine, publish and download of restricted assets
-- Object versioning and lifecycle rules; soft delete before physical purge
+- Immutable object keys and application-level revisions; use provider versioning when available, but do not depend on it
+- Lifecycle rules and soft delete before physical purge
 
 ## Consumer assessment model
 
@@ -203,3 +204,5 @@ Do not extend `0001_initial.sql` after production use. Create reversible migrati
 6. Commerce mapping; order/payment tables only when Marketplace scope is approved
 
 Each migration should be backward compatible: add nullable structures, backfill, then enforce constraints in a later migration.
+
+รายละเอียด role/permission, staged import, review workflow และตารางที่ต้องเพิ่มอยู่ใน [Admin Catalog Operations Plan](admin-catalog-operations-plan.md).

@@ -116,3 +116,5 @@ Full-bleed responsive canvas, dual-audience information architecture, public nav
 - ข้อความ disclaimer ที่ผ่านการทบทวนด้านวิศวกรรม การเงิน และกฎหมาย
 
 See [Journey–Feature Alignment](journey-feature-map.md) and [Data and File Architecture](data-architecture-plan.md) for the implementation contract.
+
+Account Admin, Super Admin, SKU import และ Datasheet operations อยู่ใน [Admin Catalog Operations Plan](admin-catalog-operations-plan.md).
