@@ -73,9 +73,9 @@ const periodDetails: Record<
 
 const initialDraft: SolarAssessmentDraft = {
   bills: [
-    { amountThb: 0, energyKwh: null, month: "" },
-    { amountThb: 0, energyKwh: null, month: "" },
-    { amountThb: 0, energyKwh: null, month: "" },
+    { amountThb: 0, energyKwh: null },
+    { amountThb: 0, energyKwh: null },
+    { amountThb: 0, energyKwh: null },
   ],
   occupancy: { morning: 0, daytime: 0, evening: 0, night: 0 },
   acUsage: {
@@ -101,7 +101,7 @@ const exportLabels = {
 } as const;
 
 function toNumber(value: string) {
-  const parsed = Number(value);
+  const parsed = Number(value.replaceAll(",", "").trim());
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -124,8 +124,7 @@ function getStepErrors(stepIndex: number, draft: SolarAssessmentDraft) {
 
   const messages = result.error.issues.map((issue) => {
     if (stepIndex === 0) {
-      if (issue.path.includes("month")) return "กรุณาเลือกเดือนของบิลทั้ง 3 เดือน";
-      if (issue.path.includes("amountThb")) return "กรุณากรอกค่าไฟมากกว่า 0 บาทให้ครบ";
+      if (issue.path.includes("amountThb")) return "กรอกยอดค่าไฟให้ครบทั้ง 3 บิล (มากกว่า 0 บาท)";
       if (issue.path.includes("energyKwh")) return "หน่วยไฟต้องมากกว่า 0 หรือเว้นว่างไว้";
     }
     return issue.message;
@@ -230,8 +229,8 @@ export function SolarAssessmentForm() {
             <strong>{formatNumber(summary.averageBillThb)} บาท</strong>
           </div>
           <div>
-            <span>จำนวนคนช่วงมีแสง</span>
-            <strong>{formatNumber(summary.daytimeOccupancy)} คน·ช่วง</strong>
+            <span>คนอยู่เฉลี่ยช่วงมีแสง</span>
+            <strong>{formatNumber(summary.daylightAverageOccupancy, 1)} คน</strong>
           </div>
           <div>
             <span>การใช้แอร์ที่ระบุ</span>
@@ -322,7 +321,7 @@ export function SolarAssessmentForm() {
           <div>
             <p>{steps[currentStep].shortLabel}</p>
             <h2 ref={headingRef} tabIndex={-1}>
-              {currentStep === 0 && "กรอกค่าไฟย้อนหลัง 3 เดือน"}
+              {currentStep === 0 && "กรอกยอดค่าไฟจากบิล 3 ใบล่าสุด"}
               {currentStep === 1 && "แต่ละช่วงเวลามีคนอยู่กี่คน"}
               {currentStep === 2 && "เปิดเครื่องปรับอากาศเมื่อไร"}
               {currentStep === 3 && "เลือกอัตราค่าไฟและการขายคืน"}
@@ -392,6 +391,9 @@ interface StepProps {
 }
 
 function BillStep({ draft, onChange }: StepProps) {
+  const [isEnergyVisible, setIsEnergyVisible] = useState(() =>
+    draft.bills.some((bill) => bill.energyKwh !== null),
+  );
   const validBills = draft.bills.filter((bill) => bill.amountThb > 0);
   const averageBill = validBills.length === 3
     ? validBills.reduce((total, bill) => total + bill.amountThb, 0) / 3
@@ -400,34 +402,20 @@ function BillStep({ draft, onChange }: StepProps) {
   return (
     <div className="assessment-step">
       <p className="assessment-step__lead">
-        กรอกยอดรวมที่ต้องชำระของแต่ละเดือน หากบิลมีจำนวนหน่วย kWh ให้กรอกเพิ่มเพื่อเพิ่มความแม่นยำ
+        ใช้เฉพาะยอดที่จ่ายจริง ไม่ต้องเลือกเดือนและไม่ต้องเรียงลำดับ
       </p>
-      <div className="bill-table">
-        <div className="bill-table__head" aria-hidden="true">
-          <span>เดือน</span><span>ค่าไฟรวม</span><span>หน่วยไฟ (ถ้ามี)</span>
-        </div>
+      <div className="bill-entry-grid">
         {draft.bills.map((bill, index) => (
-          <fieldset className="bill-row" key={index}>
-            <legend className="sr-only">บิลเดือนที่ {index + 1}</legend>
-            <label>
-              <span className="bill-row__mobile-label">เดือน</span>
-              <input
-                type="month"
-                value={bill.month}
-                onChange={(event) => {
-                  const bills = [...draft.bills];
-                  bills[index] = { ...bill, month: event.target.value };
-                  onChange({ ...draft, bills });
-                }}
-              />
-            </label>
+          <div className="bill-entry-card" key={index}>
+            <span className="bill-entry-card__index">บิลที่ {index + 1}</span>
             <label className="input-with-unit">
-              <span className="bill-row__mobile-label">ค่าไฟรวม</span>
+              <span className="sr-only">ยอดค่าไฟบิลที่ {index + 1}</span>
               <input
+                aria-label={`ยอดค่าไฟบิลที่ ${index + 1}`}
+                autoComplete="off"
                 inputMode="decimal"
-                min="0"
-                placeholder="0"
-                type="number"
+                placeholder="เช่น 3,200"
+                type="text"
                 value={bill.amountThb || ""}
                 onChange={(event) => {
                   const bills = [...draft.bills];
@@ -437,13 +425,30 @@ function BillStep({ draft, onChange }: StepProps) {
               />
               <span>บาท</span>
             </label>
-            <label className="input-with-unit">
-              <span className="bill-row__mobile-label">หน่วยไฟ (ถ้ามี)</span>
+          </div>
+        ))}
+      </div>
+
+      <details
+        className="bill-energy-details"
+        open={isEnergyVisible}
+        onToggle={(event) => setIsEnergyVisible(event.currentTarget.open)}
+      >
+        <summary>
+          <span>มีข้อมูลหน่วยไฟ (kWh)</span>
+          <small>ไม่บังคับ</small>
+        </summary>
+        <p>ดูตัวเลข “หน่วยที่ใช้” จากบิล หากหาไม่เจอให้เว้นไว้ได้</p>
+        <div className="bill-energy-grid">
+          {draft.bills.map((bill, index) => (
+            <label className="input-with-unit" key={index}>
+              <span className="bill-energy-grid__label">บิลที่ {index + 1}</span>
               <input
+                aria-label={`หน่วยไฟบิลที่ ${index + 1}`}
+                autoComplete="off"
                 inputMode="decimal"
-                min="0"
                 placeholder="ไม่ทราบ"
-                type="number"
+                type="text"
                 value={bill.energyKwh ?? ""}
                 onChange={(event) => {
                   const bills = [...draft.bills];
@@ -456,14 +461,15 @@ function BillStep({ draft, onChange }: StepProps) {
               />
               <span>kWh</span>
             </label>
-          </fieldset>
-        ))}
-      </div>
-      <div className="assessment-inline-result">
+          ))}
+        </div>
+      </details>
+
+      <div className="assessment-inline-result" aria-live="polite">
         <Banknote size={20} aria-hidden="true" />
         <div>
-          <span>ค่าไฟเฉลี่ยจากข้อมูลที่กรอก</span>
-          <strong>{averageBill === null ? "รอข้อมูลครบ 3 เดือน" : `${formatNumber(averageBill)} บาท/เดือน`}</strong>
+          <span>{averageBill === null ? `กรอกแล้ว ${validBills.length} จาก 3 บิล` : "ค่าไฟเฉลี่ย 3 เดือน"}</span>
+          <strong>{averageBill === null ? "กรอกยอดให้ครบเพื่อไปต่อ" : `${formatNumber(averageBill)} บาท/เดือน`}</strong>
         </div>
       </div>
     </div>
@@ -474,7 +480,8 @@ function OccupancyStep({ draft, onChange }: StepProps) {
   return (
     <div className="assessment-step">
       <p className="assessment-step__lead">
-        ระบุจำนวนคนที่อยู่บ้านหรืออาคารเป็นส่วนใหญ่ในแต่ละช่วง ค่า 0 หมายถึงไม่มีคนอยู่และต่างจาก “ไม่ทราบ”
+        ระบุจำนวนคนที่อยู่บ้านหรืออาคารเป็นส่วนใหญ่ในแต่ละช่วง ค่า 0 หมายถึงไม่มีคนอยู่
+        ระบบจะหาค่าเฉลี่ยตามเวลา ไม่ได้นำจำนวนคนแต่ละช่วงมาบวกกัน
       </p>
       <div className="period-list">
         {assessmentPeriodKeys.map((period) => {
@@ -664,8 +671,8 @@ function ReviewStep({
           <dd>{summary?.averageEnergyKwh ? `${formatNumber(summary.averageEnergyKwh)} kWh/เดือน` : "ไม่ได้ระบุครบ 3 เดือน"}</dd>
         </div>
         <div>
-          <dt>คนอยู่ช่วงเช้า + กลางวัน</dt>
-          <dd>{summary ? `${formatNumber(summary.daytimeOccupancy)} คน·ช่วง` : "—"}</dd>
+          <dt>คนอยู่เฉลี่ยช่วงมีแสง (06:00–16:00)</dt>
+          <dd>{summary ? `${formatNumber(summary.daylightAverageOccupancy, 1)} คน` : "—"}</dd>
         </div>
         <div>
           <dt>ช่วงเวลาที่เปิดแอร์</dt>

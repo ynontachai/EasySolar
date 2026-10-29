@@ -1157,39 +1157,36 @@ a {
   max-width: 690px;
 }
 
-.bill-table {
-  border-bottom: 1px solid var(--line);
-  border-top: 1px solid var(--line);
-}
-
-.bill-table__head,
-.bill-row {
+.bill-entry-grid,
+.bill-energy-grid {
   display: grid;
-  gap: 22px;
-  grid-template-columns: 0.85fr 1fr 1fr;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.bill-table__head {
+.bill-entry-card {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.bill-entry-card:focus-within {
+  border-color: var(--sun-deep);
+  box-shadow: 0 0 0 3px rgba(238, 118, 0, 0.12);
+}
+
+.bill-entry-card__index {
   color: #748099;
-  font-size: 9px;
+  display: block;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.08em;
-  padding: 14px 0;
-  text-transform: uppercase;
+  margin-bottom: 9px;
 }
 
-.bill-row {
-  border: 0;
-  border-top: 1px solid var(--line);
-  margin: 0;
-  padding: 14px 0;
-}
-
-.bill-row label {
-  min-width: 0;
-}
-
-.bill-row input,
+.bill-entry-card input,
+.bill-energy-grid input,
 .period-row input,
 .ac-period input[type="number"] {
   background: var(--white);
@@ -1202,8 +1199,56 @@ a {
   width: 100%;
 }
 
-.bill-row__mobile-label {
-  display: none;
+.bill-entry-card input {
+  font-size: 19px;
+  font-weight: 600;
+  height: 58px;
+}
+
+.bill-energy-details {
+  border-bottom: 1px solid var(--line);
+  margin-top: 20px;
+  padding-bottom: 18px;
+}
+
+.bill-energy-details summary {
+  align-items: center;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 10px;
+  min-height: 44px;
+  width: fit-content;
+}
+
+.bill-energy-details summary small {
+  background: var(--paper-deep);
+  border-radius: 999px;
+  color: #667085;
+  font-size: 9px;
+  font-weight: 500;
+  padding: 4px 8px;
+}
+
+.bill-energy-details > p {
+  color: #667085;
+  font-size: 11px;
+  margin: 6px 0 14px;
+}
+
+.bill-energy-grid__label {
+  color: #667085;
+  display: block;
+  font-size: 10px;
+  left: 0;
+  position: absolute;
+  top: 0;
+}
+
+.bill-energy-grid .input-with-unit {
+  padding-top: 20px;
 }
 
 .input-with-unit {
@@ -3294,25 +3339,13 @@ a {
     margin-top: 30px;
   }
 
-  .bill-table__head {
-    display: none;
-  }
-
-  .bill-row {
-    gap: 14px;
+  .bill-entry-grid,
+  .bill-energy-grid {
     grid-template-columns: 1fr;
-    padding: 22px 0;
   }
 
-  .bill-row:first-of-type {
-    border-top: 0;
-  }
-
-  .bill-row__mobile-label {
-    color: #667085;
-    display: block;
-    font-size: 10px;
-    margin-bottom: 5px;
+  .bill-entry-card {
+    padding: 15px;
   }
 
   .period-row {

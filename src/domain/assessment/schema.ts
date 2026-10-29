@@ -10,7 +10,6 @@ export const assessmentPeriodKeys = [
 export type AssessmentPeriodKey = (typeof assessmentPeriodKeys)[number];
 
 const billPeriodSchema = z.object({
-  month: z.string().regex(/^\d{4}-\d{2}$/),
   amountThb: z.number().positive().max(1_000_000),
   energyKwh: z.number().positive().max(1_000_000).nullable(),
 });
@@ -68,28 +67,9 @@ const solarAssessmentDraftBaseSchema = z.object({
   exportIntent: z.enum(["none", "interested", "contracted"]),
 });
 
-function validateUniqueBillMonths(
-  bills: Array<{ month: string }>,
-  context: z.RefinementCtx,
-) {
-  const uniqueMonths = new Set(bills.map((bill) => bill.month));
-  if (uniqueMonths.size !== bills.length) {
-    context.addIssue({
-      code: "custom",
-      message: "เดือนของบิลต้องไม่ซ้ำกัน",
-      path: ["bills"],
-    });
-  }
-}
+export const solarAssessmentDraftSchema = solarAssessmentDraftBaseSchema;
 
-export const solarAssessmentDraftSchema =
-  solarAssessmentDraftBaseSchema.superRefine((value, context) => {
-    validateUniqueBillMonths(value.bills, context);
-  });
-
-export const billStepSchema = solarAssessmentDraftBaseSchema
-  .pick({ bills: true })
-  .superRefine((value, context) => validateUniqueBillMonths(value.bills, context));
+export const billStepSchema = solarAssessmentDraftBaseSchema.pick({ bills: true });
 export const occupancyStepSchema = solarAssessmentDraftBaseSchema.pick({
   occupancy: true,
 });
@@ -116,7 +96,9 @@ export function summarizeAssessmentDraft(draft: SolarAssessmentDraft) {
       ? billsWithEnergy.reduce((total, bill) => total + bill.energyKwh, 0) /
         billsWithEnergy.length
       : null;
-  const daytimeOccupancy = draft.occupancy.morning + draft.occupancy.daytime;
+  const daylightOccupancyPersonHours =
+    draft.occupancy.morning * 4 + draft.occupancy.daytime * 6;
+  const daylightAverageOccupancy = daylightOccupancyPersonHours / 10;
   const enabledAcPeriods = assessmentPeriodKeys.filter(
     (period) => draft.acUsage[period].enabled,
   ).length;
@@ -129,7 +111,8 @@ export function summarizeAssessmentDraft(draft: SolarAssessmentDraft) {
   return {
     averageBillThb,
     averageEnergyKwh,
-    daytimeOccupancy,
+    daylightAverageOccupancy,
+    daylightOccupancyPersonHours,
     enabledAcPeriods,
     estimatedAcHours,
   };
