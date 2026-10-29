@@ -7,3 +7,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## EasySolar delivery rules
+
+- Treat responsive behavior as part of every UI feature, not as follow-up polish.
+- Before considering UI work complete, verify the affected routes at 390px, 768px, and 1440px viewport widths.
+- Do not introduce horizontal page overflow. Reflow dense data, controls, and navigation instead of clipping required information.
+- Keep navigation and primary actions available on mobile, with visible keyboard focus and at least 24px interactive target dimensions.
+- Document any intentionally hidden secondary information and preserve access to the underlying decision-critical data.

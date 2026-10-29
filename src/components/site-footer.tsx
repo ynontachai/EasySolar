@@ -8,8 +8,9 @@ export function SiteFooter() {
         <p>PV Equipment Intelligence for Solar Professionals.</p>
       </div>
       <div className="site-footer__links">
-        <Link href="/checker">Checker</Link>
-        <Link href="/equipment">Equipment Library</Link>
+        <Link href="/checker">สำหรับมืออาชีพ</Link>
+        <Link href="/solar-value">ประเมินโซลาร์</Link>
+        <Link href="/equipment">คลังอุปกรณ์</Link>
         <span>© {new Date().getFullYear()}</span>
       </div>
     </footer>

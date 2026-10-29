@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import { connection } from "next/server";
 import {
   AlertCircle,
   CheckCircle2,
   FileText,
   History,
 } from "lucide-react";
+import { DatasheetUploadPanel } from "@/components/datasheet-upload-panel";
 import { SiteHeader } from "@/components/site-header";
+import { getDatasheetRuntimeCapabilities } from "@/lib/server/runtime-config";
 
 export const metadata: Metadata = {
   title: "Admin Verification",
@@ -19,7 +22,10 @@ const fields = [
   ["βVoc", "−0.250 %/°C", "Page —"],
 ];
 
-export default function AdminEquipmentPage() {
+export default async function AdminEquipmentPage() {
+  await connection();
+  const capabilities = getDatasheetRuntimeCapabilities();
+
   return (
     <main className="admin-page">
       <SiteHeader />
@@ -28,8 +34,9 @@ export default function AdminEquipmentPage() {
           <p className="eyebrow eyebrow--dark">CATALOG OPERATIONS</p>
           <h1>Verification queue</h1>
         </div>
-        <span className="admin-mode">SCAFFOLD · READ ONLY</span>
+        <span className="admin-mode">DATASHEET INTAKE · FOUNDATION</span>
       </div>
+      <DatasheetUploadPanel capabilities={capabilities} />
       <div className="admin-workspace">
         <aside className="queue-panel">
           <strong>REVIEW QUEUE</strong>

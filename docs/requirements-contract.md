@@ -1,8 +1,10 @@
-# EasySolar MVP — Requirements Contract
+# EasySolar — Requirements Contract
 
 ## Outcome
 
 ช่วย EPC, installer และ solar engineer ตรวจสอบ PV module–inverter compatibility และหา candidate string layout เบื้องต้นได้เร็วขึ้น โดยทุกคำตอบอ้างกลับไปยัง exact model, datasheet revision, เงื่อนไข และ engine version ได้
+
+Product horizon เพิ่มเส้นทางสำหรับเจ้าของบ้านและเจ้าของธุรกิจ เพื่อประเมินว่าขนาดระบบ ราคา ผลประหยัด และผลตอบแทนของข้อเสนอ Solar สมเหตุสมผลหรือไม่ โดยต้องแสดงช่วงผลลัพธ์ สมมติฐาน ความไม่แน่นอน และข้อมูลที่ยังขาด ส่วนรายละเอียด Feature map และ release slices อยู่ใน [product blueprint](product-blueprint.md)
 
 ## Confirmed scope
 
@@ -16,7 +18,9 @@
 
 ## Out of scope
 
-Cable/protection/SPD/earthing, structural/fire, AC/grid, energy yield, battery, permitting, marketplace, billing, EPC matching และ final engineering approval
+สำหรับ Professional MVP ปัจจุบันยังไม่รวม cable/protection/SPD/earthing, structural/fire, AC/grid, energy yield, battery, permitting, marketplace, billing, EPC matching และ final engineering approval
+
+Solar Value Assessment มี input flow และ local draft แล้ว แต่ยังไม่อยู่ใน calculation scope ปัจจุบัน และห้ามแสดงตัวเลขจำลองจนกว่า tariff, usage profile, yield และ financial policy จะมี versioned source of truth
 
 ## Business rules
 
@@ -26,6 +30,8 @@ Cable/protection/SPD/earthing, structural/fire, AC/grid, energy yield, battery, 
 - **BR-004:** Hard fail ใด ๆ ต้องทำให้ผลรวมเป็น `INCOMPATIBLE`
 - **BR-005:** Missing/unverified critical data ต้องทำให้ผลรวมเป็น `INSUFFICIENT_DATA`
 - **BR-006:** Current, voltage และ topology ประเมินแยกต่อ MPPT ห้ามอนุมานว่า physical inputs คือ independent trackers
+- **BR-007:** Consumer result ต้องแสดงเป็นช่วงพร้อม confidence/missing data และห้ามสรุปความคุ้มค่าจาก simple payback ค่าเดียว
+- **BR-008:** Professional และ Consumer experiences ใช้ข้อมูลกลางร่วมกันได้ แต่ต้องแยกภาษา ระดับรายละเอียด disclaimer และ decision boundary
 
 ## Acceptance slice implemented in this scaffold
 

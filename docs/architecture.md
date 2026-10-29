@@ -21,3 +21,12 @@ The scaffold is a modular monolith. The calculation engine has no UI, HTTP, data
 - `POST /api/v1/sizing/evaluate`
 
 Persistence, report signing, RBAC, audit endpoints and analytics are intentionally not faked. Add repository adapters around the existing domain contracts after the database/provider decision.
+
+## Target platform plan
+
+The planned production baseline remains a modular monolith backed by PostgreSQL and private S3-compatible object storage. File scanning/report generation become background jobs when those features start. Engineering catalog records remain separate from merchant price and inventory so commercial ranking cannot alter safety results.
+
+- [System context](architecture/c4-context.md)
+- [Container architecture](architecture/c4-containers.md)
+- [Journey–Feature alignment](journey-feature-map.md)
+- [Data and file architecture](data-architecture-plan.md)

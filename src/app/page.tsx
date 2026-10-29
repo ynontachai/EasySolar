@@ -41,22 +41,22 @@ export default function HomePage() {
         <div className="hero__content">
           <p className="eyebrow">PV EQUIPMENT INTELLIGENCE · THAILAND</p>
           <h1>
-            ออกแบบ String
+            ตัดสินใจเรื่อง Solar
             <br />
-            ด้วยเหตุผล <em>ไม่ใช่เดา</em>
+            ด้วยข้อมูล <em>ไม่ใช่เดา</em>
           </h1>
           <p className="hero__lead">
-            ตรวจ PV–Inverter compatibility แบบอธิบายได้ พร้อม revision,
-            สมมติฐาน และข้อจำกัดที่วิศวกรตรวจทานต่อได้
+            เครื่องมือช่วยตรวจอุปกรณ์ ประเมินความคุ้มค่า และอธิบายสมมติฐาน
+            สำหรับทั้งมืออาชีพและผู้ใช้ไฟที่กำลังพิจารณาติด Solar
           </p>
           <div className="hero__actions">
-            <Link className="button button--sun" href="/checker">
-              เริ่มตรวจสอบอุปกรณ์
+            <Link className="button button--sun" href="#choose-path">
+              เลือกเครื่องมือที่เหมาะกับคุณ
               <ArrowRight size={18} aria-hidden="true" />
             </Link>
-            <Link className="text-link text-link--light" href="/equipment">
+            <Link className="text-link text-link--light" href="/checker">
               <Search size={17} aria-hidden="true" />
-              ค้นหา Datasheet
+              เปิด Engineering Checker
             </Link>
           </div>
         </div>
@@ -68,10 +68,60 @@ export default function HomePage() {
       </section>
 
       <section className="trust-strip" aria-label="หลักการของผลิตภัณฑ์">
-        <p>ผลคำนวณไม่เปลี่ยนตามสต็อกหรือสปอนเซอร์</p>
+        <p>ทุกคำตอบแสดงที่มา สมมติฐาน และข้อจำกัด</p>
         <span>Deterministic</span>
         <span>Traceable</span>
         <span>Reviewable</span>
+      </section>
+
+      <section className="audience-section" id="choose-path" aria-labelledby="audience-heading">
+        <div className="audience-section__intro">
+          <p className="eyebrow eyebrow--dark">CHOOSE YOUR WORKSPACE</p>
+          <h2 id="audience-heading">เริ่มจากคำถามที่คุณต้องการตัดสินใจ</h2>
+          <p>
+            EasySolar แยกเครื่องมือสำหรับงานวิศวกรรมและการตัดสินใจลงทุน
+            เพื่อให้แต่ละคำตอบมีรายละเอียดและคำเตือนที่เหมาะกับผู้ใช้
+          </p>
+        </div>
+        <div className="audience-paths">
+          <article className="audience-path" id="professionals">
+            <span className="audience-path__number">01 · PROFESSIONAL</span>
+            <div>
+              <p className="audience-path__status audience-path__status--ready">พร้อมทดลอง</p>
+              <h3>EPC / Installer / Engineer</h3>
+              <p>
+                ตรวจ PV–Inverter compatibility, ออกแบบ String เบื้องต้น
+                และย้อนกลับถึง exact model กับ datasheet revision
+              </p>
+            </div>
+            <div className="audience-path__actions">
+              <Link className="text-link" href="/checker">
+                เปิด Compatibility Checker
+                <ArrowRight size={17} aria-hidden="true" />
+              </Link>
+              <Link className="text-link text-link--muted" href="/equipment">
+                ค้นหาคลังอุปกรณ์
+              </Link>
+            </div>
+          </article>
+          <article className="audience-path audience-path--consumer">
+            <span className="audience-path__number">02 · SOLAR BUYER</span>
+            <div>
+              <p className="audience-path__status">กำลังวางระบบประเมิน</p>
+              <h3>เจ้าของบ้าน / เจ้าของธุรกิจ</h3>
+              <p>
+                ประเมินว่าขนาดระบบ ราคา และผลตอบแทนของข้อเสนอสมเหตุสมผลหรือไม่
+                โดยเห็นสมมติฐานและความไม่แน่นอนทุกจุด
+              </p>
+            </div>
+            <div className="audience-path__actions">
+              <Link className="text-link" href="/solar-value">
+                ดูแนวทาง Solar Value Assessment
+                <ArrowRight size={17} aria-hidden="true" />
+              </Link>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section className="checks-section">
