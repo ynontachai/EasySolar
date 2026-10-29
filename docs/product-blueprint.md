@@ -42,6 +42,7 @@ EasySolar เป็น Solar decision platform สำหรับประเท
 | E8 | File and document platform | Upload, scan, version, preview และ signed download | Planned foundation |
 | E9 | Package Builder | Customized BOM พร้อม engineering validation และ immutable versions | Planned |
 | E10 | Commerce mapping | เชื่อม canonical equipment กับ seller SKU, price และ inventory | Future Marketplace foundation |
+| E11 | Community-based negotiation | รวม qualified demand ตามพื้นที่เพื่อทำ group buying และ tender กับ EPC | Discovery; business rules pending |
 
 ## Solar Value Assessment requirements
 
@@ -116,5 +117,7 @@ Full-bleed responsive canvas, dual-audience information architecture, public nav
 - ข้อความ disclaimer ที่ผ่านการทบทวนด้านวิศวกรรม การเงิน และกฎหมาย
 
 See [Journey–Feature Alignment](journey-feature-map.md) and [Data and File Architecture](data-architecture-plan.md) for the implementation contract.
+
+Community group buying อยู่ใน [Community-Based Negotiation Discovery](community-based-negotiation-discovery.md) และต้องผ่านการตัดสินกติกาธุรกิจก่อนเริ่ม implementation
 
 Account Admin, Super Admin, SKU import และ Datasheet operations อยู่ใน [Admin Catalog Operations Plan](admin-catalog-operations-plan.md).
