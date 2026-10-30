@@ -13,6 +13,12 @@ export interface CatalogProductOption {
   exactModel: string;
   id: string;
   manufacturer: string;
+  manufacturerId: string;
+}
+
+export interface CatalogManufacturerOption {
+  id: string;
+  name: string;
 }
 
 export interface CatalogOrganizationOption {
@@ -48,12 +54,23 @@ export async function listCatalogProductOptions() {
   return sql<CatalogProductOption[]>`
     SELECT
       product_model.id::text AS id,
+      manufacturer.id::text AS "manufacturerId",
       manufacturer.name AS manufacturer,
       product_model.exact_model AS "exactModel",
       product_model.category::text AS category
     FROM product_model
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
     ORDER BY manufacturer.name, product_model.exact_model
+  `;
+}
+
+export async function listCatalogManufacturerOptions() {
+  const sql = getDb();
+  return sql<CatalogManufacturerOption[]>`
+    SELECT id::text AS id, name
+    FROM manufacturer
+    WHERE status <> 'recalled'
+    ORDER BY name
   `;
 }
 
@@ -128,14 +145,108 @@ export async function createCatalogSku(
 
   try {
     return await sql.begin(async (transaction) => {
-      const models = await transaction<Array<{ id: string }>>`
-        SELECT id::text AS id
-        FROM product_model
-        WHERE id = ${input.productModelId}
-        LIMIT 1
-      `;
-      if (!models[0]) {
-        throw new HttpError(400, "PRODUCT_MODEL_NOT_FOUND", "ไม่พบ Product Model ที่เลือก");
+      let productModelId = input.productModelId;
+      let manufacturerCreated = false;
+      let productModelCreated = false;
+
+      if (productModelId) {
+        const models = await transaction<Array<{ category: "inverter" | "pv_module"; id: string }>>`
+          SELECT id::text AS id, category::text AS category
+          FROM product_model
+          WHERE id = ${productModelId}
+          LIMIT 1
+        `;
+        if (!models[0]) {
+          throw new HttpError(400, "PRODUCT_MODEL_NOT_FOUND", "ไม่พบ Product Model ที่เลือก");
+        }
+        if (models[0].category !== input.category) {
+          throw new HttpError(
+            400,
+            "PRODUCT_CATEGORY_MISMATCH",
+            "ประเภทสินค้าไม่ตรงกับ Product Model ที่เลือก",
+          );
+        }
+      } else {
+        let manufacturerId = input.manufacturerId;
+
+        if (manufacturerId) {
+          const manufacturers = await transaction<Array<{ id: string }>>`
+            SELECT id::text AS id
+            FROM manufacturer
+            WHERE id = ${manufacturerId}
+            LIMIT 1
+          `;
+          if (!manufacturers[0]) {
+            throw new HttpError(400, "MANUFACTURER_NOT_FOUND", "ไม่พบ Brand ที่เลือก");
+          }
+        } else if (input.manufacturerName) {
+          const matchedManufacturers = await transaction<Array<{ id: string }>>`
+            SELECT id::text AS id
+            FROM manufacturer
+            WHERE lower(name) = lower(${input.manufacturerName})
+            LIMIT 1
+          `;
+
+          if (matchedManufacturers[0]) {
+            manufacturerId = matchedManufacturers[0].id;
+          } else {
+            const createdManufacturers = await transaction<Array<{ id: string }>>`
+              INSERT INTO manufacturer (name)
+              VALUES (${input.manufacturerName})
+              RETURNING id::text AS id
+            `;
+            manufacturerId = createdManufacturers[0]?.id ?? null;
+            manufacturerCreated = true;
+          }
+        }
+
+        if (!manufacturerId || !input.exactModel) {
+          throw new HttpError(400, "PRODUCT_IDENTITY_REQUIRED", "ข้อมูล Brand และ Model ไม่ครบ");
+        }
+
+        const duplicateModels = await transaction<Array<{
+          category: "inverter" | "pv_module";
+          id: string;
+        }>>`
+          SELECT id::text AS id, category::text AS category
+          FROM product_model
+          WHERE manufacturer_id = ${manufacturerId}
+            AND lower(exact_model) = lower(${input.exactModel})
+            AND market = 'TH'
+          LIMIT 1
+        `;
+        const duplicateModel = duplicateModels[0];
+        if (duplicateModel) {
+          if (duplicateModel.category !== input.category) {
+            throw new HttpError(
+              409,
+              "PRODUCT_MODEL_CATEGORY_CONFLICT",
+              "Brand และ Model นี้มีอยู่แล้ว แต่อยู่คนละประเภทสินค้า",
+            );
+          }
+          productModelId = duplicateModel.id;
+        } else {
+          const createdModels = await transaction<Array<{ id: string }>>`
+            INSERT INTO product_model (
+              manufacturer_id,
+              category,
+              exact_model,
+              market
+            ) VALUES (
+              ${manufacturerId},
+              ${input.category},
+              ${input.exactModel},
+              'TH'
+            )
+            RETURNING id::text AS id
+          `;
+          productModelId = createdModels[0]?.id ?? null;
+          productModelCreated = true;
+        }
+      }
+
+      if (!productModelId) {
+        throw new Error("PRODUCT_MODEL_INSERT_FAILED");
       }
 
       const rows = await transaction<Array<{ id: string }>>`
@@ -149,7 +260,7 @@ export async function createCatalogSku(
           updated_by
         ) VALUES (
           ${input.organizationId},
-          ${input.productModelId},
+          ${productModelId},
           ${input.sku.toUpperCase()},
           ${input.variantLabel},
           ${input.manufacturerPartNumber},
@@ -172,11 +283,14 @@ export async function createCatalogSku(
         ) VALUES (
           ${principal.userId},
           ${input.organizationId},
-          'catalog.sku.created',
+          'catalog.product_and_sku.created',
           'product_variant',
           ${created.id},
           ${transaction.json({
-            productModelId: input.productModelId,
+            category: input.category,
+            manufacturerCreated,
+            productModelCreated,
+            productModelId,
             sku: input.sku.toUpperCase(),
             variantLabel: input.variantLabel,
           })}
@@ -192,7 +306,11 @@ export async function createCatalogSku(
       "code" in error &&
       error.code === "23505"
     ) {
-      throw new HttpError(409, "SKU_ALREADY_EXISTS", "SKU นี้มีอยู่ในระบบแล้ว");
+      throw new HttpError(
+        409,
+        "CATALOG_RECORD_ALREADY_EXISTS",
+        "SKU หรือข้อมูลสินค้านี้มีอยู่ในระบบแล้ว กรุณาตรวจรายการเดิม",
+      );
     }
     throw error;
   }

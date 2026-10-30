@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import { Boxes, Search } from "lucide-react";
+import { Boxes } from "lucide-react";
 import { AdminSkuForm } from "@/components/admin-sku-form";
 import { requireAdminPage } from "@/lib/server/admin-auth";
 import {
   listCatalogProductOptions,
+  listCatalogManufacturerOptions,
   listCatalogSkus,
   listOrganizationsForPrincipal,
 } from "@/lib/server/catalog-admin-repository";
@@ -22,8 +23,9 @@ function formatUpdatedAt(value: Date) {
 export default async function AdminCatalogPage() {
   await connection();
   const principal = await requireAdminPage(["account_admin", "reviewer", "super_admin"]);
-  const [organizations, products, skus] = await Promise.all([
+  const [organizations, manufacturers, products, skus] = await Promise.all([
     listOrganizationsForPrincipal(principal),
+    listCatalogManufacturerOptions(),
     listCatalogProductOptions(),
     listCatalogSkus(principal),
   ]);
@@ -42,18 +44,23 @@ export default async function AdminCatalogPage() {
         <span>{skus.length} SKU</span>
       </header>
 
-      {canCreate ? <AdminSkuForm organizations={organizations} products={products} /> : null}
+      {canCreate ? (
+        <AdminSkuForm
+          manufacturers={manufacturers}
+          organizations={organizations}
+          products={products}
+        />
+      ) : null}
 
       <section className="admin-sku-list" aria-labelledby="sku-list-title">
         <div className="admin-sku-list__head">
           <div><Boxes size={20} /><h2 id="sku-list-title">SKU ทั้งหมดในขอบเขตของคุณ</h2></div>
-          <label><Search size={16} /><span className="sr-only">ค้นหา SKU</span><input disabled placeholder="Search ใน slice ถัดไป" /></label>
         </div>
         {skus.length === 0 ? (
           <div className="admin-sku-empty">
             <Boxes size={28} />
             <strong>ยังไม่มี SKU</strong>
-            <p>{canCreate ? "เลือก Product Model ด้านบนเพื่อสร้างรายการแรก" : "ยังไม่มีรายการให้ตรวจใน organization นี้"}</p>
+            <p>{canCreate ? "ใช้แบบฟอร์มด้านบนเพื่อสร้าง Product identity และ SKU แรก" : "ยังไม่มีรายการให้ตรวจใน organization นี้"}</p>
           </div>
         ) : (
           <div className="admin-sku-table" role="table" aria-label="รายการ SKU">

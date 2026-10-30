@@ -16,6 +16,10 @@ export async function createSkuAction(
   formData: FormData,
 ): Promise<CreateSkuActionState> {
   const parsed = createSkuSchema.safeParse({
+    category: formData.get("category"),
+    exactModel: formData.get("exactModel"),
+    manufacturerId: formData.get("manufacturerId"),
+    manufacturerName: formData.get("manufacturerName"),
     manufacturerPartNumber: formData.get("manufacturerPartNumber"),
     organizationId: formData.get("organizationId"),
     productModelId: formData.get("productModelId"),
