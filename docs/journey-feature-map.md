@@ -140,8 +140,8 @@ flowchart LR
 | เลือกกลุ่มผู้ใช้ | `/` dual-audience entry | Aligned | เพิ่ม account-aware entry ภายหลัง |
 | Solar buyer เข้าใจขอบเขต | `/solar-value` | Aligned foundation | เปลี่ยนเป็น 5-step wizard เมื่อ engine พร้อม |
 | กรอกบิล/พฤติกรรมใช้ไฟ | `/solar-value/new` five-step local draft | Input flow implemented | ต่อ Supabase persistence, consent และ anonymous retention policy |
-| Energy Fit result | ไม่มี | Gap | สร้าง load proxy, tariff/yield policy และ engine |
-| Financial reasonableness | มีเพียง product definition | Deferred | เปิดเมื่อมี package/quote cost |
+| Energy Fit result | `/solar-value/new` result state | MVP implemented | ต่อ location/roof inputs, versioned yield policy และ saved snapshot |
+| Financial reasonableness | Package price simulator ใน result state | Partial | เพิ่ม quote/BOM ingestion, NPV/IRR และ benchmark ราคา |
 | ค้นอุปกรณ์ | `/equipment` demo catalog | Partial | ต่อ PostgreSQL, filter, pagination, real records |
 | ดู/โหลด Datasheet | UI ยังไม่มี file delivery | Gap | Object storage, signed download และ asset metadata |
 | Engineering calculation | `/checker` | Prototype match | ต่อ verified catalog/project persistence |
@@ -155,7 +155,7 @@ flowchart LR
 
 - `/` — audience entry
 - `/solar-value` — assessment landing or active draft
-- `/solar-value/new` — responsive five-step Energy Fit input wizard; local draft and validation implemented, calculation pending policy integration
+- `/solar-value/new` — responsive five-step Energy Fit input wizard พร้อม recommendation, 10:00–14:00 export estimate และ Package price simulator
 - `/solar-value/[assessmentId]/result` — result, assumptions and confidence
 - `/equipment` — verified catalog
 - `/equipment/[modelId]` — model, revisions, specs and datasheet assets

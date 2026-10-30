@@ -35,7 +35,7 @@ EasySolar เป็น Solar decision platform สำหรับประเท
 | E1 | Equipment intelligence | ค้น exact model, revision, datasheet และ verification state | Scaffold |
 | E2 | Compatibility and string sizing | ตรวจ voltage/current/power/topology พร้อม rule trace | Working prototype |
 | E3 | Professional project workspace | บันทึกโครงการ เปรียบเทียบแบบ แชร์และออกรายงาน | Planned |
-| E4 | Solar Value Assessment | ประเมินขนาดระบบ ราคา ผลประหยัด คืนทุน และความสมเหตุสมผล | Five-step input form implemented; engine pending |
+| E4 | Solar Value Assessment | ประเมินขนาดระบบ ราคา ผลประหยัด คืนทุน และความสมเหตุสมผล | MVP recommendation engine and package simulator implemented |
 | E5 | Quote comparison and due diligence | เทียบข้อเสนอภายใต้สมมติฐานเดียวกันและชี้ red flags | Planned after E4 |
 | E6 | Data governance | Review, approval, provenance, audit และ policy versioning | Admin scaffold |
 | E7 | Account and collaboration | Role, organization, saved projects และ controlled sharing | Planned |
@@ -77,7 +77,7 @@ EasySolar เป็น Solar decision platform สำหรับประเท
 
 ### Slice 0 — Foundation (current)
 
-Full-bleed responsive canvas, dual-audience information architecture, public navigation, product contract และ responsive five-step input form สำหรับ Solar Value Assessment โดยยังไม่แสดงผลคำนวณที่ไม่มี policy รองรับ
+Full-bleed responsive canvas, dual-audience information architecture, public navigation, product contract และ responsive five-step input form สำหรับ Solar Value Assessment
 
 ### Slice 1 — Trusted professional baseline
 
@@ -85,7 +85,7 @@ Full-bleed responsive canvas, dual-audience information architecture, public nav
 
 ### Slice 2 — Solar Value MVP
 
-รับบิล 3 เดือน, จำนวนคน 4 ช่วงเวลา, การใช้เครื่องปรับอากาศ, Normal/TOU และ export intent เพื่อคำนวณ Energy Fit, suggested size, self-consumption, annual value range, confidence และ explanation โดยยังไม่สรุป ROI หากไม่มีราคาติดตั้ง
+รับบิล 3 เดือน, จำนวนคน 4 ช่วงเวลา, การใช้เครื่องปรับอากาศ, Normal/TOU และ export intent เพื่อคำนวณ suggested size, self-consumption, export, annual value range, confidence และ explanation พร้อม Package simulator ที่เปิด simple payback เมื่อผู้ใช้กรอกราคารวมติดตั้ง
 
 ### Slice 3 — Proposal reasonableness
 

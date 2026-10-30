@@ -12,7 +12,6 @@ import {
   Home,
   Info,
   Moon,
-  RotateCcw,
   Snowflake,
   Sun,
   Sunset,
@@ -35,6 +34,7 @@ import {
   exportCompensationPolicy,
   residentialTariffPolicy,
 } from "@/domain/assessment/tariff-policy";
+import { SolarRecommendationResult } from "@/components/solar-recommendation-result";
 
 const draftStorageKey = "easysolar:assessment-draft:v1";
 
@@ -218,71 +218,11 @@ export function SolarAssessmentForm() {
 
   if (isSubmitted && summary) {
     return (
-      <section className="assessment-complete" aria-labelledby="assessment-complete-title">
-        <div className="assessment-complete__mark" aria-hidden="true">
-          <Check size={30} strokeWidth={2} />
-        </div>
-        <p className="eyebrow eyebrow--dark">ASSESSMENT INPUT COMPLETE</p>
-        <h1 id="assessment-complete-title">ข้อมูลพร้อมสำหรับสร้างแบบจำลอง</h1>
-        <p className="assessment-complete__lead">
-          ระบบบันทึกแบบร่างไว้บนอุปกรณ์นี้แล้ว ตัวเลขด้านล่างเป็นเพียงสรุปข้อมูลที่คุณกรอก
-          ยังไม่ใช่ผลประหยัดหรือคำแนะนำขนาดระบบ
-        </p>
-
-        <div className="assessment-complete__metrics">
-          <div>
-            <span>ค่าไฟเฉลี่ย 3 เดือน</span>
-            <strong>{formatNumber(summary.averageBillThb)} บาท</strong>
-          </div>
-          <div>
-            <span>คนอยู่เฉลี่ยช่วงมีแสง</span>
-            <strong>{formatNumber(summary.daylightAverageOccupancy, 1)} คน</strong>
-          </div>
-          <div>
-            <span>การใช้แอร์ที่ระบุ</span>
-            <strong>{formatNumber(summary.estimatedAcHours, 1)} เครื่อง·ชม.</strong>
-          </div>
-        </div>
-
-        <div className="assessment-policy-result">
-          <div>
-            <span>มูลค่าไฟที่ใช้เองช่วงมีแสง</span>
-            <strong>
-              {tariffInsight.estimatedDaylightSelfUseValueBahtPerKwh === null
-                ? "ต้องมีหน่วย kWh ครบ"
-                : `≈ ${formatNumber(tariffInsight.estimatedDaylightSelfUseValueBahtPerKwh, 2)} บาท/kWh`}
-            </strong>
-            <small>รวม Ft และ VAT แบบประมาณการ · ไม่รวมค่าบริการรายเดือน</small>
-          </div>
-          <div>
-            <span>อัตรารับซื้อที่ใช้ในแบบประเมิน</span>
-            <strong>{formatNumber(tariffInsight.exportValueBahtPerKwh, 2)} บาท/kWh</strong>
-            <small>{draft.exportIntent === "none" ? "คุณเลือกไม่ขายคืน" : "Owner-defined assumption"}</small>
-          </div>
-        </div>
-
-        <div className="assessment-complete__notice">
-          <Info size={20} aria-hidden="true" />
-          <div>
-            <strong>Tariff policy พร้อมแล้ว แต่ยังไม่ใช่ ROI</strong>
-            <p>
-              ตัวเลขนี้เปรียบเทียบมูลค่าพลังงานที่ใช้เองกับการส่งออก โดยยังไม่รวม
-              Solar Yield, เงาหลังคา, ขนาดระบบ และค่าติดตั้ง
-            </p>
-          </div>
-        </div>
-
-        <div className="assessment-complete__actions">
-          <button className="button button--ink" type="button" onClick={() => setIsSubmitted(false)}>
-            แก้ไขข้อมูล
-            <ArrowLeft size={18} aria-hidden="true" />
-          </button>
-          <button className="assessment-reset" type="button" onClick={resetDraft}>
-            <RotateCcw size={17} aria-hidden="true" />
-            เริ่มแบบประเมินใหม่
-          </button>
-        </div>
-      </section>
+      <SolarRecommendationResult
+        draft={draft}
+        onEdit={() => setIsSubmitted(false)}
+        onReset={resetDraft}
+      />
     );
   }
 
