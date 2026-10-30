@@ -9,14 +9,20 @@ import { isSupabaseAuthConfigured } from "@/lib/supabase/server";
 export const metadata: Metadata = { title: "Admin Sign in" };
 
 interface AdminLoginPageProps {
-  searchParams: Promise<{ next?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }
+
+const linkErrorMessages: Record<string, string> = {
+  "invite-link": "ลิงก์คำเชิญหมดอายุหรือถูกใช้ไปแล้ว กรุณาขอคำเชิญใหม่จาก Super Admin",
+  "reset-link": "ลิงก์รีเซ็ตรหัสผ่านหมดอายุหรือถูกใช้ไปแล้ว กรุณาขอลิงก์ใหม่",
+};
 
 export default async function AdminLoginPage({ searchParams }: AdminLoginPageProps) {
   const principal = await getAdminPrincipal();
   if (principal) redirect("/admin");
 
-  const { next } = await searchParams;
+  const { error, next } = await searchParams;
+  const linkError = error ? linkErrorMessages[error] : undefined;
 
   return (
     <main className="admin-auth-page">
@@ -41,6 +47,9 @@ export default async function AdminLoginPage({ searchParams }: AdminLoginPagePro
           <h2 id="admin-login-title">เข้าสู่ระบบหลังบ้าน</h2>
           <p>ใช้บัญชีที่ EasySolar ส่งคำเชิญให้ ไม่มีการเปิดสมัครสมาชิกสาธารณะ</p>
         </div>
+        {linkError ? (
+          <p className="admin-auth-error" role="alert">{linkError}</p>
+        ) : null}
         <AdminLoginForm
           authConfigured={isSupabaseAuthConfigured()}
           nextPath={next}
