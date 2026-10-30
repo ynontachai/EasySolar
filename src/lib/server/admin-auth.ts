@@ -57,46 +57,51 @@ export const getAdminPrincipal = cache(async (): Promise<AdminPrincipal | null> 
       : email.split("@")[0] || "EasySolar user";
   const sql = getDb();
 
-  await sql`
-    INSERT INTO user_profile (id, display_name)
-    VALUES (${userId}, ${displayName})
-    ON CONFLICT (id) DO NOTHING
-  `;
-
-  const profiles = await sql<
-    Array<{ displayName: string; status: "active" | "suspended" }>
-  >`
-    SELECT display_name AS "displayName", status::text AS status
-    FROM user_profile
-    WHERE id = ${userId}
-    LIMIT 1
-  `;
-  const profile = profiles[0];
-
-  if (!profile || profile.status !== "active") return null;
-
-  const rows = await sql<
+  // One round trip: profile and active roles together. The profile row is normally
+  // created by the handle_new_auth_user trigger; insert it only when it is missing.
+  const loadPrincipalRows = () => sql<
     Array<{
-      code: string;
+      code: string | null;
+      displayName: string;
       organizationId: string | null;
       organizationName: string | null;
+      status: "active" | "suspended";
     }>
   >`
     SELECT
+      user_profile.display_name AS "displayName",
+      user_profile.status::text AS status,
       role_assignment.role_code::text AS code,
       organization.id::text AS "organizationId",
       organization.name AS "organizationName"
-    FROM role_assignment
-    LEFT JOIN organization ON organization.id = role_assignment.organization_id
-    WHERE role_assignment.user_id = ${userId}
+    FROM user_profile
+    LEFT JOIN role_assignment
+      ON role_assignment.user_id = user_profile.id
       AND (
         role_assignment.expires_at IS NULL
         OR role_assignment.expires_at > now()
       )
-    ORDER BY role_assignment.created_at
+    LEFT JOIN organization ON organization.id = role_assignment.organization_id
+    WHERE user_profile.id = ${userId}
+    ORDER BY role_assignment.created_at NULLS LAST
   `;
+
+  let rows = await loadPrincipalRows();
+
+  if (rows.length === 0) {
+    await sql`
+      INSERT INTO user_profile (id, display_name)
+      VALUES (${userId}, ${displayName})
+      ON CONFLICT (id) DO NOTHING
+    `;
+    rows = await loadPrincipalRows();
+  }
+
+  const profile = rows[0];
+  if (!profile || profile.status !== "active") return null;
+
   const roles = rows
-    .filter((row) => isAdminRoleCode(row.code))
+    .filter((row): row is typeof row & { code: string } => isAdminRoleCode(row.code ?? ""))
     .map((row) => ({
       code: row.code as AdminRoleCode,
       organizationId: row.organizationId,
