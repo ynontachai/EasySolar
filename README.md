@@ -22,7 +22,7 @@ The storage bucket must allow browser `PUT` requests from the application origin
 - `x-amz-meta-assetid`
 - `x-amz-meta-sha256hex`
 
-`FILE_SCAN_MODE=external` keeps uploaded files unavailable until the authenticated scanner callback reports `clean`. `trusted-dev` may be used only in non-production development. Admin pages use an invite-only Supabase Auth session plus application roles; the scanner token is never an Admin login credential.
+`FILE_SCAN_MODE=external` keeps uploaded files unavailable until the authenticated scanner callback reports `clean`. `trusted-dev` may be used only in non-production development. Admin pages use an invite-only Supabase Auth session plus application roles; the scanner token is never an Admin login credential. Super Admins send invitations from `/admin/users`, which needs the server-only `SUPABASE_SERVICE_ROLE_KEY`.
 
 ## Verify
 
@@ -43,6 +43,7 @@ npm run build
 - `/admin/login` — invite-only Admin sign-in
 - `/admin/catalog` — role-scoped SKU creation and list
 - `/admin/equipment` — role-scoped Datasheet verification workflow
+- `/admin/users` — Super Admin invitation email and role assignment
 - `/api/health` — health and engine version
 - `/api/v1/admin/datasheets/upload-intents` — authenticated signed upload intent
 - `/api/v1/admin/datasheets/{assetId}/finalize` — object integrity verification

@@ -5,9 +5,10 @@ import {
   LayoutDashboard,
   LogOut,
   ShieldCheck,
+  Users,
 } from "lucide-react";
 import { logoutAction } from "@/app/admin/actions";
-import type { AdminPrincipal } from "@/lib/server/admin-auth";
+import { isSuperAdmin, type AdminPrincipal } from "@/lib/server/admin-auth";
 
 const roleLabels = {
   account_admin: "Account Admin",
@@ -36,6 +37,9 @@ export function AdminShell({
           <Link href="/admin"><LayoutDashboard size={18} /> ภาพรวมงาน</Link>
           <Link href="/admin/catalog"><Boxes size={18} /> สินค้าและ SKU</Link>
           <Link href="/admin/equipment"><FileCheck2 size={18} /> Datasheet</Link>
+          {isSuperAdmin(principal) ? (
+            <Link href="/admin/users"><Users size={18} /> ผู้ใช้และคำเชิญ</Link>
+          ) : null}
         </nav>
         <div className="admin-sidebar__account">
           <ShieldCheck size={18} aria-hidden="true" />

@@ -149,6 +149,15 @@ on conflict do nothing;
 
 5. เปิด `/admin/login` ตั้งรหัสผ่านผ่าน invite แล้วตรวจว่าเห็น role `Super Admin`
 
+## Step 6 — ส่งคำเชิญ Account Admin / Reviewer ผ่านหน้าเว็บ
+
+หน้า `/admin/users` (เฉพาะ Super Admin) เรียก `auth.admin.inviteUserByEmail` จาก server action แล้วบันทึก `organization_member`, `role_assignment` และ `audit_event` (`user.invited`) ให้อัตโนมัติ
+
+- ตั้งค่า `SUPABASE_SERVICE_ROLE_KEY` ใน environment ฝั่ง server เท่านั้น ห้ามใส่ใน `NEXT_PUBLIC_*`
+- ตั้ง Email Template ของ invite ตาม Step 5 ให้ใช้ `token_hash` และ `type=invite` เพราะ `/auth/confirm` รับ token รูปแบบนี้
+- Supabase ส่งอีเมลจาก SMTP ที่ตั้งไว้ใน project; ถ้าใช้ built-in email ควรตั้ง custom SMTP ก่อนใช้งานจริง
+- ถ้าการบันทึกสิทธิ์ใน Postgres ล้มเหลว ระบบจะลบ auth user ที่เพิ่งสร้างเพื่อให้ส่งคำเชิญใหม่ได้
+
 สำหรับ Account Admin ให้สร้าง user ใน Auth ก่อน แล้วรัน:
 
 ```sql
