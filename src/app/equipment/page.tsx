@@ -2,7 +2,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
-import { ArrowRight, CheckCircle2, Download, ImageIcon, Search } from "lucide-react";
+import { ArrowRight, CheckCircle2, Download, Search } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { demoInverters, demoPvModules } from "@/data/demo-catalog";
@@ -54,8 +54,14 @@ export default async function EquipmentPage({
     })),
   ];
   const isDemoMode = publishedEquipment === null;
+  const query = params.q?.trim().toLowerCase() ?? "";
+  const matchesDemoFilters = (item: (typeof demoEquipment)[number]) => {
+    const category = item.category === "PV MODULE" ? "pv_module" : "inverter";
+    const text = `${item.manufacturer} ${item.model}`.toLowerCase();
+    return (!categories.length || categories.includes(category)) && (!query || text.includes(query));
+  };
   const equipment = isDemoMode
-    ? demoEquipment
+    ? demoEquipment.filter(matchesDemoFilters)
     : publishedEquipment.map((item) => ({
         category: item.category === "pv_module" ? "PV MODULE" : "INVERTER",
         datasheet: {
@@ -130,10 +136,10 @@ export default async function EquipmentPage({
           <div className="equipment-grid">
           {equipment.map((item) => (
             <article className="equipment-card" key={item.id}>
-              <div className="equipment-card__media">
+              <div className={item.imageAssetId ? "equipment-card__media" : "equipment-card__media equipment-card__media--empty"}>
                 {item.imageAssetId ? (
                   <img alt={item.imageAlt ?? ""} src={`/api/v1/product-media/${item.imageAssetId}`} />
-                ) : <ImageIcon aria-hidden="true" size={32} />}
+                ) : null}
               </div>
               <div className="equipment-card__identity">
                 <small>{item.category}</small>
