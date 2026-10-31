@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element -- product images redirect to short-lived signed URLs that the image optimizer cannot follow */
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
