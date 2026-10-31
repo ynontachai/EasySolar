@@ -6673,6 +6673,67 @@ a {
   justify-content: space-between;
 }
 
+.review-item__head-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  position: relative;
+}
+
+.review-item__menu {
+  position: relative;
+}
+
+.review-item__menu summary {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #344054;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 4px;
+  justify-content: center;
+  list-style: none;
+  min-height: 36px;
+  padding: 0 9px;
+}
+
+.review-item__menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.review-item__menu summary:hover {
+  background: #f8f8f7;
+}
+
+.review-item__menu[open] > .review-item__menu-delete {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 12%);
+  color: #9b2634;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 5px);
+  white-space: nowrap;
+  z-index: 4;
+}
+
+.review-item__menu[open] > .review-item__menu-delete:hover {
+  background: #fff3f1;
+}
+
+.review-item__menu-delete:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
 .review-item__head small,
 .review-item__head p {
   color: #667085;
@@ -6786,6 +6847,11 @@ a {
 @media (max-width: 620px) {
   .review-item {
     padding: 16px;
+  }
+
+  .review-item__head-actions {
+    align-items: end;
+    flex-direction: column;
   }
 
   .review-item__confirm {

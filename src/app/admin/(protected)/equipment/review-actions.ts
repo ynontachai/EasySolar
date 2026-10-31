@@ -15,7 +15,8 @@ import {
 import type { RevisionAction } from "@/domain/catalog/review-workflow";
 import { requireAdminPrincipal } from "@/lib/server/admin-auth";
 import { HttpError } from "@/lib/server/http-error";
-import { applyReviewAction, enterRevisionSpec } from "@/lib/server/review-repository";
+import { applyReviewAction, deleteDraftRevision, enterRevisionSpec } from "@/lib/server/review-repository";
+import { deleteStoredObject } from "@/lib/server/object-storage";
 
 export interface ReviewActionState {
   message: string;
@@ -91,6 +92,37 @@ export async function reviewRevisionAction(
   formData: FormData,
 ): Promise<ReviewActionState> {
   const intent = formData.get("intent");
+
+  if (intent === "delete_draft") {
+    const revisionId = z.string().uuid().safeParse(formData.get("revisionId"));
+    if (!revisionId.success) return { message: "Revision ID ไม่ถูกต้อง", status: "error" };
+
+    try {
+      const principal = await requireAdminPrincipal(["account_admin", "super_admin"]);
+      const result = await deleteDraftRevision({ actor: principal, revisionId: revisionId.data });
+      const cleanupResults = await Promise.allSettled(
+        result.cleanupObjects.map(async (asset) => {
+          if (asset.storageProvider !== "s3") throw new Error("UNSUPPORTED_STORAGE_PROVIDER");
+          await deleteStoredObject({ bucket: asset.bucket, objectKey: asset.objectKey });
+        }),
+      );
+      const cleanupFailed = cleanupResults.some((cleanup) => cleanup.status === "rejected");
+
+      revalidatePath("/admin/equipment");
+      return {
+        message: cleanupFailed
+          ? "ลบ Draft แล้ว แต่ลบไฟล์แนบจาก Storage ไม่ครบ กรุณาให้ผู้ดูแลตรวจสอบ"
+          : "ลบ Draft และไฟล์แนบแล้ว",
+        status: "success",
+      };
+    } catch (error) {
+      return {
+        message: error instanceof HttpError ? error.message : "ลบ Draft ไม่สำเร็จ กรุณาลองใหม่",
+        status: "error",
+      };
+    }
+  }
+
   const action = (["verify", "reject", "publish", "recall"] as const).find(
     (value) => value === intent,
   );

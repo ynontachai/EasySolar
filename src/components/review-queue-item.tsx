@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { CheckCircle2, LoaderCircle } from "lucide-react";
+import { CheckCircle2, LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
 import {
   reviewRevisionAction,
   type ReviewActionState,
@@ -29,9 +29,11 @@ const fieldLabels: Record<string, string> = {
 };
 
 export function ReviewQueueItem({
+  canDeleteDraft,
   canEnterSpec,
   row,
 }: {
+  canDeleteDraft: boolean;
   canEnterSpec: boolean;
   row: ReviewQueueRow;
 }) {
@@ -50,7 +52,32 @@ export function ReviewQueueItem({
           <h3 id={`review-${row.revisionId}`}>{row.exactModel}</h3>
           <p>{row.revisionLabel}</p>
         </div>
-        <span className="admin-status">{stateLabels[row.state]}</span>
+        <div className="review-item__head-actions">
+          <span className="admin-status">{stateLabels[row.state]}</span>
+          {canDeleteDraft && row.state === "draft" ? (
+            <details className="review-item__menu">
+              <summary aria-label={`เมนู Draft ${row.exactModel} ${row.revisionLabel}`}>
+                <MoreHorizontal size={18} aria-hidden="true" />
+                <span>เมนู</span>
+              </summary>
+              <button
+                className="review-item__menu-delete"
+                disabled={isPending}
+                name="intent"
+                onClick={(event) => {
+                  if (!window.confirm(`ลบ Draft ${row.exactModel} · ${row.revisionLabel} และข้อมูลที่เกี่ยวข้องถาวร ใช่ไหม?`)) {
+                    event.preventDefault();
+                  }
+                }}
+                type="submit"
+                value="delete_draft"
+              >
+                <Trash2 size={16} aria-hidden="true" />
+                ลบ Draft
+              </button>
+            </details>
+          ) : null}
+        </div>
       </div>
 
       <ul className="review-item__sources" aria-label="แหล่งข้อมูล">

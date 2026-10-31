@@ -1,5 +1,6 @@
 import "server-only";
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -109,6 +110,13 @@ export async function inspectStoredObject(objectKey: string) {
     etag: result.ETag?.replaceAll('"', "") ?? null,
     sha256Hex: result.Metadata?.sha256hex,
   };
+}
+
+export async function deleteStoredObject(input: { bucket: string; objectKey: string }) {
+  const { client } = getStorageClient();
+  await client.send(
+    new DeleteObjectCommand({ Bucket: input.bucket, Key: input.objectKey }),
+  );
 }
 
 export function isStoredObjectMissingError(error: unknown) {

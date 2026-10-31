@@ -20,6 +20,7 @@ export default async function AdminEquipmentPage() {
   const canEnterSpec = principal.roles.some(
     (role) => role.code === "account_admin" || role.code === "super_admin",
   );
+  const canDeleteDraft = canEnterSpec;
   const queue = canReview && isDatabaseConfigured() ? await listReviewQueue() : [];
 
   return (
@@ -52,7 +53,12 @@ export default async function AdminEquipmentPage() {
         ) : (
           <div className="review-queue__list">
             {queue.map((row) => (
-              <ReviewQueueItem canEnterSpec={canEnterSpec} key={row.revisionId} row={row} />
+              <ReviewQueueItem
+                canDeleteDraft={canDeleteDraft}
+                canEnterSpec={canEnterSpec}
+                key={row.revisionId}
+                row={row}
+              />
             ))}
           </div>
         )}
