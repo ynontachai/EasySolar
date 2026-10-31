@@ -11,8 +11,9 @@ Written for: Codex (or any engineer) picking up the EasySolar Datasheet review w
 
 ## Current state
 
-- Repo: `/Users/nontachai/workspace/EasySolar`, branch `main`, head `ab7339f`. Nothing committed for this slice. Not pushed.
-- Uncommitted work (this slice):
+- Repo: `/Users/nontachai/workspace/EasySolar`, branch `main`, head `5859f53` (matches `origin/main`).
+- Enter Spec and the full admin review-flow role update were committed in `b742692` (`feat(review): add enter_spec form and let admins run the full review flow`).
+- The implementation includes:
   - [src/lib/server/review-repository.ts](src/lib/server/review-repository.ts): `getRevisionSpecTarget` (loads revision + existing spec for prefill), `enterRevisionSpec` (writes spec, sets state `extracted_unverified`, writes `verification_event` and `audit_event` action `revision.enter_spec`, one transaction, `FOR UPDATE`).
   - [src/app/admin/(protected)/equipment/review-actions.ts](<src/app/admin/(protected)/equipment/review-actions.ts>): `enterSpecAction`, `parseSpecForm`. Parses PV or inverter form with [src/domain/catalog/spec-schemas.ts](src/domain/catalog/spec-schemas.ts). Requires `account_admin` or `super_admin`.
   - Page: [src/app/admin/(protected)/equipment/[revisionId]/spec/page.tsx](<src/app/admin/(protected)/equipment/[revisionId]/spec/page.tsx>). Route `/admin/equipment/[revisionId]/spec`. Blocker shown if state or role does not allow entry.
@@ -21,7 +22,7 @@ Written for: Codex (or any engineer) picking up the EasySolar Datasheet review w
   - [src/app/admin/(protected)/equipment/page.tsx](<src/app/admin/(protected)/equipment/page.tsx>): queue visible to `account_admin` too (`hasQueueAccess = canReview || canEnterSpec`).
   - [src/domain/catalog/review-workflow.ts](src/domain/catalog/review-workflow.ts): `revisionStateLabels` moved here (shared by queue item and spec page).
   - [src/app/globals.css](src/app/globals.css): `.spec-*` styles appended. Reuses `.admin-sku-form`. Breakpoints 900 and 620 px.
-- Not in the diff, pre-existing: `AGENTS.md` (auto-written by `next dev`, do not commit with this work unless intended), and `docs/codex-operating-rules.md` (untracked).
+- Pre-existing local-only changes remain: `AGENTS.md` (auto-written by `next dev`, do not commit unless intended), and `docs/codex-operating-rules.md` (untracked).
 - Verified:
   - `npm run typecheck`: pass.
   - `npm run lint`: pass.
@@ -34,16 +35,20 @@ Written for: Codex (or any engineer) picking up the EasySolar Datasheet review w
 
 ## Open items, in priority order
 
-1. **Recall for admins.** `recall` now includes `account_admin` (product owner said admin does all). The migration comment `20261031000200_datasheet_review_workflow.sql` still says "recall (Super Admin only)". Update that comment or the role matrix so they agree.
-2. **Self-verify is unverified in a real DB.** Verify the `selfVerified: true` row in `verification_event.new_value` and the `FOUR_EYES_REQUIRED` message with no reason. Write-path test is still open (item 4).
-3. **Browser check 390 / 768 / 1440 px** (AGENTS.md rule) for `/admin/equipment` (queue + upload panel), `/admin/equipment/[id]/spec` (PV and inverter with 1 and 3 MPPT rows), and the sidebar. Check: no horizontal scroll (`document.documentElement.scrollWidth <= clientWidth`), 24 px minimum targets, visible focus. Use DOM checks first; at most 3 screenshots, outside the repo.
-4. **Exercise the write path on a preview or with a test revision.** Enter a PV spec and an inverter spec with 2 MPPT rows. Check `datasheet_revision.state`, `spec_entered_by`, `spec_source_pages`, `pv_module_spec` or `inverter_spec` + `mppt_tracker`, and `verification_event` / `audit_event` rows. Then re-enter from `extracted_unverified` and confirm old tracker rows are replaced.
-5. **Add tests.** Export `parseSpecForm` (or move it into `src/domain/catalog/`) and test: PV valid, PV Vmp >= Voc rejected, inverter with 0 trackers rejected, tracker rows in order, missing category rejected.
-6. **Known behavior to decide on:**
+1. **Self-verify is unverified in a real DB.** Verify the `selfVerified: true` row in `verification_event.new_value` and the `FOUR_EYES_REQUIRED` message with no reason. Write-path test is still open (item 3).
+2. **Browser check 390 / 768 / 1440 px** (AGENTS.md rule) for `/admin/equipment` (queue + upload panel), `/admin/equipment/[id]/spec` (PV and inverter with 1 and 3 MPPT rows), and the sidebar. Check: no horizontal scroll (`document.documentElement.scrollWidth <= clientWidth`), 24 px minimum targets, visible focus. Use DOM checks first; at most 3 screenshots, outside the repo.
+3. **Exercise the write path on a preview or with a test revision.** Enter a PV spec and an inverter spec with 2 MPPT rows. Check `datasheet_revision.state`, `spec_entered_by`, `spec_source_pages`, `pv_module_spec` or `inverter_spec` + `mppt_tracker`, and `verification_event` / `audit_event` rows. Then re-enter from `extracted_unverified` and confirm old tracker rows are replaced.
+4. **Add tests.** Export `parseSpecForm` (or move it into `src/domain/catalog/`) and test: PV valid, PV Vmp >= Voc rejected, inverter with 0 trackers rejected, tracker rows in order, missing category rejected.
+5. **Known behavior to decide on:**
    - A blank `sourceUrl` keeps the old URL (`COALESCE`). There is no way to clear it through the form.
    - Re-entry deletes and re-inserts spec rows. Only allowed in `draft` and `extracted_unverified`, so published rows are never touched.
    - `review_note` is cleared on re-entry.
-7. **Commit and deploy** only when the user asks. Commit the feature files, not `AGENTS.md`. Pushing `main` deploys production (see guardrails).
+6. **Commit and deploy follow-up changes** only when the user asks. Do not include `AGENTS.md`. Pushing `main` deploys production (see guardrails).
+
+## Completed after resume (2026-10-31)
+
+- Reconciled this handoff with `main` at `5859f53`; the Enter Spec slice is already in `b742692` and on `origin/main`.
+- Updated the migration comment for `recalled` to match the implemented role matrix: both `account_admin` and `super_admin` may recall; `reviewer` may not.
 
 ## How to test locally
 

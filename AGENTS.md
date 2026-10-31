@@ -15,3 +15,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Do not introduce horizontal page overflow. Reflow dense data, controls, and navigation instead of clipping required information.
 - Keep navigation and primary actions available on mobile, with visible keyboard focus and at least 24px interactive target dimensions.
 - Document any intentionally hidden secondary information and preserve access to the underlying decision-critical data.
+
+## Token budget for agents
+
+Read `docs/codex-operating-rules.md` before starting work. It limits screenshot viewing, large reads, and thread length.

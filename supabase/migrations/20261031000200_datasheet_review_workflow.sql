@@ -2,7 +2,7 @@ BEGIN;
 
 -- Review workflow bookkeeping. State itself reuses record_status:
 -- draft -> extracted_unverified (spec entered) -> verified -> published,
--- with superseded (older published revision) and recalled (Super Admin only).
+-- with superseded (older published revision) and recalled (Account Admin or Super Admin).
 ALTER TABLE datasheet_revision
   ADD COLUMN spec_source_pages jsonb NOT NULL DEFAULT '{}'::jsonb,
   ADD COLUMN spec_entered_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
