@@ -15,10 +15,10 @@ export type ReviewRole = "account_admin" | "reviewer" | "super_admin";
 // Which role may perform which action. Scope (organization) is checked separately.
 const actionRoles: Record<RevisionAction, readonly ReviewRole[]> = {
   enter_spec: ["account_admin", "super_admin"],
-  publish: ["reviewer", "super_admin"],
-  recall: ["super_admin"],
-  reject: ["reviewer", "super_admin"],
-  verify: ["reviewer", "super_admin"],
+  publish: ["account_admin", "reviewer", "super_admin"],
+  recall: ["account_admin", "super_admin"],
+  reject: ["account_admin", "reviewer", "super_admin"],
+  verify: ["account_admin", "reviewer", "super_admin"],
 };
 
 const actionFromStates: Record<RevisionAction, readonly RevisionState[]> = {
@@ -71,12 +71,11 @@ export interface FourEyesResult {
   overrideRequired: boolean;
 }
 
-// The person who entered the spec should not also verify it. A Super Admin may override
-// with a mandatory reason so a small team is never permanently blocked; the override is
-// recorded in verification_event.
+// The person who entered the spec should not also verify it. A small team may still do so
+// with a mandatory reason, so nobody is permanently blocked; the reason and a self-verified
+// flag are recorded in verification_event.
 export function evaluateFourEyes(input: {
   actorId: string;
-  isSuperAdmin: boolean;
   overrideReason?: string | null;
   specEnteredBy: string | null;
 }): FourEyesResult {
@@ -85,7 +84,7 @@ export function evaluateFourEyes(input: {
   }
   const hasReason = Boolean(input.overrideReason && input.overrideReason.trim().length >= 10);
   return {
-    allowed: input.isSuperAdmin && hasReason,
+    allowed: hasReason,
     overrideRequired: true,
   };
 }
@@ -146,3 +145,12 @@ export function evaluatePublishGates(input: {
 
   return { blockers, ready: blockers.length === 0 };
 }
+
+export const revisionStateLabels: Record<RevisionState, string> = {
+  draft: "DRAFT · รอกรอกสเปก",
+  extracted_unverified: "รอตรวจสอบสเปก",
+  published: "PUBLISHED",
+  recalled: "RECALLED",
+  superseded: "SUPERSEDED",
+  verified: "ตรวจแล้ว · รอ Publish",
+};

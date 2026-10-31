@@ -15,7 +15,10 @@ export default async function AdminEquipmentPage() {
   const principal = await requireAdminPage();
   const capabilities = getDatasheetRuntimeCapabilities();
   const canReview = principal.roles.some(
-    (role) => role.code === "reviewer" || role.code === "super_admin",
+    (role) => role.code === "account_admin" || role.code === "reviewer" || role.code === "super_admin",
+  );
+  const canEnterSpec = principal.roles.some(
+    (role) => role.code === "account_admin" || role.code === "super_admin",
   );
   const queue = canReview && isDatabaseConfigured() ? await listReviewQueue() : [];
 
@@ -49,7 +52,7 @@ export default async function AdminEquipmentPage() {
         ) : (
           <div className="review-queue__list">
             {queue.map((row) => (
-              <ReviewQueueItem key={row.revisionId} row={row} />
+              <ReviewQueueItem canEnterSpec={canEnterSpec} key={row.revisionId} row={row} />
             ))}
           </div>
         )}

@@ -6796,3 +6796,147 @@ a {
     width: 100%;
   }
 }
+
+.spec-back {
+  align-items: center;
+  color: #344054;
+  display: inline-flex;
+  font-size: 11px;
+  gap: 6px;
+  margin-bottom: 14px;
+  min-height: 44px;
+}
+
+.spec-back__meta {
+  color: #667085;
+  font-size: 11px;
+  margin: 4px 0 0;
+}
+
+.spec-form {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.spec-form > * {
+  min-width: 0;
+}
+
+.spec-form > .admin-sku-form__head,
+.spec-form > .admin-sku-form__actions,
+.spec-form__section--wide {
+  grid-column: 1 / -1;
+}
+
+.spec-form__section {
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  min-width: 0;
+  padding: 18px;
+}
+
+.spec-form__section legend {
+  color: #344054;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 6px;
+}
+
+.spec-form__row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+.spec-form__pages {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.spec-form__tracker {
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.spec-form__tracker-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.spec-form__tracker-head strong {
+  font-size: 12px;
+}
+
+.spec-form__tracker-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.spec-form__remove,
+.spec-form__add {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: #8b2734;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 11px;
+  gap: 6px;
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+.spec-form__add {
+  color: var(--ink);
+  justify-self: start;
+}
+
+.spec-form__submit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.spec-form__submit .button {
+  min-height: 44px;
+}
+
+@media (max-width: 900px) {
+  .spec-form__tracker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .spec-form {
+    grid-template-columns: 1fr;
+  }
+
+  .spec-form__row,
+  .spec-form__pages {
+    grid-template-columns: 1fr;
+  }
+
+  .spec-form__tracker-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .spec-form__submit {
+    flex-direction: column-reverse;
+  }
+
+  .spec-form__submit .button {
+    width: 100%;
+  }
+}

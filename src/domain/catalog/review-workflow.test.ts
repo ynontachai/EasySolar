@@ -20,10 +20,12 @@ const validPv = {
 };
 
 describe("role and state permissions", () => {
-  it("lets an Account Admin enter specs but not verify or publish", () => {
+  it("lets an Account Admin do the whole review flow", () => {
     expect(canPerform("enter_spec", "draft", ["account_admin"])).toBe(true);
-    expect(canPerform("verify", "extracted_unverified", ["account_admin"])).toBe(false);
-    expect(canPerform("publish", "verified", ["account_admin"])).toBe(false);
+    expect(canPerform("verify", "extracted_unverified", ["account_admin"])).toBe(true);
+    expect(canPerform("reject", "verified", ["account_admin"])).toBe(true);
+    expect(canPerform("publish", "verified", ["account_admin"])).toBe(true);
+    expect(canPerform("recall", "published", ["account_admin"])).toBe(true);
   });
 
   it("lets a Reviewer verify and publish but not recall", () => {
@@ -46,20 +48,28 @@ describe("role and state permissions", () => {
 
 describe("four-eyes", () => {
   it("allows a different person to verify", () => {
-    expect(evaluateFourEyes({ actorId: "b", isSuperAdmin: false, specEnteredBy: "a" }).allowed).toBe(true);
-  });
-
-  it("blocks the same Reviewer", () => {
-    expect(evaluateFourEyes({ actorId: "a", isSuperAdmin: false, specEnteredBy: "a" }).allowed).toBe(false);
-  });
-
-  it("lets Super Admin override only with a reason", () => {
-    const base = { actorId: "a", isSuperAdmin: true, specEnteredBy: "a" };
-    expect(evaluateFourEyes({ ...base, overrideReason: "สั้น" }).allowed).toBe(false);
-    expect(evaluateFourEyes({ ...base, overrideReason: "ทีมมีผู้ดูแลคนเดียว ตรวจกับ datasheet แล้ว" })).toEqual({
+    expect(evaluateFourEyes({ actorId: "b", specEnteredBy: "a" })).toEqual({
       allowed: true,
+      overrideRequired: false,
+    });
+  });
+
+  it("blocks the spec author without a reason", () => {
+    expect(evaluateFourEyes({ actorId: "a", specEnteredBy: "a" })).toEqual({
+      allowed: false,
       overrideRequired: true,
     });
+    expect(evaluateFourEyes({ actorId: "a", overrideReason: "สั้น", specEnteredBy: "a" }).allowed).toBe(false);
+  });
+
+  it("lets the spec author verify with a logged reason", () => {
+    expect(
+      evaluateFourEyes({
+        actorId: "a",
+        overrideReason: "ทีมมีผู้ดูแลคนเดียว ตรวจกับ datasheet แล้ว",
+        specEnteredBy: "a",
+      }),
+    ).toEqual({ allowed: true, overrideRequired: true });
   });
 });
 

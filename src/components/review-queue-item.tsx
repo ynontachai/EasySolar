@@ -1,24 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { CheckCircle2, LoaderCircle } from "lucide-react";
 import {
   reviewRevisionAction,
   type ReviewActionState,
 } from "@/app/admin/(protected)/equipment/review-actions";
-import { criticalFieldsFor, type RevisionState } from "@/domain/catalog/review-workflow";
+import {
+  criticalFieldsFor,
+  revisionStateLabels as stateLabels,
+} from "@/domain/catalog/review-workflow";
 import type { ReviewQueueRow } from "@/lib/server/review-repository";
 
 const initialState: ReviewActionState = { message: "", status: "idle" };
-
-const stateLabels: Record<RevisionState, string> = {
-  draft: "DRAFT · รอกรอกสเปก",
-  extracted_unverified: "รอตรวจสอบสเปก",
-  published: "PUBLISHED",
-  recalled: "RECALLED",
-  superseded: "SUPERSEDED",
-  verified: "ตรวจแล้ว · รอ Publish",
-};
 
 const fieldLabels: Record<string, string> = {
   impA: "Imp",
@@ -33,10 +28,18 @@ const fieldLabels: Record<string, string> = {
   vocV: "Voc",
 };
 
-export function ReviewQueueItem({ row }: { row: ReviewQueueRow }) {
+export function ReviewQueueItem({
+  canEnterSpec,
+  row,
+}: {
+  canEnterSpec: boolean;
+  row: ReviewQueueRow;
+}) {
   const [state, action, isPending] = useActionState(reviewRevisionAction, initialState);
   const fields = criticalFieldsFor(row.category);
   const hasFile = row.assetState === "available";
+  const canOpenSpec =
+    canEnterSpec && (row.state === "draft" || row.state === "extracted_unverified");
 
   return (
     <form action={action} className="review-item" aria-labelledby={`review-${row.revisionId}`}>
@@ -71,12 +74,24 @@ export function ReviewQueueItem({ row }: { row: ReviewQueueRow }) {
         </fieldset>
       ) : null}
 
+      {row.state === "extracted_unverified" ? (
+        <label className="review-item__wide">
+          <span>เหตุผลกรณียืนยันสเปกที่กรอกเอง (อย่างน้อย 10 ตัวอักษร)</span>
+          <input maxLength={500} name="overrideReason" placeholder="เช่น ตรวจกับ Datasheet หน้า 2 แล้ว" type="text" />
+        </label>
+      ) : null}
+
       <label className="review-item__wide">
         <span>เหตุผล (ใช้เมื่อส่งกลับหรือ Recall)</span>
         <input maxLength={500} name="reason" placeholder="เช่น หน้า 2 ระบุ Voc ต่างจากที่กรอก" type="text" />
       </label>
 
       <div className="review-item__actions">
+        {canOpenSpec ? (
+          <Link className="button button--outline" href={`/admin/equipment/${row.revisionId}/spec`}>
+            {row.state === "draft" ? "กรอกสเปก" : "แก้ไขสเปก"}
+          </Link>
+        ) : null}
         {row.state === "extracted_unverified" ? (
           <button className="button button--sun" disabled={isPending} name="intent" type="submit" value="verify">
             ยืนยันสเปก
