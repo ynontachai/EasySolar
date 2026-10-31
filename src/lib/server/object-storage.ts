@@ -150,6 +150,17 @@ export async function createDatasheetDownloadUrl(input: {
   return getSignedUrl(client, command, { expiresIn: 5 * 60 });
 }
 
+export async function createDatasheetScanUrl(objectKey: string) {
+  const { client, config } = getStorageClient();
+  const command = new GetObjectCommand({
+    Bucket: config.bucket,
+    Key: objectKey,
+    ResponseContentType: DATASHEET_MEDIA_TYPE,
+  });
+
+  return getSignedUrl(client, command, { expiresIn: 15 * 60 });
+}
+
 export async function createProductImageDownloadUrl(input: {
   mediaType: string;
   objectKey: string;

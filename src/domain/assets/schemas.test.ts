@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MAX_DATASHEET_SIZE_BYTES } from "./config";
 import {
   datasheetUploadIntentSchema,
+  scanJobClaimSchema,
   scanVerdictSchema,
 } from "./schemas";
 
@@ -61,5 +62,13 @@ describe("scan verdict", () => {
     expect(
       scanVerdictSchema.parse({ scanner: "clamav", verdict: "clean" }),
     ).toEqual({ details: {}, scanner: "clamav", verdict: "clean" });
+  });
+});
+
+describe("scan job claim", () => {
+  it("defaults to ten jobs and caps each batch", () => {
+    expect(scanJobClaimSchema.parse({})).toEqual({ limit: 10 });
+    expect(scanJobClaimSchema.safeParse({ limit: 25 }).success).toBe(true);
+    expect(scanJobClaimSchema.safeParse({ limit: 26 }).success).toBe(false);
   });
 });

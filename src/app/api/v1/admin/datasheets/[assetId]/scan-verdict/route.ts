@@ -32,14 +32,14 @@ export async function POST(request: Request, context: RouteContext) {
       );
     }
 
-    const state = await recordAssetScanVerdict({
+    const result = await recordAssetScanVerdict({
       assetId: assetId.data,
       details: body.data.details,
       scanner: body.data.scanner,
       verdict: body.data.verdict,
     });
 
-    return Response.json({ assetId: assetId.data, state });
+    return Response.json({ assetId: assetId.data, ...result });
   } catch (error) {
     return errorResponse(error);
   }

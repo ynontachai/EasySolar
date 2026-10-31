@@ -50,6 +50,10 @@ export const scanVerdictSchema = z.object({
   details: z.record(z.string(), z.unknown()).default({}),
 });
 
+export const scanJobClaimSchema = z.object({
+  limit: z.number().int().min(1).max(25).default(10),
+});
+
 export type DatasheetUploadIntentInput = z.infer<
   typeof datasheetUploadIntentSchema
 >;

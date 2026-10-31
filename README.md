@@ -24,6 +24,8 @@ The storage bucket must allow browser `PUT` requests from the application origin
 
 `FILE_SCAN_MODE=external` keeps uploaded files unavailable until the authenticated scanner callback reports `clean`. `trusted-dev` may be used only in non-production development. Admin pages use an invite-only Supabase Auth session plus application roles; the scanner token is never an Admin login credential. Super Admins send invitations from `/admin/users`, which needs the server-only `SUPABASE_SERVICE_ROLE_KEY`.
 
+Production malware scanning runs from `.github/workflows/datasheet-scanner.yml`. The worker claims one pending asset per unique SHA-256, downloads it through a 15-minute signed URL, validates its PDF signature, size and checksum, scans it with updated ClamAV signatures, and posts the verdict back to the authenticated callback. Configure the same `EASYSOLAR_SCANNER_TOKEN` in Vercel Production and GitHub Actions secrets; optionally set the GitHub Actions variable `EASYSOLAR_BASE_URL` when the production origin changes.
+
 ## Verify
 
 ```bash
@@ -48,6 +50,7 @@ npm run build
 - `/api/v1/admin/datasheets/upload-intents` — authenticated signed upload intent
 - `/api/v1/admin/datasheets/{assetId}/finalize` — object integrity verification
 - `/api/v1/admin/datasheets/{assetId}/scan-verdict` — scanner callback
+- `/api/v1/admin/datasheets/scan-jobs` — authenticated scanner work queue
 - `/api/v1/datasheets/{revisionId}/download` — signed download for available verified files
 
 ## Guardrails

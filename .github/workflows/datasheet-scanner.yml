@@ -1,0 +1,33 @@
+name: Datasheet malware scanner
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: easysolar-production-datasheet-scanner
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install and update ClamAV
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clamav
+          sudo systemctl stop clamav-freshclam.service || true
+          sudo freshclam
+
+      - name: Scan pending datasheets
+        env:
+          EASYSOLAR_BASE_URL: ${{ vars.EASYSOLAR_BASE_URL || 'https://easy-solar-one.vercel.app' }}
+          EASYSOLAR_SCANNER_TOKEN: ${{ secrets.EASYSOLAR_SCANNER_TOKEN }}
+        run: node scripts/scan-datasheets.mjs

@@ -28,6 +28,14 @@ export interface FinalizableAsset {
   state: AssetState;
 }
 
+export interface PendingScanAsset {
+  assetId: string;
+  filename: string;
+  objectKey: string;
+  sha256: string;
+  sizeBytes: number;
+}
+
 export interface PublishedCatalogItem {
   assetState: AssetState | null;
   category: "pv_module" | "inverter";
@@ -245,22 +253,44 @@ export async function recordAssetScanVerdict(input: {
   const sql = getDb();
 
   return sql.begin(async (transaction) => {
-    const [existing] = await transaction<{ state: AssetState }[]>`
-      SELECT state FROM asset WHERE id = ${input.assetId} FOR UPDATE
+    const [existing] = await transaction<{ sha256: string; state: AssetState }[]>`
+      SELECT sha256, state FROM asset WHERE id = ${input.assetId} FOR UPDATE
     `;
 
     if (!existing) {
       throw new HttpError(404, "ASSET_NOT_FOUND", "ไม่พบไฟล์ที่ระบุ");
     }
 
+    if (existing.state !== "scanning") {
+      throw new HttpError(
+        409,
+        "ASSET_NOT_SCANNING",
+        `ไฟล์อยู่ในสถานะ ${existing.state} และไม่รับผลสแกนซ้ำ`,
+      );
+    }
+
+    const targetAssetIds =
+      input.verdict === "error"
+        ? [input.assetId]
+        : (
+            await transaction<Array<{ assetId: string }>>`
+              SELECT id::text AS "assetId"
+              FROM asset
+              WHERE purpose = 'datasheet'
+                AND state = 'scanning'
+                AND sha256 = ${existing.sha256}
+              FOR UPDATE
+            `
+          ).map((asset) => asset.assetId);
+
     await transaction`
       INSERT INTO asset_scan_event (asset_id, scanner, verdict, details_json)
-      VALUES (
-        ${input.assetId},
+      SELECT
+        target.id,
         ${input.scanner},
         ${input.verdict},
         ${JSON.stringify(input.details)}::jsonb
-      )
+      FROM unnest(${targetAssetIds}::uuid[]) AS target(id)
     `;
 
     const nextState: AssetState =
@@ -270,19 +300,38 @@ export async function recordAssetScanVerdict(input: {
           ? "quarantined"
           : "scanning";
 
-    const [updated] = await transaction<{ state: AssetState }[]>`
+    const updated = await transaction<Array<{ state: AssetState }>>`
       UPDATE asset
       SET
         state = ${nextState},
         available_at = CASE WHEN ${nextState} = 'available' THEN now() ELSE available_at END,
         quarantined_at = CASE WHEN ${nextState} = 'quarantined' THEN now() ELSE quarantined_at END,
         updated_at = now()
-      WHERE id = ${input.assetId}
+      WHERE id = ANY(${targetAssetIds}::uuid[])
       RETURNING state
     `;
 
-    return updated.state;
+    return { affectedAssetCount: updated.length, state: nextState };
   });
+}
+
+export async function listPendingScanAssets(limit: number): Promise<PendingScanAsset[]> {
+  const sql = getDb();
+  const rows = await sql<Array<Omit<PendingScanAsset, "sizeBytes"> & { sizeBytes: string }>>`
+    SELECT DISTINCT ON (asset.sha256)
+      asset.id::text AS "assetId",
+      asset.original_filename AS filename,
+      asset.object_key AS "objectKey",
+      asset.sha256,
+      asset.size_bytes::text AS "sizeBytes"
+    FROM asset
+    WHERE asset.purpose = 'datasheet'
+      AND asset.state = 'scanning'
+    ORDER BY asset.sha256, asset.created_at
+    LIMIT ${limit}
+  `;
+
+  return rows.map((row) => ({ ...row, sizeBytes: Number(row.sizeBytes) }));
 }
 
 export async function findDownloadableDatasheet(revisionId: string) {
