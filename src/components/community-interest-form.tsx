@@ -1,12 +1,18 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, Check, LocateFixed, LoaderCircle, ShieldCheck } from "lucide-react";
 import {
   registerCommunityInterestAction,
   type CommunityInterestActionState,
 } from "@/app/community-buy/join/actions";
+import { CommunityLocationMap } from "@/components/community-location-map";
+import { ThemeSelect, type ThemeSelectOption } from "@/components/theme-select";
+
+interface AddressOption extends ThemeSelectOption {
+  postalCode?: string;
+}
 
 interface CommunityInterestFormProps {
   initialInvestmentScore: number | null;
@@ -33,6 +39,54 @@ export function CommunityInterestForm({
   const [locationState, setLocationState] = useState<"idle" | "loading" | "ready" | "denied">("idle");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
+  const [provinceId, setProvinceId] = useState("");
+  const [districtId, setDistrictId] = useState("");
+  const [subdistrictId, setSubdistrictId] = useState("");
+  const [provinceOptions, setProvinceOptions] = useState<AddressOption[]>([]);
+  const [districtOptions, setDistrictOptions] = useState<AddressOption[]>([]);
+  const [subdistrictOptions, setSubdistrictOptions] = useState<AddressOption[]>([]);
+  const [addressLoading, setAddressLoading] = useState(true);
+  const [stepError, setStepError] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/v1/locations?level=provinces")
+      .then((response) => response.json() as Promise<{ options: AddressOption[] }>)
+      .then((payload) => { if (active) setProvinceOptions(payload.options); })
+      .catch(() => { if (active) setStepError("โหลดรายชื่อจังหวัดไม่สำเร็จ กรุณาลองใหม่"); })
+      .finally(() => { if (active) setAddressLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!provinceId) return;
+    let active = true;
+    fetch(`/api/v1/locations?level=districts&provinceId=${encodeURIComponent(provinceId)}`)
+      .then((response) => response.json() as Promise<{ options: AddressOption[] }>)
+      .then((payload) => { if (active) setDistrictOptions(payload.options); })
+      .catch(() => { if (active) setStepError("โหลดรายชื่ออำเภอ/เขตไม่สำเร็จ กรุณาเลือกจังหวัดอีกครั้ง"); })
+      .finally(() => { if (active) setAddressLoading(false); });
+    return () => { active = false; };
+  }, [provinceId]);
+
+  useEffect(() => {
+    if (!districtId) return;
+    let active = true;
+    fetch(`/api/v1/locations?level=subdistricts&districtId=${encodeURIComponent(districtId)}`)
+      .then((response) => response.json() as Promise<{ options: AddressOption[] }>)
+      .then((payload) => { if (active) setSubdistrictOptions(payload.options); })
+      .catch(() => { if (active) setStepError("โหลดรายชื่อตำบล/แขวงไม่สำเร็จ กรุณาเลือกอำเภออีกครั้ง"); })
+      .finally(() => { if (active) setAddressLoading(false); });
+    return () => { active = false; };
+  }, [districtId]);
+
+  const province = provinceOptions.find((option) => option.value === provinceId)?.label ?? "";
+  const district = districtOptions.find((option) => option.value === districtId)?.label ?? "";
+  const selectedSubdistrict = subdistrictOptions.find((option) => option.value === subdistrictId);
+  const subdistrict = selectedSubdistrict?.label ?? "";
+  const postalCode = selectedSubdistrict?.postalCode ?? "";
 
   function requestLocation() {
     if (!navigator.geolocation) {
@@ -52,6 +106,13 @@ export function CommunityInterestForm({
   }
 
   function goToNextStep() {
+    setStepError("");
+    if (step === 2 && (!provinceId || !districtId || !subdistrictId)) {
+      setStepError("กรุณาเลือกจังหวัด อำเภอ/เขต และตำบล/แขวงให้ครบ");
+      const missingId = !provinceId ? "province" : !districtId ? "district" : "subdistrict";
+      document.getElementById(missingId)?.focus();
+      return;
+    }
     const currentSection = formRef.current?.querySelector<HTMLElement>(
       `.community-form__step:not([hidden])`,
     );
@@ -64,6 +125,13 @@ export function CommunityInterestForm({
       return;
     }
     setStep((current) => Math.min(current + 1, 3));
+  }
+
+  function formatPhone(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 10);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
   }
 
   if (actionState.status === "success") {
@@ -113,39 +181,39 @@ export function CommunityInterestForm({
         <p className="eyebrow eyebrow--dark">01 · YOUR SOLAR PLAN</p>
         <h2>คุณกำลังวางแผนติด Solar แบบไหน</h2>
         <div className="community-form__grid">
-          <label>
+          <div className="community-form__field">
             <span>ประเภทสถานที่</span>
-            <select name="propertyType" value={propertyType} onChange={(event) => setPropertyType(event.target.value)}>
-              <option value="detached_home">บ้านเดี่ยว</option>
-              <option value="townhome">ทาวน์โฮม / อาคารแถว</option>
-              <option value="commercial">ร้านค้า / ธุรกิจขนาดเล็ก</option>
-              <option value="other">อื่น ๆ</option>
-            </select>
-          </label>
-          <label>
+            <ThemeSelect name="propertyType" onValueChange={setPropertyType} options={[
+              { label: "บ้านเดี่ยว", value: "detached_home" },
+              { label: "ทาวน์โฮม / อาคารแถว", value: "townhome" },
+              { label: "ร้านค้า / ธุรกิจขนาดเล็ก", value: "commercial" },
+              { label: "อื่น ๆ", value: "other" },
+            ]} required value={propertyType} />
+          </div>
+          <div className="community-form__field">
             <span>บทบาทในการตัดสินใจ</span>
-            <select name="decisionRole" value={decisionRole} onChange={(event) => setDecisionRole(event.target.value)}>
-              <option value="owner">เจ้าของสถานที่</option>
-              <option value="authorized">ได้รับมอบหมายให้ตัดสินใจ</option>
-              <option value="exploring">กำลังหาข้อมูลให้ครอบครัว/องค์กร</option>
-            </select>
-          </label>
-          <label>
+            <ThemeSelect name="decisionRole" onValueChange={setDecisionRole} options={[
+              { label: "เจ้าของสถานที่", value: "owner" },
+              { label: "ได้รับมอบหมายให้ตัดสินใจ", value: "authorized" },
+              { label: "กำลังหาข้อมูลให้ครอบครัว/องค์กร", value: "exploring" },
+            ]} required value={decisionRole} />
+          </div>
+          <div className="community-form__field">
             <span>ขนาดระบบที่สนใจ</span>
-            <select name="selectedSystemSizeKw" value={systemSizeKw} onChange={(event) => setSystemSizeKw(event.target.value)}>
-              {[3, 5, 8, 10].map((size) => <option key={size} value={size}>{size} kW</option>)}
-            </select>
+            <ThemeSelect name="selectedSystemSizeKw" onValueChange={setSystemSizeKw} options={
+              [3, 5, 8, 10].map((size) => ({ label: `${size} kW`, value: String(size) }))
+            } required value={systemSizeKw} />
             {initialSystemSizeKw ? <small>นำมาจากผลประเมินล่าสุดของคุณ</small> : null}
-          </label>
-          <label>
+          </div>
+          <div className="community-form__field">
             <span>ช่วงเวลาที่อยากติดตั้ง</span>
-            <select name="installationWindow" value={installationWindow} onChange={(event) => setInstallationWindow(event.target.value)}>
-              <option value="0_3_months">ภายใน 3 เดือน</option>
-              <option value="3_6_months">3–6 เดือน</option>
-              <option value="6_12_months">6–12 เดือน</option>
-              <option value="exploring">ยังไม่กำหนด กำลังเปรียบเทียบ</option>
-            </select>
-          </label>
+            <ThemeSelect name="installationWindow" onValueChange={setInstallationWindow} options={[
+              { label: "ภายใน 3 เดือน", value: "0_3_months" },
+              { label: "3–6 เดือน", value: "3_6_months" },
+              { label: "6–12 เดือน", value: "6_12_months" },
+              { label: "ยังไม่กำหนด กำลังเปรียบเทียบ", value: "exploring" },
+            ]} required value={installationWindow} />
+          </div>
         </div>
       </section>
 
@@ -155,11 +223,30 @@ export function CommunityInterestForm({
         <p className="community-form__lead">
           ใช้พื้นที่เพื่อค้นหากลุ่มใกล้เคียงเท่านั้น หน้า Public จะแสดงเป็นจำนวนรวม ไม่แสดงบ้านหรือพิกัดของคุณ
         </p>
+        <input name="province" type="hidden" value={province} />
+        <input name="district" type="hidden" value={district} />
+        <input name="subdistrict" type="hidden" value={subdistrict} />
+        <input name="postalCode" type="hidden" value={postalCode} />
         <div className="community-form__grid">
-          <label><span>จังหวัด</span><input name="province" placeholder="เช่น เชียงใหม่" required /></label>
-          <label><span>อำเภอ / เขต</span><input name="district" placeholder="เช่น เมืองเชียงใหม่" required /></label>
-          <label><span>ตำบล / แขวง</span><input name="subdistrict" placeholder="เช่น ศรีภูมิ" required /></label>
-          <label><span>รหัสไปรษณีย์</span><input inputMode="numeric" maxLength={5} name="postalCode" pattern="[0-9]{5}" placeholder="50000" required /></label>
+          <div className="community-form__field">
+            <span>จังหวัด</span>
+            <ThemeSelect disabled={addressLoading && !provinceOptions.length} id="province" onValueChange={(value) => {
+              setAddressLoading(true); setProvinceId(value); setDistrictId(""); setDistrictOptions([]); setSubdistrictId(""); setSubdistrictOptions([]); setStepError("");
+            }} options={provinceOptions} placeholder="เลือกจังหวัด" required searchable value={provinceId} />
+          </div>
+          <div className="community-form__field">
+            <span>อำเภอ / เขต</span>
+            <ThemeSelect disabled={!provinceId || addressLoading} id="district" onValueChange={(value) => {
+              setAddressLoading(true); setDistrictId(value); setSubdistrictId(""); setSubdistrictOptions([]); setStepError("");
+            }} options={districtOptions} placeholder={provinceId ? "เลือกอำเภอ / เขต" : "เลือกจังหวัดก่อน"} required searchable value={districtId} />
+          </div>
+          <div className="community-form__field">
+            <span>ตำบล / แขวง</span>
+            <ThemeSelect disabled={!districtId || addressLoading} id="subdistrict" onValueChange={(value) => {
+              setSubdistrictId(value); setStepError("");
+            }} options={subdistrictOptions} placeholder={districtId ? "เลือกตำบล / แขวง" : "เลือกอำเภอก่อน"} required searchable value={subdistrictId} />
+          </div>
+          <label><span>รหัสไปรษณีย์</span><input aria-readonly="true" inputMode="numeric" placeholder="ระบบกรอกให้อัตโนมัติ" readOnly value={postalCode} /></label>
         </div>
         <fieldset className="community-radius">
           <legend>ระยะที่ยอมรับให้จับคู่</legend>
@@ -176,6 +263,9 @@ export function CommunityInterestForm({
           {locationState === "ready" ? "บันทึกตำแหน่งโดยประมาณแล้ว" : "ใช้ตำแหน่งปัจจุบัน (ไม่บังคับ)"}
         </button>
         {locationState === "denied" ? <p className="community-location-note">ไม่เป็นไร คุณสามารถลงทะเบียนด้วยจังหวัดและอำเภอได้</p> : null}
+        {step === 2 ? <CommunityLocationMap latitude={latitude} longitude={longitude} onLocationChange={(nextLatitude, nextLongitude) => {
+          setLatitude(nextLatitude); setLongitude(nextLongitude); setLocationState("ready");
+        }} /> : null}
       </section>
 
       <section className="community-form__step" hidden={step !== 3}>
@@ -183,8 +273,8 @@ export function CommunityInterestForm({
         <h2>ให้ EasySolar แจ้งเมื่อพื้นที่ของคุณเริ่มรวมกลุ่มได้</h2>
         <div className="community-form__grid">
           <label><span>ชื่อที่ใช้ติดต่อ</span><input autoComplete="name" name="fullName" required /></label>
-          <label><span>อีเมล</span><input autoComplete="email" name="email" required type="email" /></label>
-          <label className="community-form__wide"><span>เบอร์โทร (ไม่บังคับ)</span><input autoComplete="tel" inputMode="tel" name="phone" /></label>
+          <label><span>อีเมล</span><input autoCapitalize="none" autoComplete="email" inputMode="email" maxLength={254} name="email" onChange={(event) => setEmail(event.target.value.toLowerCase().replace(/\s/g, ""))} placeholder="name@example.com" required spellCheck={false} type="email" value={email} /></label>
+          <label className="community-form__wide"><span>เบอร์โทร (ไม่บังคับ)</span><input autoComplete="tel" inputMode="numeric" maxLength={12} name="phone" onChange={(event) => setPhone(formatPhone(event.target.value))} pattern="0[0-9]{2}-[0-9]{3}-[0-9]{3,4}" placeholder="081-234-5678" type="tel" value={phone} /></label>
         </div>
         <div className="community-consents">
           <label>
@@ -202,6 +292,7 @@ export function CommunityInterestForm({
         </div>
       </section>
 
+      {stepError ? <p className="community-form__error" role="alert">{stepError}</p> : null}
       {actionState.status === "error" ? <p className="community-form__error" role="alert">{actionState.message}</p> : null}
 
       <footer className="community-form__actions">

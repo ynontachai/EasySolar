@@ -1,15 +1,18 @@
 import { z } from "zod";
+import { isValidThaiAddress } from "@/domain/location/thai-address";
 
 const optionalNumber = z.preprocess(
   (value) => (value === "" || value === null || value === undefined ? null : Number(value)),
   z.number().finite().nullable(),
 );
 
-const optionalText = (max: number) =>
-  z.preprocess(
-    (value) => (typeof value === "string" && value.trim() ? value.trim() : null),
-    z.string().max(max).nullable(),
-  );
+const optionalPhone = z.preprocess(
+  (value) => {
+    if (typeof value !== "string" || !value.trim()) return null;
+    return value.replace(/\D/g, "");
+  },
+  z.string().regex(/^0\d{8,9}$/, "รูปแบบเบอร์โทรไม่ถูกต้อง").nullable(),
+);
 
 export const communityInterestSchema = z
   .object({
@@ -27,7 +30,7 @@ export const communityInterestSchema = z
     latitude: optionalNumber.pipe(z.number().min(-90).max(90).nullable()),
     longitude: optionalNumber.pipe(z.number().min(-180).max(180).nullable()),
     packagePriceThb: optionalNumber.pipe(z.number().int().positive().max(100_000_000).nullable()),
-    phone: optionalText(30),
+    phone: optionalPhone,
     postalCode: z.string().trim().regex(/^\d{5}$/, "รหัสไปรษณีย์ต้องมี 5 หลัก"),
     preferredRadiusKm: z.coerce.number().int().pipe(z.union([z.literal(10), z.literal(15), z.literal(20)])),
     propertyType: z.enum(["detached_home", "townhome", "commercial", "other"]),
@@ -41,6 +44,13 @@ export const communityInterestSchema = z
         code: "custom",
         message: "ข้อมูลพิกัดไม่ครบ กรุณาลองระบุตำแหน่งอีกครั้งหรือข้ามขั้นตอนนี้",
         path: ["latitude"],
+      });
+    }
+    if (!isValidThaiAddress(value)) {
+      context.addIssue({
+        code: "custom",
+        message: "จังหวัด อำเภอ ตำบล และรหัสไปรษณีย์ไม่สัมพันธ์กัน",
+        path: ["postalCode"],
       });
     }
   });

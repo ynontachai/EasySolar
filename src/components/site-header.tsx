@@ -11,10 +11,10 @@ export function SiteHeader({ inverse = false }: { inverse?: boolean }) {
         <span>EasySolar</span>
       </Link>
       <nav className="main-nav" aria-label="เมนูหลัก">
-        <Link href="/#epc">EPC</Link>
-        <Link href="/#engineer">Engineer</Link>
-        <Link href="/solar-value">ประเมินโซลาร์</Link>
-        <Link href="/community-buy">Community Buy</Link>
+        <Link className="role-shortcut" href="/#epc"><span>01</span>EPC</Link>
+        <Link className="role-shortcut" href="/#engineer"><span>02</span>Engineer</Link>
+        <Link className="role-shortcut" href="/solar-value"><span>03</span>ประเมินโซลาร์</Link>
+        <Link className="role-shortcut" href="/community-buy"><span>04</span>Community Buy</Link>
       </nav>
       <div className="header-actions">
         <Link className="admin-entry" href="/admin/login">
