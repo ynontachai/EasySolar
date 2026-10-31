@@ -364,12 +364,12 @@ export async function findDownloadableDatasheet(revisionId: string) {
   return asset;
 }
 
-export async function listPublishedCatalogItems(filters: {
+export async function listPublishedCatalogPage(filters: {
   categories?: Array<"inverter" | "pv_module">;
+  limit?: number;
+  offset?: number;
   query?: string;
-} = {}): Promise<
-  PublishedCatalogItem[] | null
-> {
+} = {}): Promise<{ items: PublishedCatalogItem[]; total: number } | null> {
   if (!isDatabaseConfigured()) return null;
 
   const sql = getDb();
@@ -384,6 +384,9 @@ export async function listPublishedCatalogItems(filters: {
   const categoryFilter = categories.length
     ? sql`AND product_model.category IN ${sql(categories)}`
     : sql``;
+  const pagination = filters.limit === undefined
+    ? sql``
+    : sql`LIMIT ${filters.limit} OFFSET ${filters.offset ?? 0}`;
   const rows = await sql<
     Array<{
       assetState: AssetState | null;
@@ -397,6 +400,7 @@ export async function listPublishedCatalogItems(filters: {
       ratedAcKw: string | null;
       revisionId: string;
       revisionLabel: string;
+      totalCount: string;
       trackerCount: string | null;
       verificationStatus: "verified" | "published";
       vmpV: string | null;
@@ -420,7 +424,8 @@ export async function listPublishedCatalogItems(filters: {
       pv_module_spec.vmp_v::text AS "vmpV",
       inverter_spec.rated_ac_kw::text AS "ratedAcKw",
       inverter_spec.max_dc_voltage_v::text AS "maxDcVoltageV",
-      COUNT(mppt_tracker.id)::text AS "trackerCount"
+      COUNT(mppt_tracker.id)::text AS "trackerCount",
+      (COUNT(*) OVER())::text AS "totalCount"
     FROM product_model
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
     JOIN datasheet_revision ON datasheet_revision.product_model_id = product_model.id
@@ -461,9 +466,10 @@ export async function listPublishedCatalogItems(filters: {
       inverter_spec.rated_ac_kw,
       inverter_spec.max_dc_voltage_v
     ORDER BY manufacturer.name, product_model.exact_model
+    ${pagination}
   `;
 
-  return rows.map((row) => {
+  const items = rows.map((row) => {
     const isModule = row.category === "pv_module";
     return {
       assetState: row.assetState,
@@ -488,6 +494,17 @@ export async function listPublishedCatalogItems(filters: {
       verificationStatus: row.verificationStatus,
     };
   });
+
+  // COUNT(*) OVER() is only present on returned rows, so an out-of-range page reports 0.
+  return { items, total: Number(rows[0]?.totalCount ?? 0) };
+}
+
+export async function listPublishedCatalogItems(filters: {
+  categories?: Array<"inverter" | "pv_module">;
+  query?: string;
+} = {}): Promise<PublishedCatalogItem[] | null> {
+  const page = await listPublishedCatalogPage(filters);
+  return page?.items ?? null;
 }
 
 export async function listPublishedEquipmentOptions(): Promise<PublishedEquipmentOption[]> {

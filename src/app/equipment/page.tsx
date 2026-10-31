@@ -6,7 +6,9 @@ import { ArrowRight, CheckCircle2, Download, Search } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { demoInverters, demoPvModules } from "@/data/demo-catalog";
-import { listPublishedCatalogItems } from "@/lib/server/datasheet-repository";
+import { listPublishedCatalogPage } from "@/lib/server/datasheet-repository";
+
+const PAGE_SIZE = 12;
 
 export const metadata: Metadata = {
   title: "Equipment Library",
@@ -16,7 +18,7 @@ export const metadata: Metadata = {
 export default async function EquipmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string | string[]; q?: string }>;
+  searchParams: Promise<{ category?: string | string[]; page?: string; q?: string }>;
 }) {
   await connection();
   const params = await searchParams;
@@ -24,7 +26,15 @@ export default async function EquipmentPage({
   const categories = rawCategories.filter(
     (value): value is "inverter" | "pv_module" => value === "inverter" || value === "pv_module",
   );
-  const publishedEquipment = await listPublishedCatalogItems({ categories, query: params.q });
+  const requestedPage = Number(params.page);
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const offset = (page - 1) * PAGE_SIZE;
+  const catalogPage = await listPublishedCatalogPage({
+    categories,
+    limit: PAGE_SIZE,
+    offset,
+    query: params.q,
+  });
   const demoEquipment = [
     ...demoPvModules.map((item) => ({
       category: "PV MODULE",
@@ -53,16 +63,18 @@ export default async function EquipmentPage({
       verificationStatus: "unverified" as const,
     })),
   ];
-  const isDemoMode = publishedEquipment === null;
+  const isDemoMode = catalogPage === null;
   const query = params.q?.trim().toLowerCase() ?? "";
   const matchesDemoFilters = (item: (typeof demoEquipment)[number]) => {
     const category = item.category === "PV MODULE" ? "pv_module" : "inverter";
     const text = `${item.manufacturer} ${item.model}`.toLowerCase();
     return (!categories.length || categories.includes(category)) && (!query || text.includes(query));
   };
+  const demoMatches = demoEquipment.filter(matchesDemoFilters);
+  const totalRecords = isDemoMode ? demoMatches.length : catalogPage.total;
   const equipment = isDemoMode
-    ? demoEquipment.filter(matchesDemoFilters)
-    : publishedEquipment.map((item) => ({
+    ? demoMatches.slice(offset, offset + PAGE_SIZE)
+    : catalogPage.items.map((item) => ({
         category: item.category === "pv_module" ? "PV MODULE" : "INVERTER",
         datasheet: {
           revisionLabel: item.revisionLabel,
@@ -81,6 +93,16 @@ export default async function EquipmentPage({
         secondarySpec: item.secondarySpec,
         verificationStatus: item.verificationStatus,
       }));
+
+  const pageCount = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
+  const buildPageHref = (target: number) => {
+    const search = new URLSearchParams();
+    if (params.q) search.set("q", params.q);
+    for (const category of categories) search.append("category", category);
+    if (target > 1) search.set("page", String(target));
+    const queryString = search.toString();
+    return queryString ? `/equipment?${queryString}` : "/equipment";
+  };
 
   return (
     <main>
@@ -125,7 +147,7 @@ export default async function EquipmentPage({
         </aside>
         <div className="catalog-list">
           <div className="catalog-list__head">
-            <span>{equipment.length} records</span>
+            <span>{totalRecords} records</span>
             <span>{isDemoMode ? "Source · demo scaffold" : "Source · PostgreSQL catalog"}</span>
           </div>
           {!isDemoMode && equipment.length === 0 ? (
@@ -176,6 +198,21 @@ export default async function EquipmentPage({
             </article>
           ))}
           </div>
+          {pageCount > 1 ? (
+            <nav aria-label="เลือกหน้ารายการ" className="catalog-pagination">
+              {page > 1 ? (
+                <Link href={buildPageHref(page - 1)} rel="prev">ก่อนหน้า</Link>
+              ) : (
+                <span aria-disabled="true">ก่อนหน้า</span>
+              )}
+              <span>หน้า {page} / {pageCount}</span>
+              {page < pageCount ? (
+                <Link href={buildPageHref(page + 1)} rel="next">ถัดไป</Link>
+              ) : (
+                <span aria-disabled="true">ถัดไป</span>
+              )}
+            </nav>
+          ) : null}
         </div>
       </section>
       <SiteFooter />
