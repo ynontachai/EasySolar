@@ -103,8 +103,8 @@ export default function HomePage() {
                 เปิดคลังอุปกรณ์
                 <ArrowRight size={17} aria-hidden="true" />
               </Link>
-              <Link className="text-link text-link--muted" href="/community-buy">
-                รู้จัก Community Buy
+              <Link className="text-link text-link--muted" href="/community-buy/pools">
+                ดู Demand pool ตามจังหวัด
               </Link>
             </div>
           </article>
