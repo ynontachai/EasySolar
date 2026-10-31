@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { DATASHEET_MEDIA_TYPE, MAX_DATASHEET_SIZE_BYTES } from "./config";
+import {
+  DATASHEET_MEDIA_TYPE,
+  MAX_DATASHEET_SIZE_BYTES,
+  MAX_PRODUCT_IMAGE_SIZE_BYTES,
+  PRODUCT_IMAGE_MEDIA_TYPES,
+} from "./config";
 
 const sha256HexSchema = z
   .string()
@@ -25,6 +30,20 @@ export const datasheetUploadIntentSchema = z.object({
 
 export const assetIdSchema = z.string().uuid();
 
+export const productImageUploadIntentSchema = z.object({
+  altText: z.string().trim().min(2, "กรุณาระบุคำอธิบายรูป").max(180),
+  filename: z.string().trim().min(1).max(255),
+  mediaType: z.enum(PRODUCT_IMAGE_MEDIA_TYPES),
+  organizationId: z.string().uuid(),
+  productModelId: z.string().uuid(),
+  productVariantId: z.string().uuid(),
+  role: z.enum(["primary", "gallery"]),
+  sha256Base64: sha256Base64Schema,
+  sha256Hex: sha256HexSchema,
+  sizeBytes: z.number().int().positive().max(MAX_PRODUCT_IMAGE_SIZE_BYTES),
+  sortOrder: z.number().int().min(0).max(20),
+});
+
 export const scanVerdictSchema = z.object({
   verdict: z.enum(["clean", "infected", "error"]),
   scanner: z.string().trim().min(2).max(100),
@@ -33,4 +52,7 @@ export const scanVerdictSchema = z.object({
 
 export type DatasheetUploadIntentInput = z.infer<
   typeof datasheetUploadIntentSchema
+>;
+export type ProductImageUploadIntentInput = z.infer<
+  typeof productImageUploadIntentSchema
 >;

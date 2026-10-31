@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { CheckCircle2, LoaderCircle, MailPlus } from "lucide-react";
 import {
   inviteAdminAction,
   type InviteAdminActionState,
 } from "@/app/admin/(protected)/users/actions";
 import type { CatalogOrganizationOption } from "@/lib/server/catalog-admin-repository";
+import { ThemeSelect } from "@/components/theme-select";
 
 const initialState: InviteAdminActionState = { message: "", status: "idle" };
 
@@ -17,6 +18,8 @@ export function AdminInviteForm({
 }) {
   const [state, action, isPending] = useActionState(inviteAdminAction, initialState);
   const formRef = useRef<HTMLFormElement>(null);
+  const [role, setRole] = useState("account_admin");
+  const [organizationId, setOrganizationId] = useState(organizations[0]?.id ?? "");
 
   useEffect(() => {
     if (state.status === "success") formRef.current?.reset();
@@ -56,21 +59,19 @@ export function AdminInviteForm({
           <span>ชื่อที่แสดง</span>
           <input maxLength={120} name="displayName" placeholder="ไม่บังคับ" type="text" />
         </label>
-        <label>
+        <div className="admin-invite-form__field">
           <span>บทบาท</span>
-          <select defaultValue="account_admin" name="role" required>
-            <option value="account_admin">Account Admin</option>
-            <option value="reviewer">Catalog Reviewer</option>
-          </select>
-        </label>
-        <label className="admin-invite-form__wide">
+          <ThemeSelect name="role" onValueChange={setRole} options={[
+            { label: "Account Admin", value: "account_admin" },
+            { label: "Catalog Reviewer", value: "reviewer" },
+          ]} required value={role} />
+        </div>
+        <div className="admin-invite-form__field admin-invite-form__wide">
           <span>Organization</span>
-          <select defaultValue={organizations[0]?.id} name="organizationId" required>
-            {organizations.map((organization) => (
-              <option key={organization.id} value={organization.id}>{organization.name}</option>
-            ))}
-          </select>
-        </label>
+          <ThemeSelect disabled={!isReady} name="organizationId" onValueChange={setOrganizationId} options={
+            organizations.map((organization) => ({ label: organization.name, value: organization.id }))
+          } required searchable value={organizationId} />
+        </div>
       </div>
       <div className="admin-invite-form__actions">
         <p data-status={state.status} role={state.status === "error" ? "alert" : "status"}>

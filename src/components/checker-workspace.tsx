@@ -16,9 +16,28 @@ import type {
   RuleFinding,
   SizingResult,
 } from "@/domain/sizing/types";
+import { ThemeSelect } from "@/components/theme-select";
+
+export interface CheckerEquipmentOption {
+  isDemo: boolean;
+  label: string;
+  revisionLabel: string;
+  value: string;
+}
 
 interface CheckerWorkspaceProps {
+  initialInverterId: string;
+  initialPvModuleId: string;
   initialResult: SizingResult;
+  inverterOptions: CheckerEquipmentOption[];
+  pvOptions: CheckerEquipmentOption[];
+}
+
+function selectionHelp(option: CheckerEquipmentOption | undefined) {
+  if (!option) return "";
+  return option.isDemo
+    ? "ข้อมูลสังเคราะห์ · ยังไม่ผ่านการตรวจสอบ"
+    : `Revision ${option.revisionLabel} · Published`;
 }
 
 const statusCopy: Record<OverallStatus, { label: string; detail: string }> = {
@@ -44,11 +63,19 @@ function FindingIcon({ status }: { status: RuleFinding["status"] }) {
   return <CircleDashed size={15} aria-hidden="true" />;
 }
 
-export function CheckerWorkspace({ initialResult }: CheckerWorkspaceProps) {
+export function CheckerWorkspace({
+  initialInverterId,
+  initialPvModuleId,
+  initialResult,
+  inverterOptions,
+  pvOptions,
+}: CheckerWorkspaceProps) {
   const [tcellMinC, setTcellMinC] = useState(-10);
   const [tcellMaxC, setTcellMaxC] = useState(70);
   const [targetDcPowerKw, setTargetDcPowerKw] = useState(11);
   const [currentSafetyFactor, setCurrentSafetyFactor] = useState(1.25);
+  const [pvModule, setPvModule] = useState(initialPvModuleId);
+  const [inverter, setInverter] = useState(initialInverterId);
   const [result, setResult] = useState(initialResult);
   const [selectedCandidateId, setSelectedCandidateId] = useState(
     initialResult.candidates[0]?.id ?? "",
@@ -74,8 +101,8 @@ export function CheckerWorkspace({ initialResult }: CheckerWorkspaceProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          pvModuleId: "demo-pv-550",
-          inverterId: "demo-inverter-10k",
+          pvModuleId: pvModule,
+          inverterId: inverter,
           assumptions: {
             tcellMinC,
             tcellMaxC,
@@ -117,23 +144,29 @@ export function CheckerWorkspace({ initialResult }: CheckerWorkspaceProps) {
         <form onSubmit={handleSubmit}>
           <div className="field-group">
             <label htmlFor="pv-module">PV Module</label>
-            <select id="pv-module" defaultValue="demo-pv-550">
-              <option value="demo-pv-550">EasySolar Lab · DEMO-PV-550</option>
-            </select>
-            <p className="field-help field-help--warning">
-              Demo R1 · ยังไม่ผ่านการตรวจสอบ
+            <ThemeSelect
+              id="pv-module"
+              onValueChange={setPvModule}
+              options={pvOptions}
+              searchable={pvOptions.length > 8}
+              value={pvModule}
+            />
+            <p className={`field-help${pvOptions.find((option) => option.value === pvModule)?.isDemo ? " field-help--warning" : ""}`}>
+              {selectionHelp(pvOptions.find((option) => option.value === pvModule))}
             </p>
           </div>
 
           <div className="field-group">
             <label htmlFor="inverter">Inverter</label>
-            <select id="inverter" defaultValue="demo-inverter-10k">
-              <option value="demo-inverter-10k">
-                EasySolar Lab · DEMO-INV-10K-2MPPT
-              </option>
-            </select>
-            <p className="field-help field-help--warning">
-              Demo R1 · ยังไม่ผ่านการตรวจสอบ
+            <ThemeSelect
+              id="inverter"
+              onValueChange={setInverter}
+              options={inverterOptions}
+              searchable={inverterOptions.length > 8}
+              value={inverter}
+            />
+            <p className={`field-help${inverterOptions.find((option) => option.value === inverter)?.isDemo ? " field-help--warning" : ""}`}>
+              {selectionHelp(inverterOptions.find((option) => option.value === inverter))}
             </p>
           </div>
 

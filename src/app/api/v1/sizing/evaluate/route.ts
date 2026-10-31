@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { findInverter, findPvModule } from "@/data/demo-catalog";
 import { evaluateSizing } from "@/domain/sizing/engine";
 import { sizingRequestSchema } from "@/domain/sizing/schemas";
+import { resolveInverter, resolvePvModule } from "@/lib/server/equipment-resolver";
 
 export async function POST(request: Request) {
   const json = await request.json().catch(() => null);
@@ -18,8 +18,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const pvModule = findPvModule(parsed.data.pvModuleId);
-  const inverter = findInverter(parsed.data.inverterId);
+  const [pvModule, inverter] = await Promise.all([
+    resolvePvModule(parsed.data.pvModuleId),
+    resolveInverter(parsed.data.inverterId),
+  ]);
 
   if (!pvModule || !inverter) {
     return NextResponse.json(

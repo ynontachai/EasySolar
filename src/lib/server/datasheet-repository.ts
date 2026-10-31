@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { AssetState } from "@/domain/assets/config";
+import type { InverterSpec, PvModuleSpec } from "@/domain/catalog/types";
 import {
   assetIdSchema,
   type DatasheetUploadIntentInput,
@@ -33,12 +34,21 @@ export interface PublishedCatalogItem {
   downloadPath: string | null;
   exactModel: string;
   id: string;
+  imageAlt: string | null;
+  imageAssetId: string | null;
   manufacturer: string;
   primarySpec: string;
   revisionId: string;
   revisionLabel: string;
   secondarySpec: string;
   verificationStatus: "verified" | "published";
+}
+
+export interface PublishedEquipmentOption {
+  category: "inverter" | "pv_module";
+  id: string;
+  label: string;
+  revisionLabel: string;
 }
 
 export async function createDatasheetUploadRecord(
@@ -305,18 +315,34 @@ export async function findDownloadableDatasheet(revisionId: string) {
   return asset;
 }
 
-export async function listPublishedCatalogItems(): Promise<
+export async function listPublishedCatalogItems(filters: {
+  categories?: Array<"inverter" | "pv_module">;
+  query?: string;
+} = {}): Promise<
   PublishedCatalogItem[] | null
 > {
   if (!isDatabaseConfigured()) return null;
 
   const sql = getDb();
+  const search = filters.query?.trim();
+  const categories = filters.categories ?? [];
+  const searchFilter = search
+    ? sql`AND (
+        manufacturer.name ILIKE ${`%${search}%`}
+        OR product_model.exact_model ILIKE ${`%${search}%`}
+      )`
+    : sql``;
+  const categoryFilter = categories.length
+    ? sql`AND product_model.category IN ${sql(categories)}`
+    : sql``;
   const rows = await sql<
     Array<{
       assetState: AssetState | null;
       category: "pv_module" | "inverter";
       exactModel: string;
       id: string;
+      imageAlt: string | null;
+      imageAssetId: string | null;
       manufacturer: string;
       pmaxWp: string | null;
       ratedAcKw: string | null;
@@ -333,6 +359,8 @@ export async function listPublishedCatalogItems(): Promise<
       product_model.id::text AS id,
       product_model.category,
       product_model.exact_model AS "exactModel",
+      primary_media.asset_id::text AS "imageAssetId",
+      primary_media.alt_text AS "imageAlt",
       manufacturer.name AS manufacturer,
       datasheet_revision.id::text AS "revisionId",
       datasheet_revision.revision_label AS "revisionLabel",
@@ -357,11 +385,25 @@ export async function listPublishedCatalogItems(): Promise<
       ON datasheet_asset.datasheet_revision_id = datasheet_revision.id
       AND datasheet_asset.role = 'original'
     LEFT JOIN asset ON asset.id = datasheet_asset.asset_id
-    WHERE product_model.status IN ('verified', 'published')
-      AND datasheet_revision.state IN ('verified', 'published')
+    LEFT JOIN LATERAL (
+      SELECT product_media.asset_id, product_media.alt_text
+      FROM product_media
+      JOIN asset AS media_asset ON media_asset.id = product_media.asset_id
+      WHERE product_media.product_model_id = product_model.id
+        AND product_media.role = 'primary'
+        AND media_asset.state = 'available'
+      ORDER BY product_media.created_at DESC
+      LIMIT 1
+    ) AS primary_media ON true
+    WHERE product_model.status = 'published'
+      AND datasheet_revision.state = 'published'
+      ${searchFilter}
+      ${categoryFilter}
     GROUP BY
       product_model.id,
       manufacturer.name,
+      primary_media.asset_id,
+      primary_media.alt_text,
       datasheet_revision.id,
       asset.state,
       pv_module_spec.pmax_wp,
@@ -383,6 +425,8 @@ export async function listPublishedCatalogItems(): Promise<
           : null,
       exactModel: row.exactModel,
       id: row.id,
+      imageAlt: row.imageAlt,
+      imageAssetId: row.imageAssetId,
       manufacturer: row.manufacturer,
       primarySpec: isModule
         ? `${Number(row.pmaxWp)} Wp`
@@ -395,6 +439,174 @@ export async function listPublishedCatalogItems(): Promise<
       verificationStatus: row.verificationStatus,
     };
   });
+}
+
+export async function listPublishedEquipmentOptions(): Promise<PublishedEquipmentOption[]> {
+  const items = await listPublishedCatalogItems();
+  if (!items) return [];
+  return items.map((item) => ({
+    category: item.category,
+    id: item.id,
+    label: `${item.manufacturer} · ${item.exactModel}`,
+    revisionLabel: item.revisionLabel,
+  }));
+}
+
+export async function findPublishedPvModule(id: string): Promise<PvModuleSpec | null> {
+  if (!isDatabaseConfigured()) return null;
+  const sql = getDb();
+  const [row] = await sql<Array<{
+    betaVmpPerC: string | null;
+    betaVocPerC: string | null;
+    exactModel: string;
+    impA: string;
+    iscA: string;
+    manufacturer: string;
+    market: string;
+    maxSystemVoltageV: string;
+    pmaxWp: string;
+    revisionId: string;
+    revisionLabel: string;
+    verifiedAt: string;
+    vmpV: string;
+    vocV: string;
+    bifacialityFactor: string | null;
+  }>>`
+    SELECT
+      manufacturer.name AS manufacturer,
+      product_model.exact_model AS "exactModel",
+      product_model.market,
+      datasheet_revision.id::text AS "revisionId",
+      datasheet_revision.revision_label AS "revisionLabel",
+      datasheet_revision.verified_at::text AS "verifiedAt",
+      pv_module_spec.pmax_wp::text AS "pmaxWp",
+      pv_module_spec.voc_v::text AS "vocV",
+      pv_module_spec.vmp_v::text AS "vmpV",
+      pv_module_spec.isc_a::text AS "iscA",
+      pv_module_spec.imp_a::text AS "impA",
+      pv_module_spec.beta_voc_per_c::text AS "betaVocPerC",
+      pv_module_spec.beta_vmp_per_c::text AS "betaVmpPerC",
+      pv_module_spec.max_system_voltage_v::text AS "maxSystemVoltageV",
+      pv_module_spec.bifaciality_factor::text AS "bifacialityFactor"
+    FROM product_model
+    JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
+    JOIN datasheet_revision ON datasheet_revision.product_model_id = product_model.id
+    JOIN pv_module_spec ON pv_module_spec.datasheet_revision_id = datasheet_revision.id
+    WHERE product_model.id = ${id}
+      AND product_model.category = 'pv_module'
+      AND product_model.status = 'published'
+      AND datasheet_revision.state = 'published'
+    ORDER BY datasheet_revision.published_at DESC NULLS LAST
+    LIMIT 1
+  `;
+  if (!row) return null;
+  return {
+    betaVmpPerC: row.betaVmpPerC === null ? null : Number(row.betaVmpPerC),
+    betaVocPerC: row.betaVocPerC === null ? null : Number(row.betaVocPerC),
+    datasheet: {
+      revisionId: row.revisionId,
+      revisionLabel: row.revisionLabel,
+      sourceNote: "EasySolar verified datasheet",
+      sourceUrl: null,
+      verificationStatus: "verified",
+      verifiedAt: row.verifiedAt,
+    },
+    id,
+    impA: Number(row.impA),
+    isBifacial: Number(row.bifacialityFactor ?? 0) > 0,
+    iscA: Number(row.iscA),
+    manufacturer: row.manufacturer,
+    market: row.market,
+    maxSystemVoltageV: Number(row.maxSystemVoltageV),
+    model: row.exactModel,
+    pmaxWp: Number(row.pmaxWp),
+    vmpV: Number(row.vmpV),
+    vocV: Number(row.vocV),
+  };
+}
+
+export async function findPublishedInverter(id: string): Promise<InverterSpec | null> {
+  if (!isDatabaseConfigured()) return null;
+  const sql = getDb();
+  const rows = await sql<Array<{
+    exactModel: string;
+    inputCount: number;
+    manufacturer: string;
+    market: string;
+    maxDcPowerWp: string | null;
+    maxDcVoltageV: string;
+    maxOperatingCurrentA: string;
+    maxRecommendedPvWp: string | null;
+    maxShortCircuitCurrentA: string;
+    mpptMaxV: string;
+    mpptMinV: string;
+    ratedAcKw: string;
+    revisionId: string;
+    revisionLabel: string;
+    startupVoltageV: string | null;
+    trackerIndex: number;
+    verifiedAt: string;
+  }>>`
+    SELECT
+      manufacturer.name AS manufacturer,
+      product_model.exact_model AS "exactModel",
+      product_model.market,
+      datasheet_revision.id::text AS "revisionId",
+      datasheet_revision.revision_label AS "revisionLabel",
+      datasheet_revision.verified_at::text AS "verifiedAt",
+      inverter_spec.rated_ac_kw::text AS "ratedAcKw",
+      inverter_spec.max_dc_voltage_v::text AS "maxDcVoltageV",
+      inverter_spec.max_dc_power_wp::text AS "maxDcPowerWp",
+      inverter_spec.max_recommended_pv_wp::text AS "maxRecommendedPvWp",
+      inverter_spec.startup_voltage_v::text AS "startupVoltageV",
+      mppt_tracker.tracker_index AS "trackerIndex",
+      mppt_tracker.mppt_min_v::text AS "mpptMinV",
+      mppt_tracker.mppt_max_v::text AS "mpptMaxV",
+      mppt_tracker.max_operating_current_a::text AS "maxOperatingCurrentA",
+      mppt_tracker.max_short_circuit_current_a::text AS "maxShortCircuitCurrentA",
+      mppt_tracker.input_count AS "inputCount"
+    FROM product_model
+    JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
+    JOIN datasheet_revision ON datasheet_revision.product_model_id = product_model.id
+    JOIN inverter_spec ON inverter_spec.datasheet_revision_id = datasheet_revision.id
+    JOIN mppt_tracker ON mppt_tracker.inverter_revision_id = datasheet_revision.id
+    WHERE product_model.id = ${id}
+      AND product_model.category = 'inverter'
+      AND product_model.status = 'published'
+      AND datasheet_revision.state = 'published'
+    ORDER BY datasheet_revision.published_at DESC NULLS LAST, mppt_tracker.tracker_index
+  `;
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    datasheet: {
+      revisionId: row.revisionId,
+      revisionLabel: row.revisionLabel,
+      sourceNote: "EasySolar verified datasheet",
+      sourceUrl: null,
+      verificationStatus: "verified",
+      verifiedAt: row.verifiedAt,
+    },
+    id,
+    manufacturer: row.manufacturer,
+    market: row.market,
+    maxDcPowerWp: row.maxDcPowerWp === null ? null : Number(row.maxDcPowerWp),
+    maxDcVoltageV: Number(row.maxDcVoltageV),
+    maxRecommendedPvWp: row.maxRecommendedPvWp === null ? null : Number(row.maxRecommendedPvWp),
+    model: row.exactModel,
+    ratedAcKw: Number(row.ratedAcKw),
+    startupVoltageV: row.startupVoltageV === null ? null : Number(row.startupVoltageV),
+    trackers: rows
+      .filter((item) => item.revisionId === row.revisionId)
+      .map((item) => ({
+        inputCount: item.inputCount,
+        maxOperatingCurrentA: Number(item.maxOperatingCurrentA),
+        maxShortCircuitCurrentA: Number(item.maxShortCircuitCurrentA),
+        mpptMaxV: Number(item.mpptMaxV),
+        mpptMinV: Number(item.mpptMinV),
+        trackerIndex: item.trackerIndex,
+      })),
+  };
 }
 
 export async function findPublishedEquipmentRevisions(equipmentId: string) {

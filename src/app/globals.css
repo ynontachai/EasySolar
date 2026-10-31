@@ -115,19 +115,203 @@ a {
   display: flex;
   font-size: 14px;
   font-weight: 400;
-  gap: 28px;
+  gap: 8px;
 }
 
-.main-nav a {
+.main-nav .role-shortcut {
   align-items: center;
+  border: 1px solid transparent;
   display: flex;
+  gap: 7px;
   min-height: 44px;
-  opacity: 0.74;
-  transition: opacity 160ms ease;
+  padding: 0 10px;
+  position: relative;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
-.main-nav a:hover {
-  opacity: 1;
+.main-nav .role-shortcut::after {
+  background: var(--sun);
+  bottom: 3px;
+  content: "";
+  height: 3px;
+  left: 10px;
+  position: absolute;
+  right: 10px;
+  transform: scaleX(0.28);
+  transform-origin: left;
+  transition: transform 160ms ease;
+}
+
+.main-nav .role-shortcut > span {
+  color: var(--sun-deep);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.site-header--inverse .main-nav .role-shortcut > span {
+  color: var(--sun);
+}
+
+.main-nav .role-shortcut:hover,
+.main-nav .role-shortcut:focus-visible {
+  background: var(--sun);
+  border-color: var(--sun);
+  color: var(--ink);
+}
+
+.main-nav .role-shortcut:hover::after,
+.main-nav .role-shortcut:focus-visible::after {
+  background: var(--ink);
+  transform: scaleX(1);
+}
+
+.main-nav .role-shortcut:hover > span,
+.main-nav .role-shortcut:focus-visible > span {
+  color: var(--ink);
+}
+
+/* Theme-aligned select: replaces platform-native dropdown chrome. */
+.theme-select {
+  min-width: 0;
+  position: relative;
+  width: 100%;
+}
+
+.theme-select:has(.theme-select__popover) {
+  z-index: 40;
+}
+
+.theme-select__trigger {
+  align-items: center;
+  background: var(--white);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  gap: 14px;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 0 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.theme-select__trigger[data-empty="true"] {
+  color: #89909d;
+}
+
+.theme-select__trigger[aria-expanded="true"] {
+  border-color: var(--sun-deep);
+  box-shadow: 0 0 0 2px rgba(255, 159, 28, 0.18);
+}
+
+.theme-select__trigger svg {
+  color: var(--sun-deep);
+  flex: 0 0 auto;
+  transition: transform 160ms ease;
+}
+
+.theme-select__trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.theme-select[data-disabled="true"] .theme-select__trigger {
+  background: #edece8;
+  color: #8a909b;
+  cursor: not-allowed;
+}
+
+.theme-select__popover {
+  background: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 18px 48px rgba(17, 24, 39, 0.24);
+  color: var(--white);
+  left: 0;
+  min-width: 100%;
+  overflow: hidden;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 7px);
+  z-index: 50;
+}
+
+.theme-select__search {
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  display: grid !important;
+  gap: 10px !important;
+  grid-template-columns: auto minmax(0, 1fr);
+  margin: 0 !important;
+  padding: 10px 12px;
+}
+
+.theme-select__search input {
+  background: rgba(255, 255, 255, 0.09) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: var(--white) !important;
+  min-height: 40px !important;
+  outline: 0;
+  padding: 0 10px !important;
+}
+
+.theme-select__search input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.theme-select__list {
+  max-height: min(320px, 46vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+}
+
+.theme-select__option {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 9px 11px;
+  text-align: left;
+  width: 100%;
+}
+
+.theme-select__option:hover,
+.theme-select__option:focus-visible,
+.theme-select__option[aria-selected="true"] {
+  background: var(--sun);
+  color: var(--ink);
+  outline: 0;
+}
+
+.theme-select__option span,
+.theme-select__option strong,
+.theme-select__option small {
+  display: block;
+}
+
+.theme-select__option strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.theme-select__option small {
+  font-size: 9px;
+  margin-top: 2px;
+  opacity: 0.65;
+}
+
+.theme-select__empty {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+  margin: 0;
+  padding: 18px 12px;
 }
 
 .header-action {
@@ -2635,6 +2819,20 @@ a {
   gap: 8px;
 }
 
+.datasheet-intake__field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.datasheet-intake__field > span {
+  color: #53627b;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
 .datasheet-intake__form label > span {
   color: #53627b;
   font-size: 10px;
@@ -3507,11 +3705,15 @@ a {
 }
 
 .admin-sidebar {
+  align-self: start;
   background: var(--ink);
   color: var(--white);
   display: flex;
   flex-direction: column;
+  height: 100dvh;
+  max-height: 100dvh;
   min-height: 100svh;
+  overflow-y: auto;
   padding: 28px 22px;
   position: sticky;
   top: 0;
@@ -4433,7 +4635,11 @@ a {
   }
 
   .admin-sidebar {
+    align-self: stretch;
+    height: auto;
+    max-height: none;
     min-height: auto;
+    overflow: visible;
     padding: 14px 18px;
     position: relative;
   }
@@ -5259,6 +5465,20 @@ a {
   gap: 8px;
 }
 
+.admin-invite-form__field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-invite-form__field > span {
+  color: #344054;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .admin-invite-form__grid label > span {
   color: #344054;
   font-size: 9px;
@@ -5920,6 +6140,29 @@ a {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.community-form__field {
+  min-width: 0;
+}
+
+.community-form__field > span {
+  color: #53617b;
+  display: block;
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+.community-form__field > small {
+  color: #748099;
+  display: block;
+  font-size: 9px;
+  margin-top: 7px;
+}
+
+.community-form .theme-select__trigger {
+  min-height: 56px;
+  padding: 0 15px;
+}
+
 .community-form label > span:first-child,
 .community-radius legend {
   color: #53617b;
@@ -6022,6 +6265,98 @@ a {
   color: #748099;
   font-size: 11px;
   margin: 4px 0 0;
+}
+
+.community-map {
+  border: 1px solid var(--line);
+  margin-top: 22px;
+  overflow: hidden;
+}
+
+.community-map__head {
+  align-items: center;
+  background: var(--ink);
+  color: var(--white);
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  min-height: 74px;
+  padding: 14px 18px;
+}
+
+.community-map__head > div {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.community-map__head svg {
+  color: var(--sun);
+  flex: 0 0 auto;
+}
+
+.community-map__head strong,
+.community-map__head small {
+  display: block;
+}
+
+.community-map__head strong {
+  font-size: 13px;
+}
+
+.community-map__head small {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 9px;
+  margin-top: 3px;
+}
+
+.community-map__status {
+  background: var(--sun);
+  color: var(--ink);
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 7px 9px;
+}
+
+.community-map__canvas {
+  background: #d9e3de;
+  height: 350px;
+  position: relative;
+  width: 100%;
+}
+
+.community-map__canvas > p {
+  align-items: center;
+  background: var(--paper-deep);
+  display: flex;
+  font-size: 11px;
+  inset: 0;
+  justify-content: center;
+  margin: 0;
+  padding: 24px;
+  position: absolute;
+  text-align: center;
+  z-index: 2;
+}
+
+.community-map__marker {
+  background: var(--sun);
+  border: 3px solid var(--ink);
+  border-radius: 50% 50% 50% 0;
+  box-shadow: 0 6px 18px rgba(17, 24, 39, 0.28);
+  display: block;
+  height: 25px;
+  transform: rotate(-45deg);
+  width: 25px;
+}
+
+.community-map__credit {
+  background: var(--white);
+  color: #748099;
+  font-size: 8px;
+  margin: 0;
+  padding: 7px 10px;
 }
 
 .community-consents {
@@ -6276,5 +6611,19 @@ a {
   .community-form__actions .button {
     justify-content: center;
     min-width: 0;
+  }
+
+  .theme-select__popover {
+    max-width: calc(100vw - 36px);
+  }
+
+  .community-map__head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .community-map__canvas {
+    height: 280px;
   }
 }

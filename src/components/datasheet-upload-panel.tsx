@@ -13,6 +13,7 @@ import {
   MAX_DATASHEET_SIZE_BYTES,
   type DatasheetRuntimeCapabilities,
 } from "@/domain/assets/config";
+import { ThemeSelect } from "@/components/theme-select";
 
 interface UploadIntentResponse {
   assetId: string;
@@ -54,6 +55,8 @@ async function readApiResponse<T>(response: Response): Promise<T> {
 export function DatasheetUploadPanel({ capabilities }: DatasheetUploadPanelProps) {
   const [phase, setPhase] = useState<UploadPhase>("idle");
   const [message, setMessage] = useState("");
+  const [category, setCategory] = useState("pv_module");
+  const [language, setLanguage] = useState("th");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -180,13 +183,13 @@ export function DatasheetUploadPanel({ capabilities }: DatasheetUploadPanelProps
             <span>Exact model</span>
             <input name="exactModel" placeholder="รหัสรุ่นตาม Datasheet" required />
           </label>
-          <label>
+          <div className="datasheet-intake__field">
             <span>ประเภทอุปกรณ์</span>
-            <select defaultValue="pv_module" name="category">
-              <option value="pv_module">PV Module</option>
-              <option value="inverter">Inverter</option>
-            </select>
-          </label>
+            <ThemeSelect name="category" onValueChange={setCategory} options={[
+              { label: "PV Module", value: "pv_module" },
+              { label: "Inverter", value: "inverter" },
+            ]} value={category} />
+          </div>
           <label>
             <span>Market</span>
             <input defaultValue="TH" maxLength={16} name="market" required />
@@ -195,13 +198,13 @@ export function DatasheetUploadPanel({ capabilities }: DatasheetUploadPanelProps
             <span>Revision label</span>
             <input name="revisionLabel" placeholder="เช่น Rev. 2026-01" required />
           </label>
-          <label>
+          <div className="datasheet-intake__field">
             <span>ภาษา</span>
-            <select defaultValue="th" name="language">
-              <option value="th">ไทย</option>
-              <option value="en">English</option>
-            </select>
-          </label>
+            <ThemeSelect name="language" onValueChange={setLanguage} options={[
+              { label: "ไทย", value: "th" },
+              { label: "English", value: "en" },
+            ]} value={language} />
+          </div>
           <label className="datasheet-intake__file">
             <span>Official Datasheet PDF</span>
             <input

@@ -1,13 +1,17 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   CheckCircle2,
   ChevronRight,
   LoaderCircle,
   PackagePlus,
+  ImagePlus,
   Plus,
+  UploadCloud,
 } from "lucide-react";
 import {
   createSkuAction,
@@ -18,6 +22,8 @@ import type {
   CatalogOrganizationOption,
   CatalogProductOption,
 } from "@/lib/server/catalog-admin-repository";
+import { ThemeSelect } from "@/components/theme-select";
+import { MAX_PRODUCT_IMAGE_SIZE_BYTES, PRODUCT_IMAGE_MEDIA_TYPES } from "@/domain/assets/config";
 
 const initialState: CreateSkuActionState = { message: "", status: "idle" };
 type Category = "pv_module" | "inverter";
@@ -27,6 +33,23 @@ const categoryLabels: Record<Category, string> = {
   inverter: "Inverter",
   pv_module: "PV Module",
 };
+
+type MediaPhase = "idle" | "uploading" | "success" | "error";
+
+async function createFileChecksums(file: File) {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  const bytes = new Uint8Array(digest);
+  return {
+    base64: btoa(String.fromCharCode(...bytes)),
+    hex: Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(""),
+  };
+}
+
+async function readMediaResponse<T>(response: Response) {
+  const body = await response.json().catch(() => ({})) as T & { message?: string };
+  if (!response.ok) throw new Error(body.message || `Media request failed (${response.status})`);
+  return body;
+}
 
 function getInitialIdentity(
   manufacturers: CatalogManufacturerOption[],
@@ -56,6 +79,7 @@ export function AdminSkuForm({
   organizations: CatalogOrganizationOption[];
   products: CatalogProductOption[];
 }) {
+  const router = useRouter();
   const initialIdentity = getInitialIdentity(manufacturers, products);
   const [state, action, isPending] = useActionState(createSkuAction, initialState);
   const [organizationId, setOrganizationId] = useState(organizations[0]?.id ?? "");
@@ -70,6 +94,13 @@ export function AdminSkuForm({
   const [exactModel, setExactModel] = useState("");
   const [sku, setSku] = useState("");
   const [variantLabel, setVariantLabel] = useState("");
+  const [altText, setAltText] = useState("");
+  const [mediaFiles, setMediaFiles] = useState<File[]>([]);
+  const [mediaPreviews, setMediaPreviews] = useState<string[]>([]);
+  const [mediaPhase, setMediaPhase] = useState<MediaPhase>("idle");
+  const [mediaMessage, setMediaMessage] = useState("");
+  const uploadedVariantRef = useRef("");
+  const uploadedMediaIndexesRef = useRef(new Set<number>());
 
   const availableModels = useMemo(
     () =>
@@ -92,8 +123,74 @@ export function AdminSkuForm({
     productMode === "new" ? exactModel.trim() : selectedProduct?.exactModel ?? "";
   const identityReady = Boolean(displayedBrand && displayedModel);
   const canSubmit = Boolean(
-    organizations.length && identityReady && sku.trim() && variantLabel.trim(),
+    organizations.length && identityReady && sku.trim() && variantLabel.trim() &&
+    altText.trim().length >= 2 && mediaFiles.length > 0,
   );
+
+  useEffect(() => {
+    return () => mediaPreviews.forEach((preview) => URL.revokeObjectURL(preview));
+  }, [mediaPreviews]);
+
+  const uploadCreatedMedia = useCallback(async () => {
+    if (!state.productVariantId || !state.productModelId || !state.organizationId) return;
+    try {
+      uploadedVariantRef.current = state.productVariantId;
+      setMediaPhase("uploading");
+      setMediaMessage(`กำลังอัปโหลดรูป ${uploadedMediaIndexesRef.current.size}/${mediaFiles.length}`);
+      for (const [index, file] of mediaFiles.entries()) {
+        if (uploadedMediaIndexesRef.current.has(index)) continue;
+          const checksum = await createFileChecksums(file);
+          const intentResponse = await fetch("/api/v1/admin/product-media/upload-intents", {
+            body: JSON.stringify({
+              altText,
+              filename: file.name,
+              mediaType: file.type,
+              organizationId: state.organizationId,
+              productModelId: state.productModelId,
+              productVariantId: state.productVariantId,
+              role: index === 0 ? "primary" : "gallery",
+              sha256Base64: checksum.base64,
+              sha256Hex: checksum.hex,
+              sizeBytes: file.size,
+              sortOrder: index,
+            }),
+            headers: { "content-type": "application/json" },
+            method: "POST",
+          });
+          const intent = await readMediaResponse<{
+            assetId: string;
+            uploadHeaders: Record<string, string>;
+            uploadUrl: string;
+          }>(intentResponse);
+          const uploadResponse = await fetch(intent.uploadUrl, {
+            body: file,
+            headers: intent.uploadHeaders,
+            method: "PUT",
+          });
+          if (!uploadResponse.ok) throw new Error(`Storage ปฏิเสธรูป ${file.name}`);
+          await readMediaResponse(
+            await fetch(`/api/v1/admin/product-media/${intent.assetId}/finalize`, { method: "POST" }),
+          );
+        uploadedMediaIndexesRef.current.add(index);
+        setMediaMessage(`กำลังอัปโหลดรูป ${index + 1}/${mediaFiles.length}`);
+      }
+      setMediaPhase("success");
+      setMediaMessage(`สร้าง ${state.sku} และอัปโหลดรูป ${mediaFiles.length} รูปเรียบร้อย`);
+      router.refresh();
+    } catch (error) {
+      setMediaPhase("error");
+      setMediaMessage(error instanceof Error ? `สร้าง SKU แล้ว แต่รูปยังไม่ครบ: ${error.message}` : "อัปโหลดรูปไม่สำเร็จ");
+    }
+  }, [altText, mediaFiles, router, state.organizationId, state.productModelId, state.productVariantId, state.sku]);
+
+  useEffect(() => {
+    if (
+      state.status !== "success" ||
+      !state.productVariantId ||
+      uploadedVariantRef.current === state.productVariantId
+    ) return;
+    void uploadCreatedMedia();
+  }, [state.productVariantId, state.status, uploadCreatedMedia]);
 
   function chooseCategory(nextCategory: Category) {
     setCategory(nextCategory);
@@ -149,20 +246,19 @@ export function AdminSkuForm({
 
             <div className="admin-product-field">
               <label htmlFor="organizationId">เจ้าของรายการ / Organization</label>
-              <select
+              <ThemeSelect
                 id="organizationId"
                 name="organizationId"
-                onChange={(event) => setOrganizationId(event.target.value)}
+                onValueChange={setOrganizationId}
+                options={organizations.map((organization) => ({
+                  label: organization.name,
+                  value: organization.id,
+                }))}
+                placeholder="เลือก Organization"
                 required
+                searchable
                 value={organizationId}
-              >
-                <option disabled value="">เลือก Organization</option>
-                {organizations.map((organization) => (
-                  <option key={organization.id} value={organization.id}>
-                    {organization.name}
-                  </option>
-                ))}
-              </select>
+              />
               <small>SKU จะอยู่ภายใต้สิทธิ์และ audit scope ของ Organization นี้</small>
             </div>
 
@@ -199,20 +295,19 @@ export function AdminSkuForm({
                 </button>
               </div>
               {manufacturerMode === "existing" ? (
-                <select
+                <ThemeSelect
                   id="manufacturerId"
                   name="manufacturerId"
-                  onChange={(event) => chooseManufacturer(event.target.value)}
+                  onValueChange={chooseManufacturer}
+                  options={manufacturers.map((manufacturer) => ({
+                    label: manufacturer.name,
+                    value: manufacturer.id,
+                  }))}
+                  placeholder="เลือก Brand"
                   required
+                  searchable
                   value={manufacturerId}
-                >
-                  <option disabled value="">เลือก Brand</option>
-                  {manufacturers.map((manufacturer) => (
-                    <option key={manufacturer.id} value={manufacturer.id}>
-                      {manufacturer.name}
-                    </option>
-                  ))}
-                </select>
+                />
               ) : (
                 <input
                   autoComplete="organization"
@@ -245,18 +340,19 @@ export function AdminSkuForm({
                 ) : null}
               </div>
               {productMode === "existing" && manufacturerMode === "existing" ? (
-                <select
+                <ThemeSelect
                   id="productModelId"
                   name="productModelId"
-                  onChange={(event) => setProductModelId(event.target.value)}
+                  onValueChange={setProductModelId}
+                  options={availableModels.map((product) => ({
+                    label: product.exactModel,
+                    value: product.id,
+                  }))}
+                  placeholder="เลือก Model"
                   required
+                  searchable
                   value={productModelId}
-                >
-                  <option disabled value="">เลือก Model</option>
-                  {availableModels.map((product) => (
-                    <option key={product.id} value={product.id}>{product.exactModel}</option>
-                  ))}
-                </select>
+                />
               ) : (
                 <input
                   id="productModelId"
@@ -326,6 +422,72 @@ export function AdminSkuForm({
               <small>ไม่บังคับ และแยกจาก SKU ภายใน EasySolar</small>
             </div>
           </fieldset>
+
+          <fieldset className="admin-product-section admin-product-media">
+            <legend>
+              <span>03</span>
+              <div>
+                <strong>Product media</strong>
+                <small>รูปแรกเป็นรูปหลัก ใช้ในคลังอุปกรณ์และ Package Builder</small>
+              </div>
+            </legend>
+            <label className="admin-media-dropzone">
+              <input
+                accept="image/jpeg,image/png,image/webp"
+                multiple
+                onChange={(event) => {
+                  const files = Array.from(event.target.files ?? []).slice(0, 5);
+                  const invalid = files.find(
+                    (file) =>
+                      file.size > MAX_PRODUCT_IMAGE_SIZE_BYTES ||
+                      !PRODUCT_IMAGE_MEDIA_TYPES.includes(file.type as (typeof PRODUCT_IMAGE_MEDIA_TYPES)[number]),
+                  );
+                  if (invalid) {
+                    event.target.value = "";
+                    setMediaFiles([]);
+                    setMediaPreviews([]);
+                    setMediaPhase("error");
+                    setMediaMessage(`ไฟล์ ${invalid.name} ต้องเป็น JPEG, PNG หรือ WebP และไม่เกิน 5 MB`);
+                    return;
+                  }
+                  mediaPreviews.forEach((preview) => URL.revokeObjectURL(preview));
+                  setMediaFiles(files);
+                  uploadedMediaIndexesRef.current.clear();
+                  setMediaPreviews(files.map((file) => URL.createObjectURL(file)));
+                  setMediaPhase("idle");
+                  setMediaMessage("");
+                }}
+                required
+                type="file"
+              />
+              <ImagePlus aria-hidden="true" size={24} />
+              <strong>เลือกรูปสินค้า 1–5 รูป</strong>
+              <span>JPEG, PNG หรือ WebP · รูปละไม่เกิน 5 MB</span>
+            </label>
+            {mediaPreviews.length ? (
+              <div className="admin-media-previews" aria-label="รูปสินค้าที่เลือก">
+                {mediaPreviews.map((preview, index) => (
+                  <figure key={preview} data-primary={index === 0}>
+                    {/* Blob preview is local-only and is never persisted as a URL. */}
+                    <img alt="" src={preview} />
+                    <figcaption>{index === 0 ? "รูปหลัก" : `รูปที่ ${index + 1}`}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            ) : null}
+            <div className="admin-product-field">
+              <label htmlFor="productImageAlt">คำอธิบายรูปสำหรับผู้ใช้ Screen reader</label>
+              <input
+                id="productImageAlt"
+                maxLength={180}
+                onChange={(event) => setAltText(event.target.value)}
+                placeholder="เช่น แผงโซลาร์ LONGi รุ่น LR5-72HTH มุมด้านหน้า"
+                required
+                value={altText}
+              />
+              <small>อธิบายสิ่งที่เห็นโดยไม่ใช้คำว่า “รูปภาพของ”</small>
+            </div>
+          </fieldset>
         </div>
 
         <aside className="admin-product-summary" aria-label="สรุปสินค้าที่กำลังสร้าง">
@@ -355,14 +517,24 @@ export function AdminSkuForm({
       </div>
 
       <footer className="admin-product-builder__actions">
-        <p data-status={state.status} role={state.status === "error" ? "alert" : "status"}>
+        <p data-status={mediaPhase === "error" ? "error" : state.status} role={state.status === "error" || mediaPhase === "error" ? "alert" : "status"}>
           {state.status === "success" ? <CheckCircle2 size={17} /> : null}
-          {state.message || "ระบบจะสร้าง Product identity และ SKU พร้อม Audit event"}
+          {mediaMessage || state.message || "ระบบจะสร้าง Product identity, SKU และรูป พร้อม Audit event"}
         </p>
-        <button className="button button--sun" disabled={!canSubmit || isPending} type="submit">
-          {isPending ? <LoaderCircle className="spin" size={17} /> : <PackagePlus size={17} />}
-          {isPending ? "กำลังบันทึก" : "บันทึกสินค้าและ SKU"}
-        </button>
+        {mediaPhase === "success" ? (
+          <Link className="button button--ink" href="/admin/equipment">
+            ไปแนบ Datasheet <ChevronRight size={17} />
+          </Link>
+        ) : mediaPhase === "error" && state.status === "success" ? (
+          <button className="button button--sun" onClick={() => void uploadCreatedMedia()} type="button">
+            <UploadCloud size={17} /> ลองอัปโหลดรูปอีกครั้ง
+          </button>
+        ) : (
+          <button className="button button--sun" disabled={!canSubmit || isPending || mediaPhase === "uploading"} type="submit">
+            {isPending || mediaPhase === "uploading" ? <LoaderCircle className="spin" size={17} /> : <UploadCloud size={17} />}
+            {isPending ? "กำลังสร้าง SKU" : mediaPhase === "uploading" ? "กำลังอัปโหลดรูป" : "บันทึกสินค้า รูป และ SKU"}
+          </button>
+        )}
       </footer>
     </form>
   );

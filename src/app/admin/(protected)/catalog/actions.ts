@@ -8,6 +8,10 @@ import { HttpError } from "@/lib/server/http-error";
 
 export interface CreateSkuActionState {
   message: string;
+  organizationId?: string;
+  productModelId?: string;
+  productVariantId?: string;
+  sku?: string;
   status: "error" | "idle" | "success";
 }
 
@@ -36,9 +40,16 @@ export async function createSkuAction(
 
   try {
     const principal = await requireAdminPrincipal(["account_admin", "super_admin"]);
-    await createCatalogSku(principal, parsed.data);
+    const created = await createCatalogSku(principal, parsed.data);
     revalidatePath("/admin/catalog");
-    return { message: `สร้าง SKU ${parsed.data.sku.toUpperCase()} แล้ว`, status: "success" };
+    return {
+      message: `สร้าง SKU ${parsed.data.sku.toUpperCase()} แล้ว`,
+      organizationId: parsed.data.organizationId,
+      productModelId: created.productModelId,
+      productVariantId: created.id,
+      sku: parsed.data.sku.toUpperCase(),
+      status: "success",
+    };
   } catch (error) {
     return {
       message: error instanceof HttpError ? error.message : "สร้าง SKU ไม่สำเร็จ",

@@ -1,13 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
-import {
-  ArrowRight,
-  CheckCircle2,
-  CircleDashed,
-  Download,
-  Search,
-} from "lucide-react";
+import { ArrowRight, CheckCircle2, Download, ImageIcon, Search } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { demoInverters, demoPvModules } from "@/data/demo-catalog";
@@ -18,14 +12,25 @@ export const metadata: Metadata = {
   description: "คลัง PV Module และ Inverter พร้อม revision และแหล่งข้อมูล",
 };
 
-export default async function EquipmentPage() {
+export default async function EquipmentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ category?: string | string[]; q?: string }>;
+}) {
   await connection();
-  const publishedEquipment = await listPublishedCatalogItems();
+  const params = await searchParams;
+  const rawCategories = Array.isArray(params.category) ? params.category : params.category ? [params.category] : [];
+  const categories = rawCategories.filter(
+    (value): value is "inverter" | "pv_module" => value === "inverter" || value === "pv_module",
+  );
+  const publishedEquipment = await listPublishedCatalogItems({ categories, query: params.q });
   const demoEquipment = [
     ...demoPvModules.map((item) => ({
       category: "PV MODULE",
       downloadPath: null,
       id: item.id,
+      imageAlt: null,
+      imageAssetId: null,
       manufacturer: item.manufacturer,
       model: item.model,
       primarySpec: `${item.pmaxWp} Wp`,
@@ -37,6 +42,8 @@ export default async function EquipmentPage() {
       category: "INVERTER",
       downloadPath: null,
       id: item.id,
+      imageAlt: null,
+      imageAssetId: null,
       manufacturer: item.manufacturer,
       model: item.model,
       primarySpec: `${item.ratedAcKw} kW`,
@@ -59,6 +66,8 @@ export default async function EquipmentPage() {
         },
         downloadPath: item.downloadPath,
         id: item.id,
+        imageAlt: item.imageAlt,
+        imageAssetId: item.imageAssetId,
         manufacturer: item.manufacturer,
         model: item.exactModel,
         primarySpec: item.primarySpec,
@@ -76,9 +85,9 @@ export default async function EquipmentPage() {
           ค้นหาด้วย exact model และตรวจ revision ก่อนใช้ทุกครั้ง
           {isDemoMode
             ? " รายการใน scaffold นี้เป็นข้อมูล demo เพราะยังไม่ได้ตั้งค่า Database"
-            : " แสดงเฉพาะรายการที่ผ่าน verification หรือ publish แล้ว"}
+            : " แสดงเฉพาะรายการที่ตรวจสอบและ Publish แล้ว"}
         </p>
-        <form className="catalog-search" action="/equipment">
+        <form className="catalog-search" action="/equipment" id="catalog-filter-form">
           <Search size={18} aria-hidden="true" />
           <label className="sr-only" htmlFor="catalog-q">
             ค้นหาอุปกรณ์
@@ -88,6 +97,7 @@ export default async function EquipmentPage() {
             name="q"
             placeholder="ค้นหา brand หรือ exact model…"
             type="search"
+            defaultValue={params.q ?? ""}
           />
           <button type="submit">ค้นหา</button>
         </form>
@@ -97,15 +107,14 @@ export default async function EquipmentPage() {
         <aside className="catalog-filters">
           <strong>FILTERS</strong>
           <label>
-            <input defaultChecked type="checkbox" /> PV Module
+            <input defaultChecked={!categories.length || categories.includes("pv_module")} form="catalog-filter-form" name="category" type="checkbox" value="pv_module" /> PV Module
           </label>
           <label>
-            <input defaultChecked type="checkbox" /> Inverter
+            <input defaultChecked={!categories.length || categories.includes("inverter")} form="catalog-filter-form" name="category" type="checkbox" value="inverter" /> Inverter
           </label>
           <span>Verification</span>
-          <label>
-            <input defaultChecked type="checkbox" /> Unverified demo
-          </label>
+          <p className="catalog-verified-only"><CheckCircle2 size={14} /> Published only</p>
+          <button form="catalog-filter-form" type="submit">ใช้ตัวกรอง</button>
         </aside>
         <div className="catalog-list">
           <div className="catalog-list__head">
@@ -117,30 +126,32 @@ export default async function EquipmentPage() {
               ยังไม่มีอุปกรณ์ที่ผ่านการตรวจและ publish
             </div>
           ) : null}
+          <div className="equipment-grid">
           {equipment.map((item) => (
-            <article className="equipment-row" key={item.id}>
-              <div>
+            <article className="equipment-card" key={item.id}>
+              <div className="equipment-card__media">
+                {item.imageAssetId ? (
+                  <img alt={item.imageAlt ?? ""} src={`/api/v1/product-media/${item.imageAssetId}`} />
+                ) : <ImageIcon aria-hidden="true" size={32} />}
+                <span>{item.category}</span>
+              </div>
+              <div className="equipment-card__identity">
                 <small>{item.category}</small>
                 <p>{item.manufacturer}</p>
                 <h2>{item.model}</h2>
               </div>
-              <div className="equipment-row__spec">
+              <div className="equipment-card__spec">
                 <strong>{item.primarySpec}</strong>
                 <span>{item.secondarySpec}</span>
               </div>
-              <div className="equipment-row__source">
+              <div className="equipment-card__source">
                 <span className="verification-badge">
-                  {item.verificationStatus === "unverified" ? (
-                    <CircleDashed size={13} aria-hidden="true" />
-                  ) : (
-                    <CheckCircle2 size={13} aria-hidden="true" />
-                  )}
-                  {item.verificationStatus.toUpperCase()}
+                  <CheckCircle2 size={13} aria-hidden="true" /> PUBLISHED
                 </span>
                 <small>{item.datasheet.revisionLabel}</small>
                 <p>{item.datasheet.sourceNote}</p>
               </div>
-              <div className="equipment-row__actions">
+              <div className="equipment-card__actions">
                 {item.downloadPath ? (
                   <a
                     aria-label={`เปิด Datasheet ${item.model}`}
@@ -151,12 +162,13 @@ export default async function EquipmentPage() {
                     <Download aria-hidden="true" />
                   </a>
                 ) : null}
-                <Link href="/checker" aria-label={`เปิด ${item.model} ใน checker`}>
-                  <ArrowRight aria-hidden="true" />
+                <Link href={`/checker?${item.category === "PV MODULE" ? "pvModuleId" : "inverterId"}=${item.id}`} aria-label={`เลือก ${item.model} ใน checker`}>
+                  เลือกใน Checker <ArrowRight aria-hidden="true" size={17} />
                 </Link>
               </div>
             </article>
           ))}
+          </div>
         </div>
       </section>
       <SiteFooter />

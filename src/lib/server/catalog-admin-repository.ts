@@ -31,6 +31,8 @@ export interface CatalogSkuRow {
   category: "inverter" | "pv_module";
   exactModel: string;
   id: string;
+  imageAlt: string | null;
+  imageAssetId: string | null;
   manufacturer: string;
   organizationName: string;
   sku: string;
@@ -115,6 +117,8 @@ export async function listCatalogSkus(principal: AdminPrincipal) {
       product_variant.variant_label AS "variantLabel",
       product_variant.status::text AS status,
       product_variant.updated_at AS "updatedAt",
+      primary_media.asset_id::text AS "imageAssetId",
+      primary_media.alt_text AS "imageAlt",
       organization.name AS "organizationName",
       manufacturer.name AS manufacturer,
       product_model.exact_model AS "exactModel",
@@ -123,6 +127,16 @@ export async function listCatalogSkus(principal: AdminPrincipal) {
     JOIN organization ON organization.id = product_variant.organization_id
     JOIN product_model ON product_model.id = product_variant.product_model_id
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
+    LEFT JOIN LATERAL (
+      SELECT product_media.asset_id, product_media.alt_text
+      FROM product_media
+      JOIN asset ON asset.id = product_media.asset_id
+      WHERE product_media.product_model_id = product_model.id
+        AND product_media.role = 'primary'
+        AND asset.state = 'available'
+      ORDER BY product_media.created_at DESC
+      LIMIT 1
+    ) AS primary_media ON true
     ${scope}
     ORDER BY product_variant.updated_at DESC
     LIMIT 200
@@ -297,7 +311,7 @@ export async function createCatalogSku(
         )
       `;
 
-      return created;
+      return { id: created.id, productModelId };
     });
   } catch (error) {
     if (

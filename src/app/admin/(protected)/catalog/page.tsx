@@ -65,11 +65,16 @@ export default async function AdminCatalogPage() {
         ) : (
           <div className="admin-sku-table" role="table" aria-label="รายการ SKU">
             <div className="admin-sku-table__header" role="row">
-              <span role="columnheader">SKU</span><span role="columnheader">Product Model</span><span role="columnheader">Organization</span><span role="columnheader">สถานะ</span><span role="columnheader">อัปเดต</span>
+              <span role="columnheader">สินค้า / SKU</span><span role="columnheader">Product Model</span><span role="columnheader">Organization</span><span role="columnheader">สถานะ</span><span role="columnheader">อัปเดต</span>
             </div>
             {skus.map((sku) => (
               <article className="admin-sku-row" key={sku.id} role="row">
-                <div role="cell"><strong>{sku.sku}</strong><small>{sku.variantLabel}</small></div>
+                <div className="admin-sku-identity" role="cell">
+                  <span className="admin-sku-thumb">
+                    {sku.imageAssetId ? <img alt={sku.imageAlt ?? ""} src={`/api/v1/product-media/${sku.imageAssetId}`} /> : <Boxes aria-hidden="true" size={18} />}
+                  </span>
+                  <span><strong>{sku.sku}</strong><small>{sku.variantLabel}</small></span>
+                </div>
                 <div role="cell"><strong>{sku.manufacturer}</strong><small>{sku.exactModel} · {sku.category === "pv_module" ? "PV Module" : "Inverter"}</small></div>
                 <span role="cell">{sku.organizationName}</span>
                 <span className="admin-status" role="cell">{sku.status}</span>
