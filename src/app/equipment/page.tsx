@@ -134,7 +134,6 @@ export default async function EquipmentPage({
                 {item.imageAssetId ? (
                   <img alt={item.imageAlt ?? ""} src={`/api/v1/product-media/${item.imageAssetId}`} />
                 ) : <ImageIcon aria-hidden="true" size={32} />}
-                <span>{item.category}</span>
               </div>
               <div className="equipment-card__identity">
                 <small>{item.category}</small>
@@ -155,6 +154,7 @@ export default async function EquipmentPage({
               <div className="equipment-card__actions">
                 {item.downloadPath ? (
                   <a
+                    className="equipment-card__download"
                     aria-label={`เปิด Datasheet ${item.model}`}
                     href={item.downloadPath}
                     rel="noreferrer"
@@ -163,7 +163,7 @@ export default async function EquipmentPage({
                     <Download aria-hidden="true" />
                   </a>
                 ) : null}
-                <Link href={`/checker?${item.category === "PV MODULE" ? "pvModuleId" : "inverterId"}=${item.id}`} aria-label={`เลือก ${item.model} ใน checker`}>
+                <Link className="equipment-card__checker" href={`/checker?${item.category === "PV MODULE" ? "pvModuleId" : "inverterId"}=${item.id}`} aria-label={`เลือก ${item.model} ใน checker`}>
                   เลือกใน Checker <ArrowRight aria-hidden="true" size={17} />
                 </Link>
               </div>
