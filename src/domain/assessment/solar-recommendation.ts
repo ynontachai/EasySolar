@@ -41,6 +41,15 @@ export interface PaybackRange {
   slowestYears: number;
 }
 
+export interface InvestmentScore {
+  band: "review" | "compare" | "promising" | "strong";
+  confidencePoints: number;
+  label: string;
+  paybackPoints: number;
+  score: number;
+  selfUsePoints: number;
+}
+
 export interface SolarEnergyScenario {
   monthlyConsumptionKwh: number;
   monthlyGenerationKwh: number;
@@ -74,6 +83,7 @@ export interface SolarRecommendation {
   annualConfirmedValueThb: number;
   annualPotentialValueThb: number;
   confirmedPayback: PaybackRange | null;
+  investmentScore: InvestmentScore | null;
   potentialPayback: PaybackRange | null;
 }
 
@@ -298,6 +308,71 @@ function createPaybackRange(
   };
 }
 
+function createInvestmentScore(
+  payback: PaybackRange | null,
+  selfConsumptionRatio: number,
+  confidence: SolarRecommendation["confidence"],
+): InvestmentScore | null {
+  if (!payback) return null;
+
+  const midpointYears = (payback.fastestYears + payback.slowestYears) / 2;
+  const paybackPoints =
+    midpointYears <= 6
+      ? 55
+      : midpointYears <= 8
+        ? 48
+        : midpointYears <= 10
+          ? 40
+          : midpointYears <= 12
+            ? 32
+            : midpointYears <= 15
+              ? 20
+              : 8;
+  const selfUsePoints = Math.round(clamp(selfConsumptionRatio / 0.8, 0, 1) * 25);
+  const confidencePoints = { high: 20, medium: 14, low: 8 }[confidence];
+  const score = paybackPoints + selfUsePoints + confidencePoints;
+
+  if (score >= 80) {
+    return {
+      band: "strong",
+      confidencePoints,
+      label: "คุ้มค่าน่าสนใจ",
+      paybackPoints,
+      score,
+      selfUsePoints,
+    };
+  }
+  if (score >= 65) {
+    return {
+      band: "promising",
+      confidencePoints,
+      label: "มีแนวโน้มน่าสนใจ",
+      paybackPoints,
+      score,
+      selfUsePoints,
+    };
+  }
+  if (score >= 50) {
+    return {
+      band: "compare",
+      confidencePoints,
+      label: "ควรเทียบราคาเพิ่ม",
+      paybackPoints,
+      score,
+      selfUsePoints,
+    };
+  }
+
+  return {
+    band: "review",
+    confidencePoints,
+    label: "ควรทบทวน Package",
+    paybackPoints,
+    score,
+    selfUsePoints,
+  };
+}
+
 function calculateAnnualValues(
   draft: SolarAssessmentDraft,
   systemSizeKw: number,
@@ -372,6 +447,11 @@ export function createSolarRecommendation(
       : draft.tariff !== "unknown"
         ? "medium"
         : "low";
+  const confirmedPayback = createPaybackRange(
+    packagePriceThb,
+    optimisticAnnualValues.confirmed,
+    conservativeAnnualValues.confirmed,
+  );
 
   return {
     recommendedSystemSizeKw,
@@ -386,10 +466,11 @@ export function createSolarRecommendation(
     monthlyExportValueThb: round(monthlyExportValueThb),
     annualConfirmedValueThb: round(confirmedAnnualValueThb),
     annualPotentialValueThb: round(annualPotentialValueThb),
-    confirmedPayback: createPaybackRange(
-      packagePriceThb,
-      optimisticAnnualValues.confirmed,
-      conservativeAnnualValues.confirmed,
+    confirmedPayback,
+    investmentScore: createInvestmentScore(
+      confirmedPayback,
+      energy.selfConsumptionRatio,
+      confidence,
     ),
     potentialPayback: createPaybackRange(
       packagePriceThb,

@@ -64,6 +64,7 @@ describe("createSolarRecommendation", () => {
 
     expect(recommendation.confirmedPayback).toBeNull();
     expect(recommendation.potentialPayback).toBeNull();
+    expect(recommendation.investmentScore).toBeNull();
   });
 
   it("keeps uncontracted export out of the confirmed payback", () => {
@@ -77,6 +78,27 @@ describe("createSolarRecommendation", () => {
     expect(recommendation.confirmedPayback?.fastestYears).toBeGreaterThan(
       recommendation.potentialPayback?.fastestYears ?? 0,
     );
+    expect(recommendation.investmentScore?.score).toBeGreaterThanOrEqual(0);
+    expect(recommendation.investmentScore?.score).toBeLessThanOrEqual(100);
+    expect(recommendation.investmentScore?.score).toBe(
+      (recommendation.investmentScore?.paybackPoints ?? 0) +
+        (recommendation.investmentScore?.selfUsePoints ?? 0) +
+        (recommendation.investmentScore?.confidencePoints ?? 0),
+    );
+  });
+
+  it("does not let uncontracted export inflate the investment score", () => {
+    const interested = createSolarRecommendation(createDraft(), {
+      packagePriceThb: 220_000,
+      systemSizeKw: 5,
+    });
+    const noExport = createSolarRecommendation(
+      createDraft({ exportIntent: "none" }),
+      { packagePriceThb: 220_000, systemSizeKw: 5 },
+    );
+
+    expect(interested.investmentScore?.score).toBe(noExport.investmentScore?.score);
+    expect(interested.confirmedPayback).toEqual(noExport.confirmedPayback);
   });
 
   it("counts export income as confirmed only when a contract is declared", () => {

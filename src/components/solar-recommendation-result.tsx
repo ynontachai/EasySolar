@@ -1,14 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Activity,
   ArrowLeft,
+  ArrowRight,
   Banknote,
   Info,
+  MapPin,
   RotateCcw,
+  ShieldCheck,
   Sun,
   TrendingUp,
+  UsersRound,
   Zap,
 } from "lucide-react";
 import type { SolarAssessmentDraft } from "@/domain/assessment/schema";
@@ -82,10 +87,14 @@ export function SolarRecommendationResult({
   const peakExportPercent = Math.max(100 - peakSelfUsePercent, 0);
   const isRecommendedScenario =
     selectedSystemSizeKw === recommendation.recommendedSystemSizeKw;
-  const paybackForDecision =
-    draft.exportIntent === "contracted"
-      ? recommendation.confirmedPayback
-      : recommendation.potentialPayback;
+  const paybackForDecision = recommendation.confirmedPayback;
+  const communityHref = `/community-buy/join?systemSizeKw=${selectedSystemSizeKw}${
+    packagePriceThb > 0 ? `&packagePriceThb=${packagePriceThb}` : ""
+  }${
+    recommendation.investmentScore
+      ? `&investmentScore=${recommendation.investmentScore.score}`
+      : ""
+  }`;
 
   return (
     <section
@@ -275,6 +284,52 @@ export function SolarRecommendationResult({
             </p>
           </div>
         ) : null}
+
+        <section className="investment-score" aria-labelledby="investment-score-title">
+          <div className="investment-score__gauge" data-band={recommendation.investmentScore?.band ?? "pending"}>
+            <span>SCORE</span>
+            <strong>{recommendation.investmentScore?.score ?? "—"}</strong>
+            <small>/ 100</small>
+          </div>
+          <div className="investment-score__content">
+            <p className="eyebrow">INVESTMENT VALUE SCORE</p>
+            <h3 id="investment-score-title">
+              {recommendation.investmentScore?.label ?? "ใส่ราคา Package เพื่อดูคะแนน"}
+            </h3>
+            <p>
+              คะแนนคัดกรองจากระยะคืนทุนที่ยืนยันได้ สัดส่วนใช้ไฟเอง และความครบของข้อมูล
+              ไม่รวมรายได้ขายคืนที่ยังไม่มีสัญญา
+            </p>
+            {recommendation.investmentScore ? (
+              <dl className="investment-score__breakdown">
+                <div><dt>คืนทุน</dt><dd>{recommendation.investmentScore.paybackPoints}/55</dd></div>
+                <div><dt>ใช้ไฟเอง</dt><dd>{recommendation.investmentScore.selfUsePoints}/25</dd></div>
+                <div><dt>ความมั่นใจ</dt><dd>{recommendation.investmentScore.confidencePoints}/20</dd></div>
+              </dl>
+            ) : null}
+            <small>เป็น Screening Score ไม่ใช่การรับประกันผลตอบแทนทางการเงิน</small>
+          </div>
+        </section>
+      </section>
+
+      <section className="community-next" aria-labelledby="community-next-title">
+        <div className="community-next__icon" aria-hidden="true"><UsersRound /></div>
+        <div>
+          <p className="eyebrow eyebrow--dark">NEXT · COMMUNITY BUY</p>
+          <h2 id="community-next-title">รวมความต้องการใกล้บ้าน เพื่อให้ต่อรองได้มากขึ้น</h2>
+          <p>
+            ลงทะเบียนความสนใจตามพื้นที่และระยะ 10–20 กม. EasySolar จะรวม Demand
+            ก่อนคัดเลือก EPC และ Package มาตรฐาน โดยยังไม่มีข้อผูกมัดในการซื้อ
+          </p>
+          <ul>
+            <li><MapPin size={17} aria-hidden="true" />พิกัดจริงเก็บเป็นข้อมูลส่วนตัว</li>
+            <li><ShieldCheck size={17} aria-hidden="true" />ไม่ส่งข้อมูลให้ EPC จนกว่าจะถึงขั้นยืนยัน</li>
+          </ul>
+        </div>
+        <Link className="button button--sun" href={communityHref}>
+          ลงทะเบียนความสนใจ
+          <ArrowRight size={18} aria-hidden="true" />
+        </Link>
       </section>
 
       <section className="model-assumptions" aria-labelledby="model-assumptions-title">

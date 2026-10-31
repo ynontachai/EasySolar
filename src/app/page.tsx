@@ -2,9 +2,13 @@ import Link from "next/link";
 import {
   ArrowRight,
   BookOpenCheck,
+  BriefcaseBusiness,
+  Calculator,
   FileCheck2,
   Gauge,
+  PenTool,
   Search,
+  UsersRound,
 } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -84,40 +88,61 @@ export default function HomePage() {
           </p>
         </div>
         <div className="audience-paths">
-          <article className="audience-path" id="professionals">
-            <span className="audience-path__number">01 · PROFESSIONAL</span>
+          <article className="audience-path" id="epc">
+            <span className="audience-path__number">01 · EPC / INSTALLER</span>
             <div>
               <p className="audience-path__status audience-path__status--ready">พร้อมทดลอง</p>
-              <h3>EPC / Installer / Engineer</h3>
+              <BriefcaseBusiness className="audience-path__icon" aria-hidden="true" />
+              <h3>EPC / Installer</h3>
               <p>
-                ตรวจ PV–Inverter compatibility, ออกแบบ String เบื้องต้น
-                และย้อนกลับถึง exact model กับ datasheet revision
+                ค้นหาอุปกรณ์ จัดชุด Package และเตรียมข้อเสนอจาก Demand จริงในแต่ละพื้นที่
+              </p>
+            </div>
+            <div className="audience-path__actions">
+              <Link className="text-link" href="/equipment">
+                เปิดคลังอุปกรณ์
+                <ArrowRight size={17} aria-hidden="true" />
+              </Link>
+              <Link className="text-link text-link--muted" href="/community-buy">
+                รู้จัก Community Buy
+              </Link>
+            </div>
+          </article>
+          <article className="audience-path" id="engineer">
+            <span className="audience-path__number">02 · ENGINEER</span>
+            <div>
+              <p className="audience-path__status audience-path__status--ready">พร้อมทดลอง</p>
+              <PenTool className="audience-path__icon" aria-hidden="true" />
+              <h3>Engineer</h3>
+              <p>
+                ตรวจ PV–Inverter compatibility ออกแบบ String เบื้องต้น และทบทวนสมมติฐานทุกกฎ
               </p>
             </div>
             <div className="audience-path__actions">
               <Link className="text-link" href="/checker">
-                เปิด Compatibility Checker
+                เปิด Engineering Checker
                 <ArrowRight size={17} aria-hidden="true" />
-              </Link>
-              <Link className="text-link text-link--muted" href="/equipment">
-                ค้นหาคลังอุปกรณ์
               </Link>
             </div>
           </article>
-          <article className="audience-path audience-path--consumer">
-            <span className="audience-path__number">02 · SOLAR BUYER</span>
+          <article className="audience-path audience-path--consumer" id="electricity-user">
+            <span className="audience-path__number">03 · ELECTRICITY USER</span>
             <div>
-              <p className="audience-path__status">กำลังวางระบบประเมิน</p>
-              <h3>เจ้าของบ้าน / เจ้าของธุรกิจ</h3>
+              <p className="audience-path__status audience-path__status--ready">ประเมินได้แล้ว</p>
+              <Calculator className="audience-path__icon" aria-hidden="true" />
+              <h3>ผู้ใช้ไฟ</h3>
               <p>
-                ประเมินว่าขนาดระบบ ราคา และผลตอบแทนของข้อเสนอสมเหตุสมผลหรือไม่
-                โดยเห็นสมมติฐานและความไม่แน่นอนทุกจุด
+                ประเมินขนาดระบบ ราคา ช่วงคืนทุน และ Investment Score ก่อนรวมความต้องการกับคนใกล้บ้าน
               </p>
             </div>
             <div className="audience-path__actions">
-              <Link className="text-link" href="/solar-value">
-                ดูแนวทาง Solar Value Assessment
+              <Link className="text-link" href="/solar-value/new">
+                เริ่มประเมินความคุ้มค่า
                 <ArrowRight size={17} aria-hidden="true" />
+              </Link>
+              <Link className="text-link text-link--muted" href="/community-buy">
+                <UsersRound size={16} aria-hidden="true" />
+                ดู Community Buy
               </Link>
             </div>
           </article>
