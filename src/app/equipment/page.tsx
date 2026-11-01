@@ -1,14 +1,26 @@
 /* eslint-disable @next/next/no-img-element -- product images redirect to short-lived signed URLs that the image optimizer cannot follow */
 import type { Metadata } from "next";
+import Form from "next/form";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
-import { ArrowRight, CheckCircle2, Download, Search } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Download, Search } from "lucide-react";
+import { CatalogCategoryFilter } from "@/components/catalog-category-filter";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { demoInverters, demoPvModules } from "@/data/demo-catalog";
 import { listPublishedCatalogPage } from "@/lib/server/datasheet-repository";
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 6;
+
+function pageWindow(current: number, total: number): Array<number | "gap"> {
+  const pages = [...new Set([1, total, current - 1, current, current + 1])]
+    .filter((value) => value >= 1 && value <= total)
+    .sort((a, b) => a - b);
+  return pages.flatMap((value, index) =>
+    index > 0 && value - pages[index - 1] > 1 ? (["gap", value] as const) : [value],
+  );
+}
 
 export const metadata: Metadata = {
   title: "Equipment Library",
@@ -103,6 +115,10 @@ export default async function EquipmentPage({
     const queryString = search.toString();
     return queryString ? `/equipment?${queryString}` : "/equipment";
   };
+  if (page > 1 && equipment.length === 0) redirect(buildPageHref(1));
+  const rangeStart = totalRecords === 0 ? 0 : offset + 1;
+  const rangeEnd = offset + equipment.length;
+  const hasActiveFilters = categories.length > 0 || Boolean(params.q);
 
   return (
     <main>
@@ -116,7 +132,7 @@ export default async function EquipmentPage({
             ? " รายการใน scaffold นี้เป็นข้อมูล demo เพราะยังไม่ได้ตั้งค่า Database"
             : " แสดงเฉพาะรายการที่ตรวจสอบและ Publish แล้ว"}
         </p>
-        <form className="catalog-search" action="/equipment" id="catalog-filter-form">
+        <Form className="catalog-search" action="/equipment" id="catalog-filter-form">
           <Search size={18} aria-hidden="true" />
           <label className="sr-only" htmlFor="catalog-q">
             ค้นหาอุปกรณ์
@@ -129,25 +145,28 @@ export default async function EquipmentPage({
             defaultValue={params.q ?? ""}
           />
           <button type="submit">ค้นหา</button>
-        </form>
+        </Form>
       </section>
 
       <section className="catalog-shell">
         <aside className="catalog-filters">
           <strong>FILTERS</strong>
-          <label>
-            <input defaultChecked={!categories.length || categories.includes("pv_module")} form="catalog-filter-form" name="category" type="checkbox" value="pv_module" /> PV Module
-          </label>
-          <label>
-            <input defaultChecked={!categories.length || categories.includes("inverter")} form="catalog-filter-form" name="category" type="checkbox" value="inverter" /> Inverter
-          </label>
-          <span>Verification</span>
-          <p className="catalog-verified-only"><CheckCircle2 size={14} /> Published only</p>
-          <button form="catalog-filter-form" type="submit">ใช้ตัวกรอง</button>
+          <CatalogCategoryFilter
+            formId="catalog-filter-form"
+            key={categories.join(",")}
+            selected={categories}
+          />
+          <p className="catalog-verified-only">
+            <CheckCircle2 size={16} aria-hidden="true" />
+            <span>แสดงเฉพาะรายการที่ตรวจสอบและ Publish แล้ว</span>
+          </p>
+          {hasActiveFilters ? (
+            <Link className="catalog-reset" href="/equipment">ล้างตัวกรอง</Link>
+          ) : null}
         </aside>
         <div className="catalog-list">
           <div className="catalog-list__head">
-            <span>{totalRecords} records</span>
+            <span>{totalRecords === 0 ? "0 records" : `แสดง ${rangeStart}–${rangeEnd} จาก ${totalRecords} รายการ`}</span>
             <span>{isDemoMode ? "Source · demo scaffold" : "Source · PostgreSQL catalog"}</span>
           </div>
           {!isDemoMode && equipment.length === 0 ? (
@@ -157,7 +176,7 @@ export default async function EquipmentPage({
           ) : null}
           <div className="equipment-grid">
           {equipment.map((item) => (
-            <article className="equipment-card" key={item.id}>
+            <article className="equipment-card" data-category={item.category === "PV MODULE" ? "pv" : "inverter"} key={item.id}>
               <div className={item.imageAssetId ? "equipment-card__media" : "equipment-card__media equipment-card__media--empty"}>
                 {item.imageAssetId ? (
                   <img alt={item.imageAlt ?? ""} src={`/api/v1/product-media/${item.imageAssetId}`} />
@@ -169,6 +188,7 @@ export default async function EquipmentPage({
                 <h2>{item.model}</h2>
               </div>
               <div className="equipment-card__spec">
+                <small>POWER</small>
                 <strong>{item.primarySpec}</strong>
                 <span>{item.secondarySpec}</span>
               </div>
@@ -201,15 +221,39 @@ export default async function EquipmentPage({
           {pageCount > 1 ? (
             <nav aria-label="เลือกหน้ารายการ" className="catalog-pagination">
               {page > 1 ? (
-                <Link href={buildPageHref(page - 1)} rel="prev">ก่อนหน้า</Link>
+                <Link aria-label="หน้าก่อนหน้า" href={buildPageHref(page - 1)} rel="prev">
+                  <ChevronLeft aria-hidden="true" size={16} /> ก่อนหน้า
+                </Link>
               ) : (
-                <span aria-disabled="true">ก่อนหน้า</span>
+                <span aria-disabled="true">
+                  <ChevronLeft aria-hidden="true" size={16} /> ก่อนหน้า
+                </span>
               )}
-              <span>หน้า {page} / {pageCount}</span>
+              <ol>
+                {pageWindow(page, pageCount).map((entry, index) =>
+                  entry === "gap" ? (
+                    <li aria-hidden="true" key={`gap-${index}`}>…</li>
+                  ) : (
+                    <li key={entry}>
+                      <Link
+                        aria-current={entry === page ? "page" : undefined}
+                        aria-label={`หน้า ${entry}`}
+                        href={buildPageHref(entry)}
+                      >
+                        {entry}
+                      </Link>
+                    </li>
+                  ),
+                )}
+              </ol>
               {page < pageCount ? (
-                <Link href={buildPageHref(page + 1)} rel="next">ถัดไป</Link>
+                <Link aria-label="หน้าถัดไป" href={buildPageHref(page + 1)} rel="next">
+                  ถัดไป <ChevronRight aria-hidden="true" size={16} />
+                </Link>
               ) : (
-                <span aria-disabled="true">ถัดไป</span>
+                <span aria-disabled="true">
+                  ถัดไป <ChevronRight aria-hidden="true" size={16} />
+                </span>
               )}
             </nav>
           ) : null}
