@@ -11,18 +11,17 @@ export function SiteHeader({ inverse = false }: { inverse?: boolean }) {
         <span>EasySolar</span>
       </Link>
       <nav className="main-nav" aria-label="เมนูหลัก">
-        <Link className="role-shortcut" href="/#epc"><span>01</span>EPC</Link>
-        <Link className="role-shortcut" href="/#engineer"><span>02</span>Engineer</Link>
-        <Link className="role-shortcut" href="/solar-value"><span>03</span>ประเมินโซลาร์</Link>
-        <Link className="role-shortcut" href="/community-buy"><span>04</span>Community Buy</Link>
+        <Link className="role-shortcut" href="/equipment"><span>01</span>คลังอุปกรณ์</Link>
+        <Link className="role-shortcut" href="/checker"><span>02</span>จับคู่แผง–อินเวอร์เตอร์</Link>
+        <Link className="role-shortcut" href="/#order"><span>03</span>สั่งซื้อผ่าน LINE</Link>
       </nav>
       <div className="header-actions">
         <Link className="admin-entry" href="/admin/login">
           <LockKeyhole size={15} aria-hidden="true" />
           ผู้ดูแลระบบ
         </Link>
-        <Link className="header-action" href="/#choose-path">
-          เลือกเครื่องมือ
+        <Link className="header-action" href="/equipment">
+          เปิดคลังอุปกรณ์
           <ArrowUpRight size={16} aria-hidden="true" />
         </Link>
       </div>
@@ -32,21 +31,17 @@ export function SiteHeader({ inverse = false }: { inverse?: boolean }) {
           <span className="sr-only">เมนูหลัก</span>
         </summary>
         <nav className="mobile-nav__panel" aria-label="เมนูหลักสำหรับมือถือ">
-          <Link href="/#epc">
+          <Link href="/equipment">
             <span>01</span>
-            EPC / Installer
+            คลังอุปกรณ์ · Datasheet
           </Link>
-          <Link href="/#engineer">
+          <Link href="/checker">
             <span>02</span>
-            Engineer
+            จับคู่แผง–อินเวอร์เตอร์
           </Link>
-          <Link href="/solar-value">
+          <Link href="/#order">
             <span>03</span>
-            ผู้ใช้ไฟ · ประเมินโซลาร์
-          </Link>
-          <Link href="/community-buy">
-            <span>04</span>
-            Community Buy
+            สั่งซื้อผ่าน LINE
           </Link>
           <Link href="/admin/login">
             <span aria-hidden="true"><LockKeyhole size={14} /></span>

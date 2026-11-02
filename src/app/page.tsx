@@ -8,7 +8,6 @@ import {
   Gauge,
   PenTool,
   Search,
-  UsersRound,
 } from "lucide-react";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -36,6 +35,7 @@ const checks = [
 ];
 
 export default function HomePage() {
+  const lineOaUrl = process.env.NEXT_PUBLIC_LINE_OA_URL;
   return (
     <main>
       <section className="hero">
@@ -50,17 +50,17 @@ export default function HomePage() {
             ด้วยข้อมูล <em>ไม่ใช่เดา</em>
           </h1>
           <p className="hero__lead">
-            เครื่องมือช่วยตรวจอุปกรณ์ ประเมินความคุ้มค่า และอธิบายสมมติฐาน
-            สำหรับทั้งมืออาชีพและผู้ใช้ไฟที่กำลังพิจารณาติด Solar
+            ดูสเปกอุปกรณ์ ดาวน์โหลด Datasheet และจับคู่แผงกับอินเวอร์เตอร์ด้วยสูตรที่ตรวจสอบได้
+            สำหรับ EPC และช่างติดตั้ง แล้วสั่งซื้ออุปกรณ์ผ่าน LINE OA
           </p>
           <div className="hero__actions">
-            <Link className="button button--sun" href="#choose-path">
-              เลือกเครื่องมือที่เหมาะกับคุณ
+            <Link className="button button--sun" href="/equipment">
+              เปิดคลังอุปกรณ์
               <ArrowRight size={18} aria-hidden="true" />
             </Link>
             <Link className="text-link text-link--light" href="/checker">
               <Search size={17} aria-hidden="true" />
-              เปิด Engineering Checker
+              จับคู่แผงกับอินเวอร์เตอร์
             </Link>
           </div>
         </div>
@@ -80,70 +80,55 @@ export default function HomePage() {
 
       <section className="audience-section" id="choose-path" aria-labelledby="audience-heading">
         <div className="audience-section__intro">
-          <p className="eyebrow eyebrow--dark">CHOOSE YOUR WORKSPACE</p>
-          <h2 id="audience-heading">เริ่มจากคำถามที่คุณต้องการตัดสินใจ</h2>
+          <p className="eyebrow eyebrow--dark">FOR EPC / INSTALLER</p>
+          <h2 id="audience-heading">ดูข้อมูล คำนวณ แล้วสั่งซื้อในที่เดียว</h2>
           <p>
-            EasySolar แยกเครื่องมือสำหรับงานวิศวกรรมและการตัดสินใจลงทุน
-            เพื่อให้แต่ละคำตอบมีรายละเอียดและคำเตือนที่เหมาะกับผู้ใช้
+            ไม่ต้องสมัครสมาชิก ทุกเครื่องมือเปิดใช้ได้ทันที และสั่งซื้อหรือขอราคาผ่าน LINE OA
           </p>
         </div>
         <div className="audience-paths">
           <article className="audience-path" id="epc">
-            <span className="audience-path__number">01 · EPC / INSTALLER</span>
+            <span className="audience-path__number">01 · EQUIPMENT & DATASHEET</span>
             <div>
-              <p className="audience-path__status audience-path__status--ready">พร้อมทดลอง</p>
               <BriefcaseBusiness className="audience-path__icon" aria-hidden="true" />
-              <h3>EPC / Installer</h3>
-              <p>
-                ค้นหาอุปกรณ์ จัดชุด Package และเตรียมข้อเสนอจาก Demand จริงในแต่ละพื้นที่
-              </p>
+              <h3>คลังอุปกรณ์</h3>
+              <p>ค้นหาแผง PV และอินเวอร์เตอร์ ดูสเปกทางเทคนิค และดาวน์โหลด Datasheet ฉบับตรวจสอบแล้ว</p>
             </div>
             <div className="audience-path__actions">
               <Link className="text-link" href="/equipment">
                 เปิดคลังอุปกรณ์
                 <ArrowRight size={17} aria-hidden="true" />
               </Link>
-              <Link className="text-link text-link--muted" href="/community-buy/pools">
-                ดู Demand pool ตามจังหวัด
-              </Link>
             </div>
           </article>
-          <article className="audience-path" id="engineer">
-            <span className="audience-path__number">02 · ENGINEER</span>
+          <article className="audience-path" id="checker">
+            <span className="audience-path__number">02 · SIMPLE CALCULATOR</span>
             <div>
-              <p className="audience-path__status audience-path__status--ready">พร้อมทดลอง</p>
               <PenTool className="audience-path__icon" aria-hidden="true" />
-              <h3>Engineer</h3>
-              <p>
-                ตรวจ PV–Inverter compatibility ออกแบบ String เบื้องต้น และทบทวนสมมติฐานทุกกฎ
-              </p>
+              <h3>จับคู่แผง–อินเวอร์เตอร์</h3>
+              <p>เลือกยี่ห้อและรุ่น ระบบคำนวณจำนวนแผงต่อสตริง สตริงต่อ MPPT และรูปแบบการต่อ พร้อมสูตรทุกขั้น</p>
             </div>
             <div className="audience-path__actions">
               <Link className="text-link" href="/checker">
-                เปิด Engineering Checker
+                เปิดตัวช่วยจับคู่
                 <ArrowRight size={17} aria-hidden="true" />
               </Link>
             </div>
           </article>
-          <article className="audience-path audience-path--consumer" id="electricity-user">
-            <span className="audience-path__number">03 · ELECTRICITY USER</span>
+          <article className="audience-path" id="order">
+            <span className="audience-path__number">03 · ORDER</span>
             <div>
-              <p className="audience-path__status audience-path__status--ready">ประเมินได้แล้ว</p>
               <Calculator className="audience-path__icon" aria-hidden="true" />
-              <h3>ผู้ใช้ไฟ</h3>
-              <p>
-                ประเมินขนาดระบบ ราคา ช่วงคืนทุน และ Investment Score ก่อนรวมความต้องการกับคนใกล้บ้าน
-              </p>
+              <h3>สั่งซื้อผ่าน LINE OA</h3>
+              <p>แอด LINE OA ของ EasySolar แล้วสั่งซื้อและขอราคาผ่านเมนูใน LINE ทีมงานตอบกลับโดยตรง</p>
             </div>
             <div className="audience-path__actions">
-              <Link className="text-link" href="/solar-value/new">
-                เริ่มประเมินความคุ้มค่า
-                <ArrowRight size={17} aria-hidden="true" />
-              </Link>
-              <Link className="text-link text-link--muted" href="/community-buy">
-                <UsersRound size={16} aria-hidden="true" />
-                ดู Community Buy
-              </Link>
+              {lineOaUrl ? (
+                <a className="text-link" href={lineOaUrl} rel="noopener noreferrer" target="_blank">
+                  แอด LINE เพื่อสั่งซื้อ
+                  <ArrowRight size={17} aria-hidden="true" />
+                </a>
+              ) : null}
             </div>
           </article>
         </div>
@@ -188,7 +173,7 @@ export default function HomePage() {
             เพื่อให้การคำนวณเดิมตรวจย้อนหลังได้ แม้ catalog จะมี revision ใหม่
           </p>
           <Link className="text-link" href="/checker">
-            เปิด Engineering Workspace
+            เปิดตัวช่วยจับคู่
             <ArrowRight size={18} aria-hidden="true" />
           </Link>
         </div>
