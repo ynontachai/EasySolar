@@ -93,10 +93,10 @@ export default async function CommunityPoolsPage() {
         <div>
           <p className="eyebrow eyebrow--dark">NEXT</p>
           <h2>ต้องการเข้าร่วมการคัดเลือก EPC?</h2>
-          <p>รายละเอียดการคัดเลือก เงื่อนไข และช่องทางรับ Demand สำหรับ EPC จะเปิดในขั้นถัดไป</p>
+          <p>ช่องทางสมัครเป็น EPC Partner ยังไม่เปิดในช่วง pilot นี้ ดูวิธีคัดเลือกและขั้นตอนทั้งหมดได้ที่หน้า Community Buy</p>
         </div>
-        <Link className="button button--outline" href="/equipment">
-          เปิดคลังอุปกรณ์ <ArrowRight size={18} aria-hidden="true" />
+        <Link className="button button--outline" href="/community-buy#epc-selection">
+          ดูวิธีคัดเลือก EPC <ArrowRight size={18} aria-hidden="true" />
         </Link>
       </section>
       <SiteFooter />

@@ -148,15 +148,25 @@ export function CommunityInterestForm({
           หมายเลขอ้างอิง <strong>{actionState.referenceCode}</strong> รายการนี้ยังไม่มีข้อผูกมัด
           และยังไม่ถูกส่งให้ EPC จนกว่าจะมีการยืนยันในขั้นถัดไป
         </p>
+        <ol className="community-success__next">
+          <li><strong>สถานะตอนนี้:</strong> รอรวมกลุ่มในพื้นที่ของคุณ</li>
+          <li><strong>ขั้นถัดไป:</strong> เมื่อกลุ่มถึงเกณฑ์ EasySolar จะแจ้งคุณก่อนส่งข้อมูลให้ EPC และคุณเลือกรับหรือปฏิเสธข้อเสนอได้</li>
+          <li><strong>ถอนความสนใจ:</strong> ติดต่อทีมงานพร้อมหมายเลขอ้างอิงได้ทุกเมื่อก่อนทำสัญญา</li>
+        </ol>
+        <Link className="button button--ink" href="/community-buy/pools">
+          ดูความคืบหน้ากลุ่มในพื้นที่
+          <ArrowRight size={18} aria-hidden="true" />
+        </Link>
+        <p className="community-success__secondary">ช่วยให้กลุ่มเดินหน้าเร็วขึ้น (ไม่บังคับ)</p>
         <div className="community-referral-card">
           <Users aria-hidden="true" />
           <div>
             <span>Referral code ของคุณ</span>
             <strong>{actionState.referralCode}</strong>
-            <small>ส่ง Code หรือลิงก์นี้ให้เพื่อน ระบบจะบันทึกว่าคุณเป็นผู้แนะนำ</small>
+            <small>ส่ง Code หรือลิงก์นี้ให้คนใกล้บ้าน ระบบจะบันทึกว่าคุณเป็นผู้แนะนำ ผู้แนะนำไม่เห็นข้อมูลส่วนตัวหรือการตัดสินใจของผู้ที่ถูกแนะนำ</small>
           </div>
           <button
-            className="button button--sun"
+            className="button button--outline"
             onClick={async () => {
               const shareUrl = new URL(referralPath, window.location.origin).toString();
               try {
@@ -174,10 +184,7 @@ export function CommunityInterestForm({
             <p className="community-referral-card__error" role="status">คัดลอกอัตโนมัติไม่ได้ กรุณาคัดลอก Code ด้านบน</p>
           ) : null}
         </div>
-        <Link className="button button--ink" href="/">
-          กลับหน้าหลัก
-          <ArrowRight size={18} aria-hidden="true" />
-        </Link>
+        <Link className="text-link" href="/">กลับหน้าหลัก</Link>
       </section>
     );
   }
