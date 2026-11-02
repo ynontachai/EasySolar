@@ -109,3 +109,18 @@ describe("evaluateSizing", () => {
     expect(result.overallStatus).toBe("INSUFFICIENT_DATA");
   });
 });
+
+describe("evaluateSizing walkthrough", () => {
+  it("derives module cap, series range and per-string currents from the same specs", () => {
+    const { walkthrough } = evaluateSizing({
+      pvModule: demoPvModules[0],
+      inverter: demoInverters[0],
+      assumptions,
+    }, context);
+
+    expect(walkthrough.temperature?.vocColdV).toBeCloseTo(49.9 * (1 - 0.0025 * (-10 - 25)), 1);
+    expect(walkthrough.seriesRange?.maxModules).toBeGreaterThanOrEqual(walkthrough.seriesRange?.minModules ?? Infinity);
+    expect(walkthrough.currents.stringRows[0].strings).toBe(1);
+    expect(walkthrough.currents.stringRows).toHaveLength(walkthrough.inverterLimits.inputsPerMppt);
+  });
+});

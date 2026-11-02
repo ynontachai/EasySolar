@@ -11,7 +11,7 @@ import { listPublishedEquipmentOptions } from "@/lib/server/datasheet-repository
 import { resolveInverter, resolvePvModule } from "@/lib/server/equipment-resolver";
 
 export const metadata: Metadata = {
-  title: "Compatibility Checker",
+  title: "จับคู่แผงโซลาร์กับอินเวอร์เตอร์",
   description: "ตรวจ PV–Inverter compatibility และ Candidate String Layout",
 };
 
@@ -19,9 +19,16 @@ function toDemoOption(item: { id: string; manufacturer: string; model: string })
   return {
     isDemo: true,
     label: `${item.manufacturer} · ${item.model}`,
+    manufacturer: item.manufacturer,
+    model: item.model,
     revisionLabel: "Demo",
     value: item.id,
   };
+}
+
+function splitLabel(label: string) {
+  const [manufacturer, ...rest] = label.split(" · ");
+  return { manufacturer, model: rest.join(" · ") || label };
 }
 
 function pickSelection(
@@ -43,6 +50,7 @@ export default async function CheckerPage({
   const toOption = (item: (typeof published)[number]): CheckerEquipmentOption => ({
     isDemo: false,
     label: item.label,
+    ...splitLabel(item.label),
     revisionLabel: item.revisionLabel,
     value: item.id,
   });
@@ -84,8 +92,8 @@ export default async function CheckerPage({
       <SiteHeader />
       <div className="app-intro">
         <div>
-          <p className="eyebrow eyebrow--dark">ENGINEERING WORKSPACE</p>
-          <h1>PV–Inverter Compatibility Checker</h1>
+          <p className="eyebrow eyebrow--dark">PV–INVERTER COMPATIBILITY CHECKER</p>
+          <h1>จับคู่แผงโซลาร์กับอินเวอร์เตอร์ ให้เป็นเรื่องง่าย แค่คลิก</h1>
         </div>
         <p>
           {hasPublished

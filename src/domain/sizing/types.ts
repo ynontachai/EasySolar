@@ -53,6 +53,32 @@ export interface SizingCandidate {
   findings: RuleFinding[];
 }
 
+export interface SizingWalkthrough {
+  pvModule: Pick<PvModuleSpec, "pmaxWp" | "vocV" | "vmpV" | "iscA" | "impA" | "betaVocPerC" | "betaVmpPerC">;
+  inverterLimits: {
+    inputsPerMppt: number;
+    maxDcPowerWp: number | null;
+    maxDcVoltageV: number;
+    maxOperatingCurrentA: number;
+    maxRecommendedPvWp: number | null;
+    maxShortCircuitCurrentA: number;
+    mpptMaxV: number;
+    mpptMinV: number;
+    trackerCount: number;
+  };
+  /** Module cap from the manufacturer's recommended (else hard) PV power limit. */
+  maxModules: { limitWp: number; modules: number } | null;
+  /** Null when the datasheet lacks temperature coefficients. */
+  temperature: { vmpHotV: number; vocColdV: number; vmpColdV: number } | null;
+  seriesRange: { maxModules: number; minModules: number; voltageCeilingV: number } | null;
+  currents: {
+    designIscA: number;
+    impA: number;
+    safetyFactor: number;
+    stringRows: { strings: number; operatingA: number; shortCircuitA: number; pass: boolean }[];
+  };
+}
+
 export interface SizingResult {
   calculationId: string;
   engineVersion: string;
@@ -68,5 +94,6 @@ export interface SizingResult {
   };
   assumptions: SizingAssumptions;
   candidates: SizingCandidate[];
+  walkthrough: SizingWalkthrough;
   limitations: string[];
 }

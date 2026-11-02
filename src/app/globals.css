@@ -7891,3 +7891,136 @@ a {
   color: #667085;
   margin: 36px 0 12px;
 }
+
+.spec-cards {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 32px;
+}
+
+.spec-cards article {
+  border: 1px solid var(--line);
+  padding: 20px;
+}
+
+.spec-cards h2 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+
+.spec-cards h3 {
+  color: #667085;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 14px;
+  overflow-wrap: anywhere;
+}
+
+.spec-cards dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.spec-cards dl > div {
+  display: flex;
+  font-size: 14px;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.spec-cards dt {
+  color: #667085;
+}
+
+.spec-cards dd {
+  font-weight: 600;
+  margin: 0;
+  text-align: right;
+}
+
+.formula-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 40px;
+}
+
+.formula-heading {
+  font-size: 16px;
+  margin: 12px 0 0;
+}
+
+.formula-block {
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  padding: 16px 20px;
+}
+
+.formula-block h3 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.formula-block p {
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.formula-block > strong {
+  font-size: 18px;
+}
+
+.formula-rows {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.formula-rows li {
+  align-items: center;
+  display: grid;
+  font-size: 13px;
+  gap: 8px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+}
+
+.line-cta {
+  align-items: center;
+  background: var(--ink);
+  color: #fff;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  justify-content: space-between;
+  margin: 40px 0;
+  padding: 28px;
+}
+
+.line-cta h2 {
+  font-size: clamp(24px, 3vw, 34px);
+  margin: 8px 0;
+}
+
+.line-cta p:not(.eyebrow) {
+  line-height: 1.7;
+  margin: 0;
+  max-width: 560px;
+  opacity: 0.8;
+}
+
+@media (max-width: 760px) {
+  .spec-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .line-cta {
+    padding: 22px 18px;
+  }
+}

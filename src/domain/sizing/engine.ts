@@ -8,6 +8,7 @@ import type {
   SizingInput,
   SizingResult,
 } from "./types";
+import { buildWalkthrough } from "./walkthrough";
 
 export const ENGINE_VERSION = "0.1.0-alpha";
 const STC_REFERENCE_TEMPERATURE_C = 25;
@@ -380,6 +381,7 @@ export function evaluateSizing(
     },
     assumptions,
     candidates: rankedCandidates,
+    walkthrough: buildWalkthrough(pvModule, inverter, assumptions),
     limitations: [
       "Preliminary DC-side PV module–inverter sizing aid only.",
       "ไม่ใช่แบบรับรองวิศวกรรม และไม่ทดแทนคู่มือผู้ผลิต การสำรวจไซต์ หรือวิศวกรผู้รับผิดชอบ",

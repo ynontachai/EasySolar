@@ -20,6 +20,8 @@ import { ThemeSelect } from "@/components/theme-select";
 
 export interface CheckerEquipmentOption {
   isDemo: boolean;
+  manufacturer: string;
+  model: string;
   label: string;
   revisionLabel: string;
   value: string;
@@ -54,6 +56,73 @@ const statusCopy: Record<OverallStatus, { label: string; detail: string }> = {
     detail: "ค่าทางไฟฟ้าบางส่วนผ่าน แต่ข้อมูลยังไม่พอสำหรับยืนยันผล",
   },
 };
+
+function EquipmentPicker({
+  idPrefix,
+  label,
+  onChange,
+  options,
+  value,
+}: {
+  idPrefix: string;
+  label: string;
+  onChange: (value: string) => void;
+  options: CheckerEquipmentOption[];
+  value: string;
+}) {
+  const selected = options.find((option) => option.value === value);
+  const brands = Array.from(new Set(options.map((option) => option.manufacturer)));
+  const models = options.filter((option) => option.manufacturer === selected?.manufacturer);
+
+  return (
+    <div className="field-group">
+      <label htmlFor={`${idPrefix}-brand`}>{label}</label>
+      <div className="field-row">
+        <ThemeSelect
+          id={`${idPrefix}-brand`}
+          onValueChange={(brand) =>
+            onChange(options.find((option) => option.manufacturer === brand)?.value ?? value)
+          }
+          options={brands.map((brand) => ({ label: brand, value: brand }))}
+          placeholder="เลือกยี่ห้อ"
+          value={selected?.manufacturer ?? ""}
+        />
+        <ThemeSelect
+          id={`${idPrefix}-model`}
+          onValueChange={onChange}
+          options={models.map((option) => ({ label: option.model, value: option.value }))}
+          placeholder="เลือกรุ่น"
+          searchable={models.length > 8}
+          value={value}
+        />
+      </div>
+      <p className={`field-help${selected?.isDemo ? " field-help--warning" : ""}`}>
+        {selectionHelp(selected)}
+      </p>
+    </div>
+  );
+}
+
+function FormulaBlock({
+  children,
+  formula,
+  title,
+  result,
+}: {
+  children?: React.ReactNode;
+  formula: string;
+  result: string;
+  title: string;
+}) {
+  return (
+    <div className="formula-block">
+      <h3>{title}</h3>
+      <p>{formula}</p>
+      <strong>{result}</strong>
+      {children}
+    </div>
+  );
+}
 
 function FindingIcon({ status }: { status: RuleFinding["status"] }) {
   if (status === "PASS") return <Check size={15} aria-hidden="true" />;
@@ -129,6 +198,9 @@ export function CheckerWorkspace({
   }
 
   const overallCopy = statusCopy[result.overallStatus];
+  const wt = result.walkthrough;
+  const lineOaUrl = process.env.NEXT_PUBLIC_LINE_OA_URL;
+  const pv = wt.pvModule;
 
   return (
     <div className="checker-shell">
@@ -142,33 +214,20 @@ export function CheckerWorkspace({
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="field-group">
-            <label htmlFor="pv-module">PV Module</label>
-            <ThemeSelect
-              id="pv-module"
-              onValueChange={setPvModule}
-              options={pvOptions}
-              searchable={pvOptions.length > 8}
-              value={pvModule}
-            />
-            <p className={`field-help${pvOptions.find((option) => option.value === pvModule)?.isDemo ? " field-help--warning" : ""}`}>
-              {selectionHelp(pvOptions.find((option) => option.value === pvModule))}
-            </p>
-          </div>
-
-          <div className="field-group">
-            <label htmlFor="inverter">Inverter</label>
-            <ThemeSelect
-              id="inverter"
-              onValueChange={setInverter}
-              options={inverterOptions}
-              searchable={inverterOptions.length > 8}
-              value={inverter}
-            />
-            <p className={`field-help${inverterOptions.find((option) => option.value === inverter)?.isDemo ? " field-help--warning" : ""}`}>
-              {selectionHelp(inverterOptions.find((option) => option.value === inverter))}
-            </p>
-          </div>
+          <EquipmentPicker
+            idPrefix="inverter"
+            label="Inverter"
+            onChange={setInverter}
+            options={inverterOptions}
+            value={inverter}
+          />
+          <EquipmentPicker
+            idPrefix="pv-module"
+            label="PV Module"
+            onChange={setPvModule}
+            options={pvOptions}
+            value={pvModule}
+          />
 
           <div className="workspace-step workspace-step--compact">
             <span>02</span>
@@ -261,7 +320,7 @@ export function CheckerWorkspace({
           ) : null}
 
           <button className="button button--sun button--full" disabled={isLoading}>
-            {isLoading ? "กำลังประเมิน…" : "ประเมิน Compatibility"}
+            {isLoading ? "กำลังคำนวณ…" : "คำนวณการนำไปใช้ด้วยกัน"}
             <ChevronRight size={18} aria-hidden="true" />
           </button>
           <button
@@ -306,10 +365,105 @@ export function CheckerWorkspace({
           <span>{new Date(result.calculatedAt).toLocaleString("th-TH")}</span>
         </div>
 
+        <div className="spec-cards">
+          <article>
+            <h2>ข้อมูลอินเวอร์เตอร์</h2>
+            <h3>{result.equipment.inverter.manufacturer} {result.equipment.inverter.model}</h3>
+            <dl>
+              <div><dt>Vdc สูงสุด</dt><dd>{wt.inverterLimits.maxDcVoltageV} V</dd></div>
+              <div><dt>แรงดัน MPPT</dt><dd>{wt.inverterLimits.mpptMinV}–{wt.inverterLimits.mpptMaxV} V</dd></div>
+              <div><dt>กระแสขาเข้าสูงสุด/MPPT</dt><dd>{wt.inverterLimits.maxOperatingCurrentA} A</dd></div>
+              <div><dt>Isc สูงสุด/MPPT</dt><dd>{wt.inverterLimits.maxShortCircuitCurrentA} A</dd></div>
+              <div><dt>กำลัง PV สูงสุดที่แนะนำ</dt><dd>{wt.inverterLimits.maxRecommendedPvWp === null ? "ไม่ระบุ" : `${wt.inverterLimits.maxRecommendedPvWp} Wp`}</dd></div>
+              <div><dt>กำลัง PV ที่ใช้งานได้</dt><dd>{wt.inverterLimits.maxDcPowerWp === null ? "ไม่ระบุ" : `${wt.inverterLimits.maxDcPowerWp} Wp`}</dd></div>
+              <div><dt>MPPT / สตริงสูงสุด</dt><dd>{wt.inverterLimits.trackerCount} MPPT · {wt.inverterLimits.inputsPerMppt} สตริง</dd></div>
+            </dl>
+          </article>
+          <article>
+            <h2>ข้อมูลแผง PV</h2>
+            <h3>{result.equipment.pvModule.manufacturer} {result.equipment.pvModule.model}</h3>
+            <dl>
+              <div><dt>Pmax</dt><dd>{pv.pmaxWp} Wp</dd></div>
+              <div><dt>Voc</dt><dd>{pv.vocV} V</dd></div>
+              <div><dt>Vmp</dt><dd>{pv.vmpV} V</dd></div>
+              <div><dt>Isc</dt><dd>{pv.iscA} A</dd></div>
+              <div><dt>Imp</dt><dd>{pv.impA} A</dd></div>
+              <div><dt>Beta (Voc / Vmp)</dt><dd>{pv.betaVocPerC ?? "ไม่ระบุ"} / {pv.betaVmpPerC ?? "ไม่ระบุ"} /°C</dd></div>
+            </dl>
+          </article>
+        </div>
+
         <div className="result-section-heading">
           <div>
-            <p>03 · CANDIDATE CONFIGURATIONS</p>
-            <h2>รูปแบบ String ที่ผ่านข้อจำกัดตัวเลข</h2>
+            <p>CALCULATION STEPS</p>
+            <h2>คำนวณทีละขั้น พร้อมสูตรและค่าที่ใช้</h2>
+          </div>
+        </div>
+
+        <div className="formula-list">
+          {wt.maxModules ? (
+            <FormulaBlock
+              title="1. จำนวนแผงรวมสูงสุด"
+              formula={`${wt.maxModules.limitWp.toLocaleString("en-US")} Wp ÷ ${pv.pmaxWp} Wp = ${(wt.maxModules.limitWp / pv.pmaxWp).toFixed(1)}`}
+              result={`${wt.maxModules.modules} แผง`}
+            />
+          ) : (
+            <FormulaBlock title="1. จำนวนแผงรวมสูงสุด" formula="Datasheet ไม่ระบุกำลัง PV สูงสุด" result="ข้อมูลไม่ครบ" />
+          )}
+          {wt.temperature ? (
+            <>
+              <h3 className="formula-heading">2. แรงดันตามอุณหภูมิ (Tstc = 25 °C)</h3>
+              <FormulaBlock
+                title="Vmp ร้อน"
+                formula={`${pv.vmpV} × [1 + (${pv.betaVmpPerC}) × (${result.assumptions.tcellMaxC} − 25)]`}
+                result={`${wt.temperature.vmpHotV} V`}
+              />
+              <FormulaBlock
+                title="Voc เย็น"
+                formula={`${pv.vocV} × [1 + (${pv.betaVocPerC}) × (${result.assumptions.tcellMinC} − 25)]`}
+                result={`${wt.temperature.vocColdV} V`}
+              />
+              <FormulaBlock
+                title="Vmp เย็น"
+                formula={`${pv.vmpV} × [1 + (${pv.betaVmpPerC}) × (${result.assumptions.tcellMinC} − 25)]`}
+                result={`${wt.temperature.vmpColdV} V`}
+              />
+            </>
+          ) : (
+            <FormulaBlock title="2. แรงดันตามอุณหภูมิ" formula="Datasheet ไม่ระบุ temperature coefficient" result="ข้อมูลไม่ครบ" />
+          )}
+          {wt.seriesRange && wt.temperature ? (
+            <FormulaBlock
+              title="3. จำนวนแผงต่อสตริง"
+              formula={`มากสุด = ${wt.seriesRange.voltageCeilingV} ÷ ${wt.temperature.vocColdV} → ${wt.seriesRange.maxModules} แผง · น้อยสุด = ${wt.inverterLimits.mpptMinV} ÷ ${wt.temperature.vmpHotV} → ${wt.seriesRange.minModules} แผง`}
+              result={
+                wt.seriesRange.minModules <= wt.seriesRange.maxModules
+                  ? `ใช้ ${wt.seriesRange.minModules} ถึง ${wt.seriesRange.maxModules} แผงต่อสตริง`
+                  : "ไม่มีจำนวนแผงที่ผ่านทั้งสองขอบเขต"
+              }
+            />
+          ) : null}
+          <FormulaBlock
+            title="4. จำนวนสตริงต่อ MPPT"
+            formula={`Imp ${pv.impA} A ≤ ${wt.inverterLimits.maxOperatingCurrentA} A · Isc ${pv.iscA} A × ${wt.currents.safetyFactor} = ${wt.currents.designIscA} A ≤ ${wt.inverterLimits.maxShortCircuitCurrentA} A`}
+            result={`ต่อได้สูงสุด ${wt.currents.stringRows.filter((row) => row.pass).length} สตริงต่อ MPPT`}
+          >
+            <ul className="formula-rows">
+              {wt.currents.stringRows.map((row) => (
+                <li key={row.strings}>
+                  {row.pass ? <Check size={15} aria-hidden="true" /> : <X size={15} aria-hidden="true" />}
+                  <span>{row.strings} สตริงต่อ 1 MPPT: Imp {row.operatingA} A · Isc ออกแบบ {row.shortCircuitA} A</span>
+                  <strong>{row.pass ? "ผ่าน" : "ไม่ผ่าน"}</strong>
+                </li>
+              ))}
+            </ul>
+          </FormulaBlock>
+        </div>
+
+        <div className="result-section-heading">
+          <div>
+            <p>5 · RECOMMENDED LAYOUTS</p>
+            <h2>5. รูปแบบการต่อที่เหมาะสม</h2>
           </div>
           <span>{result.candidates.length} candidates</span>
         </div>
@@ -381,7 +535,7 @@ export function CheckerWorkspace({
             <div className="findings">
               <div className="result-section-heading">
                 <div>
-                  <p>04 · RULE TRACE</p>
+                  <p>RULE TRACE</p>
                   <h2>เหตุผลรายข้อ</h2>
                 </div>
               </div>
@@ -417,6 +571,19 @@ export function CheckerWorkspace({
             </div>
           </>
         ) : null}
+
+        <div className="line-cta">
+          <div>
+            <p className="eyebrow">PRODUCT SUPPLY</p>
+            <h2>สนใจสั่งซื้ออุปกรณ์ชุดนี้</h2>
+            <p>แอด LINE OA ของ EasySolar แล้วสั่งซื้อและขอราคาผ่านเมนูใน LINE ทีมงานตอบกลับโดยตรง ไม่ต้องสมัครสมาชิก</p>
+          </div>
+          {lineOaUrl ? (
+            <a className="button button--sun" href={lineOaUrl} rel="noopener noreferrer" target="_blank">
+              แอด LINE เพื่อสั่งซื้อ<ChevronRight size={18} aria-hidden="true" />
+            </a>
+          ) : null}
+        </div>
 
         <div className="report-disclaimer">
           <strong>PRELIMINARY ONLY — ENGINEERING REVIEW REQUIRED</strong>
