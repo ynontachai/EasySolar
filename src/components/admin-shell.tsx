@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LogOut,
   ShieldCheck,
+  UserRoundSearch,
   Users,
 } from "lucide-react";
 import { logoutAction } from "@/app/admin/actions";
@@ -37,6 +38,9 @@ export function AdminShell({
           <Link href="/admin"><LayoutDashboard size={18} /> ภาพรวมงาน</Link>
           <Link href="/admin/catalog"><Boxes size={18} /> สินค้าและ SKU</Link>
           <Link href="/admin/equipment"><FileCheck2 size={18} /> Datasheet</Link>
+          {isSuperAdmin(principal) ? (
+            <Link href="/admin/community"><UserRoundSearch size={18} /> ลูกค้า Community</Link>
+          ) : null}
           {isSuperAdmin(principal) ? (
             <Link href="/admin/users"><Users size={18} /> ผู้ใช้และคำเชิญ</Link>
           ) : null}

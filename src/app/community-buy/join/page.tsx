@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CommunityInterestForm } from "@/components/community-interest-form";
+import { communityReferralCodeSchema } from "@/domain/community/schema";
 import { SiteHeader } from "@/components/site-header";
 
 export const metadata: Metadata = {
@@ -18,6 +19,9 @@ export default async function CommunityBuyJoinPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  const rawReferralCode = Array.isArray(params.ref) ? params.ref[0] : params.ref;
+  const parsedReferralCode = communityReferralCodeSchema.safeParse(rawReferralCode);
+  const initialReferralCode = parsedReferralCode.success ? parsedReferralCode.data ?? "" : "";
 
   return (
     <main className="community-page community-page--form">
@@ -39,6 +43,7 @@ export default async function CommunityBuyJoinPage({
         <CommunityInterestForm
           initialInvestmentScore={parseOptionalNumber(params.investmentScore, 0, 100)}
           initialPackagePriceThb={parseOptionalNumber(params.packagePriceThb, 1, 100_000_000)}
+          initialReferralCode={initialReferralCode}
           initialSystemSizeKw={parseOptionalNumber(params.systemSizeKw, 1, 1000)}
         />
       </section>

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, LocateFixed, LoaderCircle, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, LocateFixed, LoaderCircle, ShieldCheck, Users } from "lucide-react";
 import {
   registerCommunityInterestAction,
   type CommunityInterestActionState,
@@ -17,6 +17,7 @@ interface AddressOption extends ThemeSelectOption {
 interface CommunityInterestFormProps {
   initialInvestmentScore: number | null;
   initialPackagePriceThb: number | null;
+  initialReferralCode: string;
   initialSystemSizeKw: number | null;
 }
 const initialState: CommunityInterestActionState = { message: "", status: "idle" };
@@ -24,6 +25,7 @@ const initialState: CommunityInterestActionState = { message: "", status: "idle"
 export function CommunityInterestForm({
   initialInvestmentScore,
   initialPackagePriceThb,
+  initialReferralCode,
   initialSystemSizeKw,
 }: CommunityInterestFormProps) {
   const [actionState, formAction, pending] = useActionState(
@@ -49,6 +51,7 @@ export function CommunityInterestForm({
   const [stepError, setStepError] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [referralCopyStatus, setReferralCopyStatus] = useState<"copied" | "error" | "idle">("idle");
 
   useEffect(() => {
     let active = true;
@@ -135,6 +138,7 @@ export function CommunityInterestForm({
   }
 
   if (actionState.status === "success") {
+    const referralPath = `/community-buy/join?ref=${encodeURIComponent(actionState.referralCode ?? "")}`;
     return (
       <section className="community-success" aria-live="polite">
         <span className="community-success__icon"><Check aria-hidden="true" /></span>
@@ -144,6 +148,32 @@ export function CommunityInterestForm({
           หมายเลขอ้างอิง <strong>{actionState.referenceCode}</strong> รายการนี้ยังไม่มีข้อผูกมัด
           และยังไม่ถูกส่งให้ EPC จนกว่าจะมีการยืนยันในขั้นถัดไป
         </p>
+        <div className="community-referral-card">
+          <Users aria-hidden="true" />
+          <div>
+            <span>Referral code ของคุณ</span>
+            <strong>{actionState.referralCode}</strong>
+            <small>ส่ง Code หรือลิงก์นี้ให้เพื่อน ระบบจะบันทึกว่าคุณเป็นผู้แนะนำ</small>
+          </div>
+          <button
+            className="button button--sun"
+            onClick={async () => {
+              const shareUrl = new URL(referralPath, window.location.origin).toString();
+              try {
+                await navigator.clipboard.writeText(shareUrl);
+                setReferralCopyStatus("copied");
+              } catch {
+                setReferralCopyStatus("error");
+              }
+            }}
+            type="button"
+          >
+            <Copy size={17} aria-hidden="true" /> {referralCopyStatus === "copied" ? "คัดลอกแล้ว" : "คัดลอกลิงก์"}
+          </button>
+          {referralCopyStatus === "error" ? (
+            <p className="community-referral-card__error" role="status">คัดลอกอัตโนมัติไม่ได้ กรุณาคัดลอก Code ด้านบน</p>
+          ) : null}
+        </div>
         <Link className="button button--ink" href="/">
           กลับหน้าหลัก
           <ArrowRight size={18} aria-hidden="true" />
@@ -156,6 +186,7 @@ export function CommunityInterestForm({
     <form action={formAction} className="community-form" ref={formRef}>
       <input name="investmentScore" type="hidden" value={initialInvestmentScore ?? ""} />
       <input name="packagePriceThb" type="hidden" value={initialPackagePriceThb ?? ""} />
+      <input name="referralCode" type="hidden" value={initialReferralCode} />
       <input name="latitude" type="hidden" value={latitude} />
       <input name="longitude" type="hidden" value={longitude} />
       <label className="community-form__honeypot" aria-hidden="true">
@@ -176,6 +207,14 @@ export function CommunityInterestForm({
           ))}
         </ol>
       </header>
+
+      {initialReferralCode ? (
+        <div className="community-referral-notice">
+          <Users size={18} aria-hidden="true" />
+          <span>สมัครผ่านคำแนะนำ <strong>{initialReferralCode}</strong></span>
+          <Link href="/community-buy/join">ไม่ใช้ Code</Link>
+        </div>
+      ) : null}
 
       <section className="community-form__step" hidden={step !== 1}>
         <p className="eyebrow eyebrow--dark">01 · YOUR SOLAR PLAN</p>
@@ -272,9 +311,9 @@ export function CommunityInterestForm({
         <p className="eyebrow eyebrow--dark">03 · CONTACT & CONSENT</p>
         <h2>ให้ EasySolar แจ้งเมื่อพื้นที่ของคุณเริ่มรวมกลุ่มได้</h2>
         <div className="community-form__grid">
-          <label><span>ชื่อที่ใช้ติดต่อ</span><input autoComplete="name" name="fullName" required /></label>
+          <label><span>ชื่อ-นามสกุล</span><input autoComplete="name" name="fullName" placeholder="ชื่อและนามสกุล" required /></label>
           <label><span>อีเมล</span><input autoCapitalize="none" autoComplete="email" inputMode="email" maxLength={254} name="email" onChange={(event) => setEmail(event.target.value.toLowerCase().replace(/\s/g, ""))} placeholder="name@example.com" required spellCheck={false} type="email" value={email} /></label>
-          <label className="community-form__wide"><span>เบอร์โทร (ไม่บังคับ)</span><input autoComplete="tel" inputMode="numeric" maxLength={12} name="phone" onChange={(event) => setPhone(formatPhone(event.target.value))} pattern="0[0-9]{2}-[0-9]{3}-[0-9]{3,4}" placeholder="081-234-5678" type="tel" value={phone} /></label>
+          <label className="community-form__wide"><span>เบอร์โทรศัพท์</span><input autoComplete="tel" inputMode="numeric" maxLength={12} name="phone" onChange={(event) => setPhone(formatPhone(event.target.value))} pattern="0[0-9]{2}-[0-9]{3}-[0-9]{3,4}" placeholder="081-234-5678" required type="tel" value={phone} /></label>
         </div>
         <div className="community-consents">
           <label>

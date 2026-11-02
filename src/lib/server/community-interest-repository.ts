@@ -6,14 +6,58 @@ import { HttpError } from "@/lib/server/http-error";
 function createReferenceCode() {
   return `CBN-${new Date().getFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 }
+
+function createReferralCode() {
+  return `ES-${crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`;
+}
+
 export async function createCommunityInterest(input: CommunityInterestInput) {
   const sql = getDb();
 
   try {
     return await sql.begin(async (transaction) => {
       const referenceCode = createReferenceCode();
+      const referralCode = createReferralCode();
+      const [referrer] = input.referralCode
+        ? await transaction<Array<{ id: string }>>`
+            SELECT id::text AS id
+            FROM community_member
+            WHERE referral_code = ${input.referralCode}
+          `
+        : [];
+
+      if (input.referralCode && !referrer) {
+        throw new HttpError(
+          422,
+          "COMMUNITY_REFERRAL_NOT_FOUND",
+          "ไม่พบ Referral code นี้ กรุณาตรวจสอบอีกครั้งหรือลบ Code เพื่อสมัครต่อ",
+        );
+      }
+
+      const [member] = await transaction<Array<{ id: string }>>`
+        INSERT INTO community_member (referral_code, referred_by_member_id)
+        VALUES (${referralCode}, ${referrer?.id ?? null})
+        RETURNING id::text AS id
+      `;
+      if (!member) throw new Error("COMMUNITY_MEMBER_INSERT_FAILED");
+
+      await transaction`
+        INSERT INTO community_member_contact_private (
+          member_id,
+          full_name,
+          email,
+          phone
+        ) VALUES (
+          ${member.id},
+          ${input.fullName},
+          ${input.email},
+          ${input.phone}
+        )
+      `;
+
       const [interest] = await transaction<Array<{ id: string }>>`
         INSERT INTO buyer_interest (
+          member_id,
           reference_code,
           property_type,
           decision_role,
@@ -24,6 +68,7 @@ export async function createCommunityInterest(input: CommunityInterestInput) {
           investment_score,
           source
         ) VALUES (
+          ${member.id},
           ${referenceCode},
           ${input.propertyType},
           ${input.decisionRole},
@@ -32,7 +77,9 @@ export async function createCommunityInterest(input: CommunityInterestInput) {
           ${input.selectedSystemSizeKw},
           ${input.packagePriceThb},
           ${input.investmentScore},
-          'solar_value_result'
+          ${input.packagePriceThb !== null || input.investmentScore !== null
+            ? "solar_value_result"
+            : "community_buy"}
         )
         RETURNING id::text AS id
       `;
@@ -59,20 +106,6 @@ export async function createCommunityInterest(input: CommunityInterestInput) {
       `;
 
       await transaction`
-        INSERT INTO interest_contact_private (
-          buyer_interest_id,
-          full_name,
-          email,
-          phone
-        ) VALUES (
-          ${interest.id},
-          ${input.fullName},
-          ${input.email},
-          ${input.phone}
-        )
-      `;
-
-      await transaction`
         INSERT INTO community_consent_record (
           buyer_interest_id,
           purpose,
@@ -88,13 +121,18 @@ export async function createCommunityInterest(input: CommunityInterestInput) {
         VALUES (
           ${interest.id},
           'interest.registered',
-          ${transaction.json({ source: "public_registration" })}
+          ${transaction.json({
+            memberId: member.id,
+            referredByMemberId: referrer?.id ?? null,
+            source: "public_registration",
+          })}
         )
       `;
 
-      return { referenceCode };
+      return { memberId: member.id, referenceCode, referralCode };
     });
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     if (error && typeof error === "object" && "code" in error && error.code === "23505") {
       throw new HttpError(
         409,

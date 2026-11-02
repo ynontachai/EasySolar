@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Boxes, FileUp, ListChecks } from "lucide-react";
+import { ArrowUpRight, Boxes, FileUp, ListChecks, Users } from "lucide-react";
 import { requireAdminPage } from "@/lib/server/admin-auth";
 
 export default async function AdminHomePage() {
@@ -11,6 +11,7 @@ export default async function AdminHomePage() {
         .filter((value): value is string => Boolean(value)),
     ),
   ];
+  const canManageCommunity = principal.roles.some((role) => role.code === "super_admin");
 
   return (
     <main className="admin-home">
@@ -25,7 +26,7 @@ export default async function AdminHomePage() {
           </p>
         </div>
       </header>
-      <section className="admin-task-grid" aria-label="งานที่เริ่มได้">
+      <section className="admin-task-grid" data-community={canManageCommunity} aria-label="งานที่เริ่มได้">
         <Link href="/admin/catalog">
           <Boxes size={24} />
           <span>สินค้าและ SKU</span>
@@ -40,6 +41,15 @@ export default async function AdminHomePage() {
           <p>ไฟล์อยู่ใน private storage และรอ scan ก่อนเข้าสู่ review</p>
           <ArrowUpRight size={18} />
         </Link>
+        {canManageCommunity ? (
+          <Link href="/admin/community">
+            <Users size={24} />
+            <span>Community customers</span>
+            <strong>ติดตาม Demand และ Referral</strong>
+            <p>ดูข้อมูลลูกค้า ขนาด kW พื้นที่ ผู้แนะนำ และอัปเดตสถานะ</p>
+            <ArrowUpRight size={18} />
+          </Link>
+        ) : null}
         <div className="admin-task-grid__disabled" aria-disabled="true">
           <ListChecks size={24} />
           <span>Bulk import</span>

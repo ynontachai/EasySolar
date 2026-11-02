@@ -6,12 +6,17 @@ const optionalNumber = z.preprocess(
   z.number().finite().nullable(),
 );
 
-const optionalPhone = z.preprocess(
+const requiredPhone = z.preprocess(
   (value) => {
-    if (typeof value !== "string" || !value.trim()) return null;
+    if (typeof value !== "string") return "";
     return value.replace(/\D/g, "");
   },
-  z.string().regex(/^0\d{8,9}$/, "รูปแบบเบอร์โทรไม่ถูกต้อง").nullable(),
+  z.string().regex(/^0\d{8,9}$/, "กรุณาระบุเบอร์โทรศัพท์ให้ถูกต้อง"),
+);
+
+export const communityReferralCodeSchema = z.preprocess(
+  (value) => typeof value === "string" && value.trim() ? value.trim().toUpperCase() : null,
+  z.string().regex(/^ES-[A-Z0-9]{6,16}$/, "Referral code ไม่ถูกต้อง").nullable(),
 );
 
 export const communityInterestSchema = z
@@ -30,15 +35,23 @@ export const communityInterestSchema = z
     latitude: optionalNumber.pipe(z.number().min(-90).max(90).nullable()),
     longitude: optionalNumber.pipe(z.number().min(-180).max(180).nullable()),
     packagePriceThb: optionalNumber.pipe(z.number().int().positive().max(100_000_000).nullable()),
-    phone: optionalPhone,
+    phone: requiredPhone,
     postalCode: z.string().trim().regex(/^\d{5}$/, "รหัสไปรษณีย์ต้องมี 5 หลัก"),
     preferredRadiusKm: z.coerce.number().int().pipe(z.union([z.literal(10), z.literal(15), z.literal(20)])),
     propertyType: z.enum(["detached_home", "townhome", "commercial", "other"]),
     province: z.string().trim().min(2, "กรุณาระบุจังหวัด").max(120),
+    referralCode: communityReferralCodeSchema,
     selectedSystemSizeKw: optionalNumber.pipe(z.number().positive().max(1000).nullable()),
     subdistrict: z.string().trim().min(2, "กรุณาระบุตำบล/แขวง").max(120),
   })
   .superRefine((value, context) => {
+    if (!/^\S+\s+\S+/.test(value.fullName)) {
+      context.addIssue({
+        code: "custom",
+        message: "กรุณาระบุชื่อและนามสกุล",
+        path: ["fullName"],
+      });
+    }
     if ((value.latitude === null) !== (value.longitude === null)) {
       context.addIssue({
         code: "custom",

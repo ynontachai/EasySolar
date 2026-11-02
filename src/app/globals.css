@@ -6299,6 +6299,7 @@ a {
   letter-spacing: -0.05em;
   line-height: 1.02;
   margin: 18px 0 26px;
+  overflow-wrap: anywhere;
 }
 
 .community-form-shell > aside > p:last-of-type {
@@ -7449,6 +7450,362 @@ a {
 
 @media (max-width: 620px) {
   .pool-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Community registration referral and Admin operations */
+.community-referral-notice {
+  align-items: center;
+  background: #fff8dc;
+  border: 1px solid #ead383;
+  display: flex;
+  font-size: 13px;
+  gap: 10px;
+  margin-bottom: 24px;
+  padding: 12px 14px;
+}
+
+.community-referral-notice a {
+  color: #775400;
+  font-size: 12px;
+  margin-left: auto;
+  min-height: 24px;
+  text-decoration: underline;
+  white-space: nowrap;
+}
+
+.community-referral-card {
+  align-items: center;
+  background: var(--ink);
+  color: var(--white);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-top: 28px;
+  max-width: 720px;
+  padding: 22px;
+}
+
+.community-referral-card > svg {
+  color: var(--sun);
+}
+
+.community-referral-card span,
+.community-referral-card strong,
+.community-referral-card small {
+  display: block;
+}
+
+.community-referral-card span,
+.community-referral-card small {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 12px;
+}
+
+.community-referral-card strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  margin: 4px 0;
+}
+
+.community-referral-card .button {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.community-referral-card__error {
+  color: #ffd6d6;
+  font-size: 12px;
+  grid-column: 2 / -1;
+  margin: 0;
+}
+
+.admin-community-page,
+.admin-community-detail {
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: 54px 42px 100px;
+}
+
+.admin-community-filters {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 30px 0;
+}
+
+.admin-community-filters label:first-child {
+  align-items: center;
+  background: var(--white);
+  border: 1px solid var(--line);
+  display: flex;
+  flex: 1 1 320px;
+  gap: 9px;
+  min-width: 0;
+  padding: 0 14px;
+}
+
+.admin-community-filters input,
+.admin-community-filters select,
+.admin-community-status-form select {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--ink);
+  min-height: 48px;
+  padding: 0 14px;
+}
+
+.admin-community-filters input {
+  border: 0;
+  min-width: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.admin-community-list,
+.admin-community-card {
+  background: var(--white);
+  border: 1px solid var(--line);
+}
+
+.admin-community-list__head,
+.admin-community-card__head {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+  padding: 18px 20px;
+}
+
+.admin-community-list__head h2,
+.admin-community-card__head h2 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.admin-community-table__header,
+.admin-community-row {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(210px, 1.35fr) minmax(160px, 0.9fr) minmax(150px, 0.8fr) 130px 100px;
+  padding: 16px 20px;
+}
+
+.admin-community-table__header {
+  border-bottom: 1px solid var(--line);
+  color: #748099;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.admin-community-row {
+  border-bottom: 1px solid var(--line);
+  min-height: 82px;
+  transition: background 150ms ease;
+}
+
+.admin-community-row:last-child {
+  border-bottom: 0;
+}
+
+.admin-community-row:hover,
+.admin-community-row:focus-visible {
+  background: #fffaf0;
+}
+
+.admin-community-row strong,
+.admin-community-row small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.admin-community-row strong {
+  font-size: 13px;
+}
+
+.admin-community-row small,
+.admin-community-row time {
+  color: #667085;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.admin-status[data-status="converted"] {
+  background: #dff3e6;
+  color: #1f6a3d;
+}
+
+.admin-status[data-status="withdrawn"] {
+  background: #f2f2f2;
+  color: #667085;
+}
+
+.admin-back-link {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 28px;
+  min-height: 32px;
+}
+
+.admin-community-detail__grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 30px;
+}
+
+.admin-community-card dl {
+  margin: 0;
+  padding: 8px 20px 20px;
+}
+
+.admin-community-card dl > div {
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 20px;
+  grid-template-columns: 140px minmax(0, 1fr);
+  padding: 13px 0;
+}
+
+.admin-community-card dl > div:last-child {
+  border-bottom: 0;
+}
+
+.admin-community-card dt {
+  color: #667085;
+  font-size: 12px;
+}
+
+.admin-community-card dd {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.admin-community-card--action > p {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 20px 20px 0;
+}
+
+.admin-community-status-form {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 20px;
+}
+
+.admin-community-status-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.admin-community-status-form label > span {
+  color: #53627b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-community-status-form p {
+  font-size: 12px;
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.admin-form-error {
+  color: #9b2737;
+}
+
+.admin-form-success {
+  color: #1f6a3d;
+}
+
+@media (max-width: 1080px) {
+  .admin-community-table__header {
+    display: none;
+  }
+
+  .admin-community-row {
+    align-items: start;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-community-row > :first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 621px) and (max-width: 900px) {
+  .admin-task-grid[data-community="true"] > *:last-child {
+    grid-column: auto;
+    min-height: 310px;
+  }
+}
+
+@media (max-width: 760px) {
+  .community-referral-card {
+    align-items: start;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .community-referral-card .button {
+    grid-column: 1 / -1;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .community-referral-card__error {
+    grid-column: 1 / -1;
+  }
+
+  .admin-community-page,
+  .admin-community-detail {
+    padding: 42px 18px 80px;
+  }
+
+  .admin-community-detail__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .admin-community-filters,
+  .admin-community-filters .button,
+  .admin-community-filters label,
+  .admin-community-filters select {
+    width: 100%;
+  }
+
+  .admin-community-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-community-row > :first-child {
+    grid-column: auto;
+  }
+
+  .admin-community-status-form {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .admin-community-card dl > div {
+    gap: 5px;
     grid-template-columns: 1fr;
   }
 }

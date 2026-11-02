@@ -5,8 +5,10 @@ import { createCommunityInterest } from "@/lib/server/community-interest-reposit
 import { HttpError } from "@/lib/server/http-error";
 
 export interface CommunityInterestActionState {
+  memberId?: string;
   message: string;
   referenceCode?: string;
+  referralCode?: string;
   status: "error" | "idle" | "success";
 }
 export async function registerCommunityInterestAction(
@@ -31,6 +33,7 @@ export async function registerCommunityInterestAction(
     preferredRadiusKm: formData.get("preferredRadiusKm"),
     propertyType: formData.get("propertyType"),
     province: formData.get("province"),
+    referralCode: formData.get("referralCode"),
     selectedSystemSizeKw: formData.get("selectedSystemSizeKw"),
     subdistrict: formData.get("subdistrict"),
   });
@@ -46,7 +49,9 @@ export async function registerCommunityInterestAction(
     const result = await createCommunityInterest(parsed.data);
     return {
       message: "ลงทะเบียนความสนใจแล้ว",
+      memberId: result.memberId,
       referenceCode: result.referenceCode,
+      referralCode: result.referralCode,
       status: "success",
     };
   } catch (error) {
