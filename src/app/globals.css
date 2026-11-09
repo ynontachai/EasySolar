@@ -4909,7 +4909,7 @@ a {
 
 @media (max-width: 900px) {
   .admin-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .admin-sidebar {
