@@ -31,6 +31,11 @@ const optionalNumber = (label: string, min: number, max: number) =>
         .nullable(),
     );
 
+const requiredNegativeCoefficient = (label: string) =>
+  requiredNumber(label, -2, 0).refine((value) => value < 0, {
+    message: `${label} ต้องเป็นค่าติดลบในหน่วย %/°C`,
+  });
+
 const sourcePage = (label: string) =>
   z.string().trim().min(1, `กรุณาระบุหน้าอ้างอิงของ ${label}`).max(40);
 
@@ -50,14 +55,16 @@ const sourceUrl = z
 
 export const pvSpecInputSchema = z
   .object({
-    betaVmpPercentPerC: optionalNumber("βVmp", -2, 0),
-    betaVocPercentPerC: optionalNumber("βVoc", -2, 0),
+    betaVmpPercentPerC: requiredNegativeCoefficient("βVmp"),
+    betaVocPercentPerC: requiredNegativeCoefficient("βVoc"),
     bifacialityFactor: optionalNumber("Bifaciality", 0, 1),
     impA: requiredNumber("Imp", 0, 100),
     iscA: requiredNumber("Isc", 0, 100),
     maxSystemVoltageV: requiredNumber("Max system voltage", 0, 5000),
     pmaxWp: requiredNumber("Pmax", 0, 2000),
     sourcePages: z.object({
+      betaVmpPercentPerC: sourcePage("βVmp"),
+      betaVocPercentPerC: sourcePage("βVoc"),
       impA: sourcePage("Imp"),
       iscA: sourcePage("Isc"),
       maxSystemVoltageV: sourcePage("Max system voltage"),
@@ -100,18 +107,20 @@ export const trackerInputSchema = z
 export const inverterSpecInputSchema = z
   .object({
     inverterType: z.enum(["string", "hybrid", "micro"], { message: "กรุณาเลือกประเภท Inverter" }),
-    maxDcPowerWp: optionalNumber("Max DC power", 0, 10_000_000),
+    maxDcPowerWp: requiredNumber("Max DC power", 0, 10_000_000),
     maxDcVoltageV: requiredNumber("Max DC voltage", 0, 5000),
     maxRecommendedPvWp: optionalNumber("Max recommended PV", 0, 10_000_000),
     ratedAcKw: requiredNumber("Rated AC", 0, 10_000),
     sourcePages: z.object({
       maxDcVoltageV: sourcePage("Max DC voltage"),
+      maxDcPowerWp: sourcePage("Max DC power"),
       mpptCurrent: sourcePage("MPPT current"),
       mpptRange: sourcePage("MPPT voltage range"),
       ratedAcKw: sourcePage("Rated AC"),
+      startupVoltageV: sourcePage("Startup voltage"),
     }),
     sourceUrl,
-    startupVoltageV: optionalNumber("Startup voltage", 0, 2000),
+    startupVoltageV: requiredNumber("Startup voltage", 0, 2000),
     trackers: z.array(trackerInputSchema).min(1, "ต้องมี MPPT อย่างน้อย 1 ตัว").max(12),
   });
 

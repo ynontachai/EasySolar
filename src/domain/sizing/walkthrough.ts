@@ -14,8 +14,8 @@ function adjusted(stc: number, beta: number, cellTemperatureC: number) {
 
 /**
  * Step-by-step numbers behind the checker, shown to the user as formulas.
- * Trackers are collapsed to their most restrictive limits so one set of numbers
- * is valid for every MPPT; the engine still evaluates each tracker separately.
+ * Every tracker remains separate. Collapsing asymmetric MPPT limits can make a
+ * valid limit look applicable to a tracker that has fewer inputs or lower current.
  */
 export function buildWalkthrough(
   pvModule: PvModuleSpec,
@@ -23,46 +23,28 @@ export function buildWalkthrough(
   assumptions: SizingAssumptions,
 ): SizingWalkthrough {
   const trackers = inverter.trackers;
-  const mpptMinV = Math.max(...trackers.map((tracker) => tracker.mpptMinV));
-  const mpptMaxV = Math.min(...trackers.map((tracker) => tracker.mpptMaxV));
-  const maxOperatingCurrentA = Math.min(...trackers.map((tracker) => tracker.maxOperatingCurrentA));
-  const maxShortCircuitCurrentA = Math.min(...trackers.map((tracker) => tracker.maxShortCircuitCurrentA));
-  const inputsPerMppt = Math.max(...trackers.map((tracker) => tracker.inputCount));
-
-  const powerLimitWp = inverter.maxRecommendedPvWp ?? inverter.maxDcPowerWp;
-  const maxModules = powerLimitWp === null ? null : Math.floor(powerLimitWp / pvModule.pmaxWp);
+  const design = pvModule.bifacialDesignCase;
+  const designPmaxWp = design?.pmaxWp ?? pvModule.pmaxWp;
+  const powerLimits = [inverter.maxRecommendedPvWp, inverter.maxDcPowerWp].filter(
+    (value): value is number => value !== null,
+  );
+  const powerLimitWp = powerLimits.length ? Math.min(...powerLimits) : null;
+  const maxModules = powerLimitWp === null ? null : Math.floor(powerLimitWp / designPmaxWp);
 
   const { betaVocPerC, betaVmpPerC } = pvModule;
   const temperature =
     betaVocPerC === null || betaVmpPerC === null
       ? null
       : {
-          vmpHotV: adjusted(pvModule.vmpV, betaVmpPerC, assumptions.tcellMaxC),
-          vocColdV: adjusted(pvModule.vocV, betaVocPerC, assumptions.tcellMinC),
-          vmpColdV: adjusted(pvModule.vmpV, betaVmpPerC, assumptions.tcellMinC),
+          vmpHotV: adjusted(design?.vmpV ?? pvModule.vmpV, betaVmpPerC, assumptions.tcellMaxC),
+          vocColdV: adjusted(design?.vocV ?? pvModule.vocV, betaVocPerC, assumptions.tcellMinC),
+          vmpColdV: adjusted(design?.vmpV ?? pvModule.vmpV, betaVmpPerC, assumptions.tcellMinC),
         };
 
   const voltageCeilingV = Math.min(inverter.maxDcVoltageV, pvModule.maxSystemVoltageV);
-  const seriesRange = temperature
-    ? {
-        maxModules: Math.floor(voltageCeilingV / temperature.vocColdV),
-        minModules: Math.ceil(mpptMinV / temperature.vmpHotV),
-        voltageCeilingV,
-      }
-    : null;
-
-  const designIscA = pvModule.iscA * assumptions.currentSafetyFactor;
-  const stringRows = Array.from({ length: inputsPerMppt }, (_, index) => {
-    const strings = index + 1;
-    const operatingA = strings * pvModule.impA;
-    const shortCircuitA = strings * designIscA;
-    return {
-      strings,
-      operatingA: round(operatingA),
-      shortCircuitA: round(shortCircuitA),
-      pass: operatingA <= maxOperatingCurrentA && shortCircuitA <= maxShortCircuitCurrentA,
-    };
-  });
+  const calculationIscA = design?.iscA ?? pvModule.iscA;
+  const calculationImpA = design?.impA ?? pvModule.impA;
+  const designIscA = calculationIscA * assumptions.currentSafetyFactor;
 
   return {
     pvModule: {
@@ -73,30 +55,76 @@ export function buildWalkthrough(
       impA: pvModule.impA,
       betaVocPerC,
       betaVmpPerC,
+      betaVmpSource: pvModule.betaVmpSource,
     },
+    designElectricals: design
+      ? {
+          impA: design.impA,
+          iscA: design.iscA,
+          pmaxWp: design.pmaxWp,
+          rearGainPercent: design.rearGainFraction * 100,
+          sourcePage: design.sourcePage,
+          vmpV: design.vmpV,
+          vocV: design.vocV,
+        }
+      : null,
     inverterLimits: {
-      inputsPerMppt,
       maxDcPowerWp: inverter.maxDcPowerWp,
       maxDcVoltageV: inverter.maxDcVoltageV,
-      maxOperatingCurrentA,
       maxRecommendedPvWp: inverter.maxRecommendedPvWp,
-      maxShortCircuitCurrentA,
-      mpptMaxV,
-      mpptMinV,
       trackerCount: trackers.length,
     },
-    maxModules: maxModules === null || powerLimitWp === null ? null : { limitWp: powerLimitWp, modules: maxModules },
+    maxModules:
+      maxModules === null || powerLimitWp === null
+        ? null
+        : { limitWp: powerLimitWp, modulePowerWp: designPmaxWp, modules: maxModules },
     temperature: temperature && {
       vmpHotV: round(temperature.vmpHotV),
       vocColdV: round(temperature.vocColdV),
       vmpColdV: round(temperature.vmpColdV),
     },
-    seriesRange: seriesRange && { ...seriesRange, voltageCeilingV: round(seriesRange.voltageCeilingV) },
     currents: {
       designIscA: round(designIscA),
-      impA: pvModule.impA,
+      impA: calculationImpA,
       safetyFactor: assumptions.currentSafetyFactor,
-      stringRows,
     },
+    trackers: trackers.map((tracker) => ({
+      inputCount: tracker.inputCount,
+      maxOperatingCurrentA: tracker.maxOperatingCurrentA,
+      maxShortCircuitCurrentA: tracker.maxShortCircuitCurrentA,
+      mpptMaxV: tracker.mpptMaxV,
+      mpptMinV: tracker.mpptMinV,
+      seriesRange: temperature
+        ? (() => {
+            const maxModulesByColdVoc = Math.floor(voltageCeilingV / temperature.vocColdV);
+            const maxModulesByColdVmp = Math.floor(tracker.mpptMaxV / temperature.vmpColdV);
+            return {
+              maxModules: Math.min(maxModulesByColdVoc, maxModulesByColdVmp),
+              maxModulesByColdVmp,
+              maxModulesByColdVoc,
+              minModules: Math.ceil(tracker.mpptMinV / temperature.vmpHotV),
+              voltageCeilingV: round(voltageCeilingV),
+            };
+          })()
+        : null,
+      stringRows: Array.from({ length: tracker.inputCount }, (_, index) => {
+        const strings = index + 1;
+        const operatingA = strings * pvModule.impA;
+        const shortCircuitA = strings * designIscA;
+        const operatingPass = operatingA <= tracker.maxOperatingCurrentA;
+        const shortCircuitPass = shortCircuitA <= tracker.maxShortCircuitCurrentA;
+        const topologyPass = strings <= tracker.inputCount;
+        return {
+          operatingA: round(operatingA),
+          operatingPass,
+          pass: operatingPass && shortCircuitPass && topologyPass,
+          shortCircuitA: round(shortCircuitA),
+          shortCircuitPass,
+          strings,
+          topologyPass,
+        };
+      }),
+      trackerIndex: tracker.trackerIndex,
+    })),
   };
 }

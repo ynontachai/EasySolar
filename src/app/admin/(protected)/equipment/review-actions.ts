@@ -178,8 +178,8 @@ const inverterFormFields = [
 ] as const;
 
 const sourcePageFields = {
-  pv_module: ["impA", "iscA", "maxSystemVoltageV", "pmaxWp", "vmpV", "vocV"],
-  inverter: ["maxDcVoltageV", "mpptCurrent", "mpptRange", "ratedAcKw"],
+  pv_module: ["betaVmpPercentPerC", "betaVocPercentPerC", "impA", "iscA", "maxSystemVoltageV", "pmaxWp", "vmpV", "vocV"],
+  inverter: ["maxDcPowerWp", "maxDcVoltageV", "mpptCurrent", "mpptRange", "ratedAcKw", "startupVoltageV"],
 } as const;
 
 const trackerFormFields = [

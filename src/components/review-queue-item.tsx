@@ -16,14 +16,18 @@ import type { ReviewQueueRow } from "@/lib/server/review-repository";
 const initialState: ReviewActionState = { message: "", status: "idle" };
 
 const fieldLabels: Record<string, string> = {
+  betaVmpPercentPerC: "βVmp (%/°C)",
+  betaVocPercentPerC: "βVoc (%/°C)",
   impA: "Imp",
   iscA: "Isc",
   mpptCurrent: "MPPT current",
   mpptRange: "MPPT voltage range",
   maxDcVoltageV: "Max DC voltage",
+  maxDcPowerWp: "Max DC power",
   maxSystemVoltageV: "Max system voltage",
   pmaxWp: "Pmax",
   ratedAcKw: "Rated AC",
+  startupVoltageV: "Startup voltage",
   vmpV: "Vmp",
   vocV: "Voc",
 };

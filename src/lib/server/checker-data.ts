@@ -28,6 +28,9 @@ function toDemoOption(item: { id: string; manufacturer: string; model: string })
 // only while that category has nothing published yet.
 export async function loadCheckerData() {
   const published = (await listPublishedCatalogItems()) ?? [];
+  const allowDemo =
+    process.env.NODE_ENV !== "production" ||
+    (process.env.CI === "true" && process.env.EASYSOLAR_E2E_ALLOW_DEMO === "true");
   const toOption = (item: (typeof published)[number]): CheckerEquipmentOption => ({
     datasheetPath: item.downloadPath,
     imageAlt: item.imageAlt,
@@ -41,8 +44,27 @@ export async function loadCheckerData() {
 
   const publishedPv = published.filter((item) => item.category === "pv_module").map(toOption);
   const publishedInverters = published.filter((item) => item.category === "inverter").map(toOption);
-  const pvOptions = publishedPv.length ? publishedPv : demoPvModules.map(toDemoOption);
-  const inverterOptions = publishedInverters.length ? publishedInverters : demoInverters.map(toDemoOption);
+  const pvOptions = publishedPv.length
+    ? publishedPv
+    : allowDemo
+      ? demoPvModules.map(toDemoOption)
+      : [];
+  const inverterOptions = publishedInverters.length
+    ? publishedInverters
+    : allowDemo
+      ? demoInverters.map(toDemoOption)
+      : [];
+
+  if (!pvOptions.length || !inverterOptions.length) {
+    return {
+      hasPublished: publishedPv.length > 0 || publishedInverters.length > 0,
+      initialInverterId: "",
+      initialPvModuleId: "",
+      initialResult: null,
+      inverterOptions,
+      pvOptions,
+    };
+  }
 
   const [pvModule, inverter] = await Promise.all([
     resolvePvModule(pvOptions[0].value),

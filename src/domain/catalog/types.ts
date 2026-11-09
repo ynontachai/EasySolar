@@ -19,8 +19,19 @@ export interface PvModuleSpec {
   impA: number;
   betaVocPerC: number | null;
   betaVmpPerC: number | null;
+  betaVmpSource: "datasheet" | "derived" | null;
   maxSystemVoltageV: number;
   isBifacial: boolean;
+  bifacialDesignCase: {
+    approvedAt: string;
+    impA: number;
+    iscA: number;
+    pmaxWp: number;
+    rearGainFraction: number;
+    sourcePage: string;
+    vmpV: number;
+    vocV: number;
+  } | null;
   datasheet: DatasheetReference;
 }
 

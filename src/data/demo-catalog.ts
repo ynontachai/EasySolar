@@ -18,8 +18,10 @@ export const demoPvModules: PvModuleSpec[] = [
     impA: 13.11,
     betaVocPerC: -0.0025,
     betaVmpPerC: -0.003,
+    betaVmpSource: "datasheet",
     maxSystemVoltageV: 1500,
     isBifacial: false,
+    bifacialDesignCase: null,
     datasheet: {
       revisionId: "demo-pv-550-r1",
       revisionLabel: "DEMO R1",

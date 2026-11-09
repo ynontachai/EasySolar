@@ -7,9 +7,20 @@ import {
 } from "./review-workflow";
 import { inverterSpecInputSchema, pvSpecInputSchema } from "./spec-schemas";
 
-const pvPages = { impA: "2", iscA: "2", maxSystemVoltageV: "3", pmaxWp: "1", vmpV: "2", vocV: "2" };
+const pvPages = {
+  betaVmpPercentPerC: "2",
+  betaVocPercentPerC: "2",
+  impA: "2",
+  iscA: "2",
+  maxSystemVoltageV: "3",
+  pmaxWp: "1",
+  vmpV: "2",
+  vocV: "2",
+};
 
 const validPv = {
+  betaVmpPercentPerC: "-0.30",
+  betaVocPercentPerC: "-0.25",
   impA: "13.11",
   iscA: "13.98",
   maxSystemVoltageV: "1500",
@@ -88,7 +99,7 @@ describe("verify and publish gates", () => {
   it("passes when all fields are confirmed with pages", () => {
     const result = evaluateVerifyGates({
       category: "pv_module",
-      confirmedFields: ["pmaxWp", "vocV", "vmpV", "iscA", "impA", "maxSystemVoltageV"],
+      confirmedFields: ["betaVmpPercentPerC", "betaVocPercentPerC", "pmaxWp", "vocV", "vmpV", "iscA", "impA", "maxSystemVoltageV"],
       sourcePages: pvPages,
       state: "extracted_unverified",
     });
@@ -110,7 +121,7 @@ describe("PV spec schema", () => {
   it("accepts a complete spec and converts nothing silently", () => {
     const parsed = pvSpecInputSchema.parse(validPv);
     expect(parsed.pmaxWp).toBe(550);
-    expect(parsed.betaVocPercentPerC).toBeNull();
+    expect(parsed.betaVocPercentPerC).toBe(-0.25);
     expect(parsed.sourceUrl).toBeNull();
   });
 
@@ -125,6 +136,11 @@ describe("PV spec schema", () => {
   it("rejects a missing source page", () => {
     const result = pvSpecInputSchema.safeParse({ ...validPv, sourcePages: { ...pvPages, vocV: "" } });
     expect(result.success).toBe(false);
+  });
+
+  it("rejects missing or non-negative temperature coefficients", () => {
+    expect(pvSpecInputSchema.safeParse({ ...validPv, betaVocPercentPerC: "" }).success).toBe(false);
+    expect(pvSpecInputSchema.safeParse({ ...validPv, betaVmpPercentPerC: "0" }).success).toBe(false);
   });
 
   it("requires an https source URL when provided", () => {
@@ -143,9 +159,11 @@ describe("inverter spec schema", () => {
   };
   const valid = {
     inverterType: "string",
+    maxDcPowerWp: "15000",
     maxDcVoltageV: "1100",
     ratedAcKw: "10",
-    sourcePages: { maxDcVoltageV: "1", mpptCurrent: "1", mpptRange: "1", ratedAcKw: "1" },
+    sourcePages: { maxDcPowerWp: "1", maxDcVoltageV: "1", mpptCurrent: "1", mpptRange: "1", ratedAcKw: "1", startupVoltageV: "1" },
+    startupVoltageV: "200",
     trackers: [tracker],
   };
 

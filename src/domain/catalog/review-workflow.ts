@@ -45,6 +45,8 @@ export function canPerform(
 }
 
 export const pvCriticalFields = [
+  "betaVmpPercentPerC",
+  "betaVocPercentPerC",
   "pmaxWp",
   "vocV",
   "vmpV",
@@ -54,10 +56,12 @@ export const pvCriticalFields = [
 ] as const;
 
 export const inverterCriticalFields = [
+  "maxDcPowerWp",
   "ratedAcKw",
   "maxDcVoltageV",
   "mpptRange",
   "mpptCurrent",
+  "startupVoltageV",
 ] as const;
 
 export function criticalFieldsFor(category: "inverter" | "pv_module") {

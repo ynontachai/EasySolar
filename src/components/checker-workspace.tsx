@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Check, ChevronRight, Download, X } from "lucide-react";
-import type { OverallStatus, RuleFinding, SizingResult } from "@/domain/sizing/types";
+import Image from "next/image";
+import { AlertTriangle, Check, ChevronRight, Download, X } from "lucide-react";
+import type { OverallStatus, RuleFinding, RuleStatus, SizingResult } from "@/domain/sizing/types";
 import { ThemeSelect } from "@/components/theme-select";
 
 export interface CheckerEquipmentOption {
@@ -36,16 +37,23 @@ const verdictCopy: Record<OverallStatus, { label: string; detail: string }> = {
   },
   INSUFFICIENT_DATA: {
     label: "ข้อมูลยังไม่พอยืนยัน",
-    detail: "ตัวเลขไฟฟ้าผ่าน แต่ข้อมูลบางส่วนยังไม่ได้ตรวจสอบกับ Datasheet จริง",
+    detail: "ระบบหยุดการแนะนำชุดจนกว่าจะมีข้อมูลสำคัญครบและตรวจสอบกับ Datasheet แล้ว",
   },
 };
 
-function Pass({ ok }: { ok: boolean }) {
+function StatusMark({ status }: { status: RuleStatus }) {
+  const isPass = status === "PASS";
+  const isWarning = status === "WARNING" || status === "INCOMPLETE";
+  const label = isPass ? "ผ่าน" : status === "WARNING" ? "คำเตือน" : status === "INCOMPLETE" ? "ข้อมูลไม่ครบ" : "ไม่ผ่าน";
   return (
-    <span className={`mark mark--${ok ? "pass" : "fail"}`} role="img" aria-label={ok ? "ผ่าน" : "ไม่ผ่าน"}>
-      {ok ? <Check size={14} aria-hidden="true" /> : <X size={14} aria-hidden="true" />}
+    <span className={`mark mark--${isPass ? "pass" : isWarning ? "warning" : "fail"}`} role="img" aria-label={label}>
+      {isPass ? <Check size={14} aria-hidden="true" /> : isWarning ? <AlertTriangle size={14} aria-hidden="true" /> : <X size={14} aria-hidden="true" />}
     </span>
   );
+}
+
+function Pass({ ok }: { ok: boolean }) {
+  return <StatusMark status={ok ? "PASS" : "FAIL"} />;
 }
 
 function EquipmentPicker({
@@ -107,9 +115,14 @@ function SpecCard({
   return (
     <article className="spec-card">
       <h3>{title}</h3>
+      <p className="spec-card__meta">
+        Revision {option?.revisionLabel ?? "ไม่ทราบ"} · {option?.isDemo ? "ข้อมูลทดลอง · ยังไม่ verified" : "ตรวจสอบและเผยแพร่แล้ว"}
+      </p>
       <div className="spec-card__body">
         <div className={`spec-card__image${option?.imageUrl ? "" : " spec-card__image--empty"}`}>
-          {option?.imageUrl ? <img alt={option.imageAlt ?? ""} src={option.imageUrl} /> : null}
+          {option?.imageUrl ? (
+            <Image alt={option.imageAlt ?? ""} fill sizes="96px" src={option.imageUrl} unoptimized />
+          ) : null}
         </div>
         <dl>
           {rows.map(([name, value]) => (
@@ -147,7 +160,7 @@ function Step({ children, number, title }: { children: React.ReactNode; number: 
 function FindingRow({ finding }: { finding: RuleFinding }) {
   return (
     <li>
-      <Pass ok={finding.status === "PASS"} />
+      <StatusMark status={finding.status} />
       <span>
         <strong>{finding.label}</strong>
         <small>
@@ -213,12 +226,15 @@ export function CheckerWorkspace({
 
   const wt = result.walkthrough;
   const pv = wt.pvModule;
+  const design = wt.designElectricals;
+  const calculationVmpV = design?.vmpV ?? pv.vmpV;
+  const calculationVocV = design?.vocV ?? pv.vocV;
   const inv = wt.inverterLimits;
   const verdict = verdictCopy[result.overallStatus];
   const pvOption = pvOptions.find((option) => option.value === result.equipment.pvModule.id);
   const inverterOption = inverterOptions.find((option) => option.value === result.equipment.inverter.id);
-  const passingStrings = wt.currents.stringRows.filter((row) => row.pass).length;
   const bestCandidate = result.candidates[0];
+  const canOrder = result.overallStatus === "PRELIMINARY_COMPATIBLE" && Boolean(bestCandidate) && result.blockingReasons.length === 0;
 
   return (
     <div className="calc">
@@ -259,12 +275,12 @@ export function CheckerWorkspace({
           option={inverterOption}
           rows={[
             ["Vdc สูงสุด", `${inv.maxDcVoltageV} V`],
-            ["แรงดัน MPPT", `${inv.mpptMinV}–${inv.mpptMaxV} V`],
-            ["กระแสขาเข้าสูงสุด/MPPT", `${inv.maxOperatingCurrentA} A`],
-            ["Isc สูงสุด/MPPT", `${inv.maxShortCircuitCurrentA} A`],
+            ["ช่วงแรงดัน MPPT", wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.mpptMinV}–${tracker.mpptMaxV} V`).join(" · ")],
+            ["กระแสขาเข้าสูงสุด/MPPT", wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.maxOperatingCurrentA} A`).join(" · ")],
+            ["Isc สูงสุด/MPPT", wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.maxShortCircuitCurrentA} A`).join(" · ")],
             ["กำลัง PV สูงสุดที่แนะนำ", inv.maxRecommendedPvWp === null ? "ไม่ระบุ" : `${inv.maxRecommendedPvWp.toLocaleString("en-US")} Wp`],
             ["กำลัง PV ที่ใช้งานได้", inv.maxDcPowerWp === null ? "ไม่ระบุ" : `${inv.maxDcPowerWp.toLocaleString("en-US")} Wp`],
-            ["MPPT / สตริงสูงสุด", `${inv.trackerCount} MPPT · ${inv.inputsPerMppt} สตริง`],
+            ["MPPT / จำนวน input", `${inv.trackerCount} MPPT · ${wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.inputCount}`).join(" · ")}`],
           ]}
           title={`${result.equipment.inverter.manufacturer} ${result.equipment.inverter.model}`}
         />
@@ -276,7 +292,13 @@ export function CheckerWorkspace({
             ["Vmp", `${pv.vmpV} V`],
             ["Isc", `${pv.iscA} A`],
             ["Imp", `${pv.impA} A`],
-            ["Beta (Voc / Vmp)", `${pv.betaVocPerC ?? "ไม่ระบุ"} / ${pv.betaVmpPerC ?? "ไม่ระบุ"} /°C`],
+            ["βVoc / βVmp", `${pv.betaVocPerC === null ? "ไม่ระบุ" : `${(pv.betaVocPerC * 100).toFixed(3)} %/°C`} / ${pv.betaVmpPerC === null ? "ไม่ระบุ" : `${(pv.betaVmpPerC * 100).toFixed(3)} %/°C${pv.betaVmpSource === "derived" ? " (derived)" : ""}`}`],
+            ...(design
+              ? [
+                  ["Approved rear-gain case", `${design.rearGainPercent.toFixed(0)}% · Datasheet หน้า ${design.sourcePage}`],
+                  ["Pmax / Isc / Imp ที่ใช้ตรวจ", `${design.pmaxWp} W · ${design.iscA} A · ${design.impA} A`],
+                ] as [string, string][]
+              : []),
           ]}
           title={`${result.equipment.pvModule.manufacturer} ${result.equipment.pvModule.model}`}
         />
@@ -285,15 +307,20 @@ export function CheckerWorkspace({
       <div className={`calc__verdict calc__verdict--${result.overallStatus.toLowerCase()}`}>
         <strong>{verdict.label}</strong>
         <span>{verdict.detail}</span>
+        {result.blockingReasons.length ? (
+          <ul>
+            {result.blockingReasons.map((reason) => <li key={reason}>{reason}</li>)}
+          </ul>
+        ) : null}
       </div>
 
       <div className="calc__steps">
-        <Step number={1} title="จำนวนแผงรวมสูงสุด">
+        <Step number={1} title="จำนวนแผงรวมตามกำลัง PV ที่ผู้ผลิตระบุ">
           {wt.maxModules ? (
             <div className="formula">
               <p>ขนาด PV แนะนำสูงสุด ÷ กำลังแผง</p>
               <p>
-                {wt.maxModules.limitWp.toLocaleString("en-US")} ÷ {pv.pmaxWp} = {(wt.maxModules.limitWp / pv.pmaxWp).toFixed(1)}
+                {wt.maxModules.limitWp.toLocaleString("en-US")} ÷ {wt.maxModules.modulePowerWp} = {(wt.maxModules.limitWp / wt.maxModules.modulePowerWp).toFixed(1)}
               </p>
               <strong>{wt.maxModules.modules} แผง</strong>
             </div>
@@ -306,18 +333,18 @@ export function CheckerWorkspace({
           {wt.temperature ? (
             <>
               <div className="formula">
-                <p><b>Vmp ร้อน</b> = Vmp × [1 + β × (T สูงสุด − 25)]</p>
-                <p>{pv.vmpV} × [1 + ({pv.betaVmpPerC}) × ({result.assumptions.tcellMaxC} − 25)]</p>
+                <p><b>Vmp ร้อน</b> = Vmp × [1 + (βVmp% ÷ 100) × (T สูงสุด − 25)]</p>
+                <p>{calculationVmpV} × [1 + ({((pv.betaVmpPerC ?? 0) * 100).toFixed(3)} ÷ 100) × ({result.assumptions.tcellMaxC} − 25)]</p>
                 <strong>{wt.temperature.vmpHotV} V</strong>
               </div>
               <div className="formula">
-                <p><b>Voc เย็น</b> = Voc × [1 + β × (T ต่ำสุด − 25)]</p>
-                <p>{pv.vocV} × [1 + ({pv.betaVocPerC}) × ({result.assumptions.tcellMinC} − 25)]</p>
+                <p><b>Voc เย็น</b> = Voc × [1 + (βVoc% ÷ 100) × (T ต่ำสุด − 25)]</p>
+                <p>{calculationVocV} × [1 + ({((pv.betaVocPerC ?? 0) * 100).toFixed(3)} ÷ 100) × ({result.assumptions.tcellMinC} − 25)]</p>
                 <strong>{wt.temperature.vocColdV} V</strong>
               </div>
               <div className="formula">
-                <p><b>Vmp เย็น</b> = Vmp × [1 + β × (T ต่ำสุด − 25)]</p>
-                <p>{pv.vmpV} × [1 + ({pv.betaVmpPerC}) × ({result.assumptions.tcellMinC} − 25)]</p>
+                <p><b>Vmp เย็น</b> = Vmp × [1 + (βVmp% ÷ 100) × (T ต่ำสุด − 25)]</p>
+                <p>{calculationVmpV} × [1 + ({((pv.betaVmpPerC ?? 0) * 100).toFixed(3)} ÷ 100) × ({result.assumptions.tcellMinC} − 25)]</p>
                 <strong>{wt.temperature.vmpColdV} V</strong>
               </div>
             </>
@@ -327,53 +354,66 @@ export function CheckerWorkspace({
         </Step>
 
         <Step number={3} title="จำนวนแผงต่ออนุกรม / สตริง">
-          {wt.seriesRange && wt.temperature ? (
-            <>
-              <div className="formula">
-                <p><b>แผงมากสุด</b> = Vdc สูงสุด ÷ Voc เย็น</p>
-                <p>{wt.seriesRange.voltageCeilingV} ÷ {wt.temperature.vocColdV}</p>
-                <strong>{wt.seriesRange.maxModules} แผง <Pass ok={wt.seriesRange.maxModules >= 1} /></strong>
-                <small>ไม่เกินแรงดัน DC สูงสุดของอินเวอร์เตอร์</small>
-              </div>
-              <div className="formula">
-                <p><b>แผงน้อยสุด</b> = แรงดันต่ำสุดของ MPPT ÷ Vmp ร้อน</p>
-                <p>{inv.mpptMinV} ÷ {wt.temperature.vmpHotV}</p>
-                <strong>{wt.seriesRange.minModules} แผง <Pass ok={wt.seriesRange.minModules <= wt.seriesRange.maxModules} /></strong>
-                <small>ต้องไม่ต่ำกว่าแรงดันต่ำสุดของ MPPT</small>
-              </div>
-              <p className="calc__answer">
-                {wt.seriesRange.minModules <= wt.seriesRange.maxModules
-                  ? `ใช้แผงได้ ${wt.seriesRange.minModules} ถึง ${wt.seriesRange.maxModules} แผงต่อสตริง`
-                  : "ไม่มีจำนวนแผงที่ผ่านทั้งสองขอบเขต"}
-              </p>
-            </>
+          {wt.temperature ? (
+            <div className="tracker-checks">
+              {wt.trackers.map((tracker) => {
+                const range = tracker.seriesRange;
+                if (!range) return null;
+                const isValid = range.minModules <= range.maxModules;
+                return (
+                  <section className="tracker-check" key={tracker.trackerIndex}>
+                    <h4>MPPT {tracker.trackerIndex}</h4>
+                    <div className="formula">
+                      <p><b>มากสุดจาก Voc</b> = Vdc สูงสุด ÷ Voc เย็น</p>
+                      <p>{range.voltageCeilingV} ÷ {wt.temperature?.vocColdV} = {range.maxModulesByColdVoc}</p>
+                      <p><b>มากสุดจาก Vmp</b> = MPPT max ÷ Vmp เย็น</p>
+                      <p>{tracker.mpptMaxV} ÷ {wt.temperature?.vmpColdV} = {range.maxModulesByColdVmp}</p>
+                      <strong>ใช้ขอบเขตที่เข้มกว่า: {range.maxModules} แผง</strong>
+                    </div>
+                    <div className="formula">
+                      <p><b>แผงน้อยสุด</b> = MPPT min ÷ Vmp ร้อน</p>
+                      <p>{tracker.mpptMinV} ÷ {wt.temperature?.vmpHotV}</p>
+                      <strong>{range.minModules} แผง <Pass ok={isValid} /></strong>
+                    </div>
+                    <p className="calc__answer">
+                      {isValid
+                        ? `MPPT ${tracker.trackerIndex}: ${range.minModules}–${range.maxModules} แผงต่อสตริง`
+                        : `MPPT ${tracker.trackerIndex}: ไม่มีจำนวนแผงที่ผ่านทุกขอบเขต`}
+                    </p>
+                  </section>
+                );
+              })}
+            </div>
           ) : (
-            <p className="calc__missing">ต้องมีค่า Beta จึงจะคำนวณข้อนี้ได้</p>
+            <p className="calc__missing">ต้องมี βVoc และ βVmp ที่ตรวจสอบแล้วจึงจะคำนวณข้อนี้ได้</p>
           )}
         </Step>
 
         <Step number={4} title="จำนวนสตริงต่อ MPPT">
-          <div className="formula">
-            <p>
-              กระแสของแผง (Imp) {pv.impA} A ต้องน้อยกว่ากระแสขาเข้าสูงสุด/MPPT {inv.maxOperatingCurrentA} A{" "}
-              <Pass ok={pv.impA <= inv.maxOperatingCurrentA} />
-            </p>
-            <p>
-              กระแสลัดวงจร (Isc) {pv.iscA} A × {wt.currents.safetyFactor} = {wt.currents.designIscA} A ต้องน้อยกว่า {inv.maxShortCircuitCurrentA} A{" "}
-              <Pass ok={wt.currents.designIscA <= inv.maxShortCircuitCurrentA} />
-            </p>
+          <div className="tracker-checks">
+            {wt.trackers.map((tracker) => {
+              const passingRows = tracker.stringRows.filter((row) => row.pass);
+              const maxPassingStrings = passingRows.at(-1)?.strings ?? 0;
+              return (
+                <section className="tracker-check" key={tracker.trackerIndex}>
+                  <h4>MPPT {tracker.trackerIndex} · {tracker.inputCount} physical input</h4>
+                  <ul className="calc__rows">
+                    {tracker.stringRows.map((row) => (
+                      <li key={row.strings}>
+                        <Pass ok={row.pass} />
+                        <span>
+                          <strong>{row.strings} สตริง:</strong>{" "}
+                          Imp รวม {row.operatingA} A {row.operatingPass ? "≤" : ">"} {tracker.maxOperatingCurrentA} A ·{" "}
+                          Isc ออกแบบ {row.shortCircuitA} A {row.shortCircuitPass ? "≤" : ">"} {tracker.maxShortCircuitCurrentA} A
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="calc__answer">ต่อได้สูงสุด {maxPassingStrings} สตริงบน MPPT {tracker.trackerIndex}</p>
+                </section>
+              );
+            })}
           </div>
-          <ul className="calc__rows">
-            {wt.currents.stringRows.map((row) => (
-              <li key={row.strings}>
-                <Pass ok={row.pass} />
-                <span>
-                  {row.strings} สตริงต่อ 1 MPPT: {row.operatingA} A {row.pass ? "<" : ">"} {inv.maxOperatingCurrentA} A
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="calc__answer">ต่อได้สูงสุด {passingStrings} สตริงต่อ MPPT</p>
         </Step>
 
         <Step number={5} title="รูปแบบการต่อที่เหมาะสม">
@@ -385,7 +425,12 @@ export function CheckerWorkspace({
                     <strong>
                       แบบที่ {candidate.rank} · {(candidate.totalDcPowerWp / 1000).toFixed(2)} kWp · {candidate.totalModules} แผง
                     </strong>
-                    <span>DC/AC {candidate.dcAcRatio.toFixed(2)}</span>
+                    <span>
+                      DC/AC {candidate.dcAcRatio.toFixed(2)}
+                      {candidate.designTotalDcPowerWp !== candidate.totalDcPowerWp
+                        ? ` · design ${(candidate.designTotalDcPowerWp / 1000).toFixed(2)} kW (${candidate.designDcAcRatio.toFixed(2)})`
+                        : ""}
+                    </span>
                   </header>
                   {candidate.mpptConfigurations.map((configuration) => (
                     <div className="layout-card__row" key={configuration.trackerIndex}>
@@ -404,7 +449,11 @@ export function CheckerWorkspace({
               ))}
             </div>
           ) : (
-            <p className="calc__missing">ไม่พบรูปแบบการต่อที่ผ่านเงื่อนไข ลองเปลี่ยนรุ่นหรือปรับเงื่อนไขด้านล่าง</p>
+            <p className="calc__missing">
+              {result.blockingReasons.length
+                ? "ระบบไม่สร้างชุดแนะนำจนกว่าข้อมูลสำคัญจะครบและผ่านการตรวจสอบ"
+                : "ไม่พบรูปแบบการต่อที่ผ่านเงื่อนไข ลองเปลี่ยนรุ่นหรือปรับเงื่อนไขด้านล่าง"}
+            </p>
           )}
         </Step>
       </div>
@@ -444,7 +493,7 @@ export function CheckerWorkspace({
             <div className="field-group">
               <label htmlFor="current-factor">ตัวคูณ Isc</label>
               <div className="unit-input">
-                <input id="current-factor" max={2} min={1} onChange={(event) => setCurrentSafetyFactor(event.target.valueAsNumber)} required step="0.01" type="number" value={currentSafetyFactor} />
+                <input id="current-factor" max={2} min={1.25} onChange={(event) => setCurrentSafetyFactor(event.target.valueAsNumber)} required step="0.01" type="number" value={currentSafetyFactor} />
                 <span>×</span>
               </div>
             </div>
@@ -466,15 +515,19 @@ export function CheckerWorkspace({
         </details>
       ) : null}
 
-      <section className="line-cta" id="order">
+      <section className={`line-cta${canOrder ? "" : " line-cta--blocked"}`} id="order">
         <div>
-          <p className="eyebrow">สั่งซื้ออุปกรณ์</p>
-          <h2>สนใจอุปกรณ์ชุดนี้</h2>
-          <p>แอด LINE OA ของ EasySolar เพื่อสอบถามและสั่งซื้อ ทีมงานตอบกลับโดยตรง</p>
+          <p className="eyebrow">{canOrder ? "ขั้นตอนถัดไป" : "ต้องตรวจข้อมูลก่อน"}</p>
+          <h2>{canOrder ? "ส่งชุดนี้ให้ทีมวิศวกรตรวจทาน" : "ยังไม่เปิดการสั่งซื้อชุดนี้"}</h2>
+          <p>
+            {canOrder
+              ? "ผลผ่านกฎเบื้องต้นจากข้อมูลที่ verified แล้ว ทีมงานจะตรวจแบบและ Datasheet ซ้ำก่อนเสนอราคา"
+              : "กรุณาแก้ข้อมูลที่ระบบแจ้งให้ครบก่อน ระบบจะไม่ใช้ผลที่ยังไม่ยืนยันเพื่อสั่งซื้อ"}
+          </p>
         </div>
-        {lineOaUrl ? (
+        {lineOaUrl && canOrder ? (
           <a className="button button--sun" href={lineOaUrl} rel="noopener noreferrer" target="_blank">
-            แอด LINE เพื่อสั่งซื้อ
+            ส่งให้ทีมวิศวกรตรวจทาน
             <ChevronRight size={18} aria-hidden="true" />
           </a>
         ) : null}

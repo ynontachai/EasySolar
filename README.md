@@ -1,6 +1,6 @@
 # EasySolar Equipment Intelligence
 
-Initial MVP scaffold for a transparent PV module–inverter compatibility checker. The current catalog contains synthetic, unverified records only; the UI and engine intentionally return `INSUFFICIENT_DATA` until real datasheet revisions pass verification.
+Production-oriented PV module–inverter compatibility checker. Public recommendations are fail-closed: missing safety-critical values, unverified revisions, or unresolved bifacial current prevent an orderable result. Synthetic records are available only outside production and in the isolated CI browser test mode.
 
 ## Run locally
 
@@ -33,20 +33,19 @@ npm run lint
 npm run typecheck
 npm test
 npm run build
+npm run test:e2e
 ```
 
-## Current routes
+## Current public flow
 
-- `/` — public landing page
-- `/equipment` — catalog scaffold
-- `/checker` — working server-authoritative sizing flow
-- `/solar-value` — consumer assessment scope and delivery roadmap
-- `/solar-value/new` — five-step consumer assessment with versioned tariff assumptions
+- `/` — EPC-first landing page with server-authoritative sizing, formula trace and verified-order boundary
+- `/checker`, `/equipment`, `/solar-value`, `/community-buy` — temporary redirects to the single-page experience
 - `/admin/login` — invite-only Admin sign-in
 - `/admin/catalog` — role-scoped SKU creation and list
 - `/admin/equipment` — role-scoped Datasheet verification workflow
 - `/admin/users` — Super Admin invitation email and role assignment
 - `/api/health` — health and engine version
+- `/api/ready` — production dependency readiness (returns 503 until all required capabilities are ready)
 - `/api/v1/admin/datasheets/upload-intents` — authenticated signed upload intent
 - `/api/v1/admin/datasheets/{assetId}/finalize` — object integrity verification
 - `/api/v1/admin/datasheets/{assetId}/scan-verdict` — scanner callback
@@ -59,5 +58,8 @@ npm run build
 - Do not make an LLM or client-side calculation authoritative.
 - Do not silently fill missing safety-critical values.
 - Do not rewrite historical calculations when a datasheet or rule changes.
+- Do not show an order action unless the result is `PRELIMINARY_COMPATIBLE`, every blocker is cleared, and both revisions are verified.
+
+Read [production readiness and release runbook](docs/production-readiness.md) before deployment.
 
 Read [product blueprint](docs/product-blueprint.md), [journey–feature alignment](docs/journey-feature-map.md), [data and file architecture](docs/data-architecture-plan.md), [admin catalog operations](docs/admin-catalog-operations-plan.md), [Supabase setup walkthrough](docs/supabase-setup-walkthrough.md), [requirements contract](docs/requirements-contract.md), [UX handoff](docs/ux-handoff.md), [architecture](docs/architecture.md), and the first PostgreSQL migration in `db/migrations/0001_initial.sql` before implementing persistence.

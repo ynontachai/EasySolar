@@ -10,7 +10,7 @@ import type {
 } from "./types";
 import { buildWalkthrough } from "./walkthrough";
 
-export const ENGINE_VERSION = "0.1.0-alpha";
+export const ENGINE_VERSION = "0.3.0";
 const STC_REFERENCE_TEMPERATURE_C = 25;
 const MAX_SERIES_MODULES_TO_ENUMERATE = 60;
 const MAX_CANDIDATES_TO_RETURN = 5;
@@ -18,6 +18,16 @@ const MAX_CANDIDATES_TO_RETURN = 5;
 function round(value: number, digits = 2) {
   const multiplier = 10 ** digits;
   return Math.round(value * multiplier) / multiplier;
+}
+
+function getDesignElectricals(pvModule: SizingInput["pvModule"]) {
+  return pvModule.bifacialDesignCase ?? {
+    impA: pvModule.impA,
+    iscA: pvModule.iscA,
+    pmaxWp: pvModule.pmaxWp,
+    vmpV: pvModule.vmpV,
+    vocV: pvModule.vocV,
+  };
 }
 
 function adjustedVoltage(
@@ -72,46 +82,52 @@ function evaluateTracker(
   parallelStrings: number,
 ): RuleFinding[] {
   const { pvModule, inverter, assumptions } = input;
+  const design = getDesignElectricals(pvModule);
 
-  if (pvModule.betaVocPerC === null || pvModule.betaVmpPerC === null) {
+  const betaVocPerC = pvModule.betaVocPerC;
+  const betaVmpPerC = pvModule.betaVmpPerC;
+  const hasTemperatureCoefficients = betaVocPerC !== null && betaVmpPerC !== null;
+
+  if (!hasTemperatureCoefficients) {
+    const missing = [
+      pvModule.betaVocPerC === null ? "βVoc" : null,
+      pvModule.betaVmpPerC === null ? "βVmp" : null,
+    ].filter(Boolean);
     return [
       {
-        ruleId: "R10_INPUT_QUALITY",
+        ruleId: "R10_TEMPERATURE_COEFFICIENTS",
         group: "DATA",
-        label: "Temperature coefficients",
+        label: `สัมประสิทธิ์อุณหภูมิ · MPPT ${tracker.trackerIndex}`,
         status: "INCOMPLETE",
-        measured: "ข้อมูลไม่ครบ",
-        limit: "ต้องมี βVoc และ βVmp",
-        rationale: "ไม่สามารถคำนวณขอบเขตแรงดันตามอุณหภูมิได้",
+        measured: `ขาด ${missing.join(" และ ")}`,
+        limit: "ต้องมี βVoc และ βVmp พร้อมหน่วยและแหล่งอ้างอิง",
+        rationale: "หยุดสร้าง Candidate เพราะยังตรวจ cold Voc และ hot/cold Vmp ไม่ได้",
       },
+      ...currentAndTopologyFindings(input, tracker, parallelStrings),
     ];
   }
 
   const coldVocString =
     seriesModules *
     adjustedVoltage(
-      pvModule.vocV,
-      pvModule.betaVocPerC,
+      design.vocV,
+      betaVocPerC,
       assumptions.tcellMinC,
     );
   const hotVmpString =
     seriesModules *
     adjustedVoltage(
-      pvModule.vmpV,
-      pvModule.betaVmpPerC,
+      design.vmpV,
+      betaVmpPerC,
       assumptions.tcellMaxC,
     );
   const coldVmpString =
     seriesModules *
     adjustedVoltage(
-      pvModule.vmpV,
-      pvModule.betaVmpPerC,
+      design.vmpV,
+      betaVmpPerC,
       assumptions.tcellMinC,
     );
-  const operatingCurrent = parallelStrings * pvModule.impA;
-  const designShortCircuitCurrent =
-    parallelStrings * pvModule.iscA * assumptions.currentSafetyFactor;
-
   const coldVocLimit = Math.min(
     inverter.maxDcVoltageV,
     pvModule.maxSystemVoltageV,
@@ -158,12 +174,149 @@ function evaluateTracker(
           : `≥ ${inverter.startupVoltageV} V`,
       rationale: "ใช้ Vmp ขณะร้อนเป็น conservative operating check เบื้องต้น",
     },
+    ...currentAndTopologyFindings(input, tracker, parallelStrings),
+  ];
+
+  return findings;
+}
+
+function getBlockingReasons(input: SizingInput) {
+  const reasons: string[] = [];
+  if (input.pvModule.betaVocPerC === null) reasons.push("Datasheet แผงไม่มี βVoc");
+  if (input.pvModule.betaVmpPerC === null) reasons.push("Datasheet แผงไม่มี βVmp");
+  if (input.inverter.startupVoltageV === null) reasons.push("Datasheet อินเวอร์เตอร์ไม่มี Startup voltage");
+  if (input.inverter.maxDcPowerWp === null) reasons.push("Datasheet อินเวอร์เตอร์ไม่มี Max DC power");
+  if (input.inverter.trackers.length === 0) reasons.push("อินเวอร์เตอร์ไม่มีข้อมูล MPPT");
+  if (input.pvModule.isBifacial && input.pvModule.bifacialDesignCase === null) {
+    reasons.push("ยังไม่มี approved rear-side design case สำหรับแผง Bifacial");
+  }
+  if (input.pvModule.datasheet.verificationStatus !== "verified") {
+    reasons.push("Datasheet แผงยังไม่ผ่านการตรวจสอบ");
+  }
+  if (input.inverter.datasheet.verificationStatus !== "verified") {
+    reasons.push("Datasheet อินเวอร์เตอร์ยังไม่ผ่านการตรวจสอบ");
+  }
+  return reasons;
+}
+
+function hasEngineeringDataBlocker(input: SizingInput) {
+  return (
+    input.pvModule.betaVocPerC === null ||
+    input.pvModule.betaVmpPerC === null ||
+    input.inverter.startupVoltageV === null ||
+    input.inverter.maxDcPowerWp === null ||
+    input.inverter.trackers.length === 0 ||
+    (input.pvModule.isBifacial && input.pvModule.bifacialDesignCase === null) ||
+    input.pvModule.datasheet.verificationStatus !== "verified" ||
+    input.inverter.datasheet.verificationStatus !== "verified"
+  );
+}
+
+interface TrackerOption {
+  configuration: SizingCandidate["mpptConfigurations"][number];
+  findings: RuleFinding[];
+}
+
+function buildTrackerOptions(input: SizingInput, tracker: MpptTrackerSpec): TrackerOption[] {
+  const options: TrackerOption[] = [];
+  for (let seriesModules = 1; seriesModules <= MAX_SERIES_MODULES_TO_ENUMERATE; seriesModules += 1) {
+    for (let parallelStrings = 1; parallelStrings <= tracker.inputCount; parallelStrings += 1) {
+      const findings = evaluateTracker(input, tracker, seriesModules, parallelStrings);
+      if (findings.some((finding) => finding.status === "FAIL" || finding.status === "INCOMPLETE")) {
+        continue;
+      }
+      const moduleCount = seriesModules * parallelStrings;
+      const design = getDesignElectricals(input.pvModule);
+      options.push({
+        configuration: {
+          trackerIndex: tracker.trackerIndex,
+          seriesModules,
+          parallelStrings,
+          moduleCount,
+          dcPowerWp: moduleCount * input.pvModule.pmaxWp,
+          designDcPowerWp: moduleCount * design.pmaxWp,
+        },
+        findings,
+      });
+    }
+  }
+  return options;
+}
+
+interface CandidateState {
+  configurations: SizingCandidate["mpptConfigurations"];
+  findings: RuleFinding[];
+  totalModules: number;
+}
+
+function combineTrackerOptions(input: SizingInput): CandidateState[] {
+  if (hasEngineeringDataBlocker(input)) return [];
+
+  const design = getDesignElectricals(input.pvModule);
+  const hardModuleLimit = Math.floor(
+    (input.inverter.maxDcPowerWp ?? 0) / design.pmaxWp,
+  );
+  let states: CandidateState[] = [{ configurations: [], findings: [], totalModules: 0 }];
+
+  for (const tracker of input.inverter.trackers) {
+    const options = buildTrackerOptions(input, tracker);
+    if (options.length === 0) return [];
+    const nextByModuleCount = new Map<number, CandidateState>();
+
+    for (const state of states) {
+      for (const option of options) {
+        const totalModules = state.totalModules + option.configuration.moduleCount;
+        if (totalModules > hardModuleLimit) continue;
+        const candidate = {
+          configurations: [...state.configurations, option.configuration],
+          findings: [...state.findings, ...option.findings],
+          totalModules,
+        };
+        const existing = nextByModuleCount.get(totalModules);
+        if (!existing || isBetterBalanced(candidate, existing)) {
+          nextByModuleCount.set(totalModules, candidate);
+        }
+      }
+    }
+    states = [...nextByModuleCount.values()];
+  }
+
+  return states;
+}
+
+function isBetterBalanced(candidate: CandidateState, existing: CandidateState) {
+  const spread = (state: CandidateState) => {
+    const series = state.configurations.map((configuration) => configuration.seriesModules);
+    return Math.max(...series) - Math.min(...series);
+  };
+  const spreadDifference = spread(candidate) - spread(existing);
+  if (spreadDifference !== 0) return spreadDifference < 0;
+
+  for (let index = 0; index < candidate.configurations.length; index += 1) {
+    const difference =
+      candidate.configurations[index].seriesModules -
+      existing.configurations[index].seriesModules;
+    if (difference !== 0) return difference > 0;
+  }
+  return false;
+}
+
+function currentAndTopologyFindings(
+  input: SizingInput,
+  tracker: MpptTrackerSpec,
+  parallelStrings: number,
+): RuleFinding[] {
+  const design = getDesignElectricals(input.pvModule);
+  const operatingCurrent = parallelStrings * design.impA;
+  const designShortCircuitCurrent =
+    parallelStrings * design.iscA * input.assumptions.currentSafetyFactor;
+
+  return [
     {
       ruleId: "R05_OPERATING_CURRENT",
       group: "CURRENT",
       label: `กระแสทำงาน · MPPT ${tracker.trackerIndex}`,
-      status:
-        operatingCurrent <= tracker.maxOperatingCurrentA ? "PASS" : "FAIL",
+      status: operatingCurrent <= tracker.maxOperatingCurrentA ? "PASS" : "FAIL",
       measured: `${round(operatingCurrent)} A`,
       limit: `≤ ${tracker.maxOperatingCurrentA} A`,
       rationale: "รวม Imp ของทุก String ที่ต่อขนานบน MPPT เดียวกัน",
@@ -173,12 +326,10 @@ function evaluateTracker(
       group: "CURRENT",
       label: `กระแสลัดวงจรออกแบบ · MPPT ${tracker.trackerIndex}`,
       status:
-        designShortCircuitCurrent <= tracker.maxShortCircuitCurrentA
-          ? "PASS"
-          : "FAIL",
+        designShortCircuitCurrent <= tracker.maxShortCircuitCurrentA ? "PASS" : "FAIL",
       measured: `${round(designShortCircuitCurrent)} A`,
       limit: `≤ ${tracker.maxShortCircuitCurrentA} A`,
-      rationale: `Isc × ${assumptions.currentSafetyFactor}; ต้องยืนยัน factor กับมาตรฐานและสภาพไซต์จริง`,
+      rationale: `Isc × ${input.assumptions.currentSafetyFactor}; ต้องยืนยัน factor กับมาตรฐานและสภาพไซต์จริง`,
     },
     {
       ruleId: "R08_TOPOLOGY",
@@ -190,8 +341,6 @@ function evaluateTracker(
       rationale: "จำนวน String ต้องไม่เกินจำนวน physical input ที่ระบุ",
     },
   ];
-
-  return findings;
 }
 
 function equipmentQualityFindings(input: SizingInput): RuleFinding[] {
@@ -200,7 +349,8 @@ function equipmentQualityFindings(input: SizingInput): RuleFinding[] {
     input.inverter.datasheet.verificationStatus,
   ];
   const isVerified = statuses.every((status) => status === "verified");
-  const hasUnresolvedBifacialCurrent = input.pvModule.isBifacial;
+  const hasUnresolvedBifacialCurrent =
+    input.pvModule.isBifacial && input.pvModule.bifacialDesignCase === null;
   const isInputComplete = isVerified && !hasUnresolvedBifacialCurrent;
 
   return [
@@ -211,6 +361,8 @@ function equipmentQualityFindings(input: SizingInput): RuleFinding[] {
       status: isInputComplete ? "PASS" : "INCOMPLETE",
       measured: hasUnresolvedBifacialCurrent
         ? "Bifacial current model unresolved"
+        : input.pvModule.bifacialDesignCase
+          ? `Approved ${(input.pvModule.bifacialDesignCase.rearGainFraction * 100).toFixed(0)}% rear-gain design case`
         : isVerified
           ? "Verified revisions"
           : "Demo / unverified",
@@ -237,6 +389,7 @@ function equipmentQualityFindings(input: SizingInput): RuleFinding[] {
 function powerFindings(
   input: SizingInput,
   totalDcPowerWp: number,
+  designTotalDcPowerWp: number,
 ): RuleFinding[] {
   const { inverter } = input;
   const findings: RuleFinding[] = [];
@@ -244,7 +397,7 @@ function powerFindings(
   const hardStatus: RuleStatus =
     inverter.maxDcPowerWp === null
       ? "INCOMPLETE"
-      : totalDcPowerWp <= inverter.maxDcPowerWp
+      : designTotalDcPowerWp <= inverter.maxDcPowerWp
         ? "PASS"
         : "FAIL";
 
@@ -253,7 +406,10 @@ function powerFindings(
     group: "POWER",
     label: "กำลัง DC รวมเทียบขีดจำกัด",
     status: hardStatus,
-    measured: `${round(totalDcPowerWp / 1000, 3)} kWp`,
+    measured:
+      designTotalDcPowerWp === totalDcPowerWp
+        ? `${round(totalDcPowerWp / 1000, 3)} kWp`
+        : `${round(designTotalDcPowerWp / 1000, 3)} kW design (${round(totalDcPowerWp / 1000, 3)} kWp front)`,
     limit:
       inverter.maxDcPowerWp === null
         ? "ไม่พบ hard maximum"
@@ -263,14 +419,14 @@ function powerFindings(
 
   if (
     inverter.maxRecommendedPvWp !== null &&
-    totalDcPowerWp > inverter.maxRecommendedPvWp
+    designTotalDcPowerWp > inverter.maxRecommendedPvWp
   ) {
     findings.push({
       ruleId: "R07_POWER_RECOMMENDED",
       group: "POWER",
       label: "ช่วงกำลัง PV ที่แนะนำ",
       status: "WARNING",
-      measured: `${round(totalDcPowerWp / 1000, 3)} kWp`,
+      measured: `${round(designTotalDcPowerWp / 1000, 3)} kW design`,
       limit: `แนะนำ ≤ ${round(inverter.maxRecommendedPvWp / 1000, 3)} kWp`,
       rationale: "เกินช่วงแนะนำแต่ไม่ตีความเป็น hard fail โดยอัตโนมัติ",
     });
@@ -284,55 +440,31 @@ export function evaluateSizing(
   context: CalculationContext,
 ): SizingResult {
   const { pvModule, inverter, assumptions } = input;
-  const candidates: SizingCandidate[] = [];
-  const maxParallelStrings = Math.max(
-    ...inverter.trackers.map((tracker) => tracker.inputCount),
-  );
-
-  for (
-    let seriesModules = 1;
-    seriesModules <= MAX_SERIES_MODULES_TO_ENUMERATE;
-    seriesModules += 1
-  ) {
-    for (
-      let parallelStrings = 1;
-      parallelStrings <= maxParallelStrings;
-      parallelStrings += 1
-    ) {
-      const mpptConfigurations = inverter.trackers.map((tracker) => ({
-        trackerIndex: tracker.trackerIndex,
-        seriesModules,
-        parallelStrings,
-        moduleCount: seriesModules * parallelStrings,
-        dcPowerWp: seriesModules * parallelStrings * pvModule.pmaxWp,
-      }));
-      const totalModules = mpptConfigurations.reduce(
-        (total, config) => total + config.moduleCount,
-        0,
-      );
-      const totalDcPowerWp = totalModules * pvModule.pmaxWp;
-      const findings = [
-        ...inverter.trackers.flatMap((tracker) =>
-          evaluateTracker(input, tracker, seriesModules, parallelStrings),
-        ),
-        ...powerFindings(input, totalDcPowerWp),
-        ...equipmentQualityFindings(input),
-      ];
-
-      if (findings.some((finding) => finding.status === "FAIL")) continue;
-
-      candidates.push({
-        id: `${seriesModules}s-${parallelStrings}p-all-mppt`,
-        rank: 0,
-        overallStatus: findStatus(findings),
-        totalModules,
-        totalDcPowerWp,
-        dcAcRatio: round(totalDcPowerWp / (inverter.ratedAcKw * 1000), 3),
-        mpptConfigurations,
-        findings,
-      });
-    }
-  }
+  const blockingReasons = getBlockingReasons(input);
+  const design = getDesignElectricals(pvModule);
+  const candidates = combineTrackerOptions(input).map((state): SizingCandidate => {
+    const totalDcPowerWp = state.totalModules * pvModule.pmaxWp;
+    const designTotalDcPowerWp = state.totalModules * design.pmaxWp;
+    const findings = [
+      ...state.findings,
+      ...powerFindings(input, totalDcPowerWp, designTotalDcPowerWp),
+      ...equipmentQualityFindings(input),
+    ];
+    return {
+      id: state.configurations
+        .map((configuration) => `${configuration.trackerIndex}-${configuration.seriesModules}s-${configuration.parallelStrings}p`)
+        .join("_"),
+      rank: 0,
+      overallStatus: findStatus(findings),
+      totalModules: state.totalModules,
+      totalDcPowerWp,
+      designTotalDcPowerWp,
+      dcAcRatio: round(totalDcPowerWp / (inverter.ratedAcKw * 1000), 3),
+      designDcAcRatio: round(designTotalDcPowerWp / (inverter.ratedAcKw * 1000), 3),
+      mpptConfigurations: state.configurations,
+      findings,
+    };
+  });
 
   const rankedCandidates = candidates
     .sort(
@@ -344,21 +476,11 @@ export function evaluateSizing(
     .slice(0, MAX_CANDIDATES_TO_RETURN)
     .map((candidate, index) => ({ ...candidate, rank: index + 1 }));
 
-  const fallbackFindings = equipmentQualityFindings(input);
   const overallStatus = rankedCandidates.length
     ? rankedCandidates[0].overallStatus
-    : findStatus([
-        ...fallbackFindings,
-        {
-          ruleId: "R00_NO_CANDIDATE",
-          group: "TOPOLOGY",
-          label: "ไม่พบ Candidate",
-          status: "FAIL",
-          measured: "0 configuration",
-          limit: "อย่างน้อย 1 configuration",
-          rationale: "ไม่มีชุด Ns/Np ในขอบเขตที่ผ่านข้อจำกัดทั้งหมด",
-        },
-      ]);
+    : blockingReasons.length > 0
+      ? "INSUFFICIENT_DATA"
+      : "INCOMPATIBLE";
 
   return {
     calculationId: context.calculationId,
@@ -380,6 +502,7 @@ export function evaluateSizing(
       },
     },
     assumptions,
+    blockingReasons,
     candidates: rankedCandidates,
     walkthrough: buildWalkthrough(pvModule, inverter, assumptions),
     limitations: [

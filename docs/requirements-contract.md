@@ -32,6 +32,10 @@ Solar Value Assessment มี input flow และ local draft แล้ว แ�
 - **BR-006:** Current, voltage และ topology ประเมินแยกต่อ MPPT ห้ามอนุมานว่า physical inputs คือ independent trackers
 - **BR-007:** Consumer result ต้องแสดงเป็นช่วงพร้อม confidence/missing data และห้ามสรุปความคุ้มค่าจาก simple payback ค่าเดียว
 - **BR-008:** Professional และ Consumer experiences ใช้ข้อมูลกลางร่วมกันได้ แต่ต้องแยกภาษา ระดับรายละเอียด disclaimer และ decision boundary
+- **BR-009:** βVoc, βVmp, Max DC power, Startup voltage และ MPPT limits เป็น safety-critical; ต้องมี source page และ reviewer confirmation ก่อน Publish
+- **BR-010:** Missing safety-critical data, unverified revision หรือ unresolved bifacial current ต้อง fail closed: ไม่สร้างชุดแนะนำและไม่เปิด order CTA
+- **BR-011:** MPPT ที่มี limit ต่างกันต้องคำนวณและอธิบายแยก tracker; ห้ามสรุป input/current ด้วยค่าที่ทำให้ tracker ใดดูรองรับเกินจริง
+- **BR-012:** Public API ห้ามใช้ Isc design factor ต่ำกว่า 1.25; ค่าที่สูงกว่าต้องแสดงใน assumptions และ calculation snapshot
 
 ## Acceptance slice implemented in this scaffold
 
@@ -39,9 +43,10 @@ Solar Value Assessment มี input flow และ local draft แล้ว แ�
 2. เปลี่ยน cell temperature, Isc factor และ target DC power แล้วประเมินผ่าน server API ได้
 3. Same input + same engine version ให้ candidate และ findings เหมือนเดิม
 4. Demo/unverified record ไม่สามารถออก `PRELIMINARY_COMPATIBLE`
-5. ผลแสดง Ns/Np, module count, kWp, DC/AC ratio และ trace รายกฎ
-6. หน้า result พิมพ์เป็น preliminary report พร้อมคำเตือนขอบเขตได้
-7. Admin scaffold แสดงเหตุผลที่ record ซึ่งไม่มี source publish ไม่ได้
+5. ผลแสดง Ns/Np แยก MPPT, module count, kWp, DC/AC ratio และ trace รายกฎ
+6. ค่า coefficient แสดงเป็น `%/°C` และสูตรแสดงการหาร 100 อย่างชัดเจน
+7. Admin บังคับหน้าอ้างอิงและ reviewer confirmation สำหรับ critical fields ทั้งหมด
+8. CTA ติดต่อเพื่อเดินหน้าชุดอุปกรณ์แสดงเฉพาะผล `PRELIMINARY_COMPATIBLE` ที่ไม่มี blocker
 
 ## Open decisions before real catalog work
 

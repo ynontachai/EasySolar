@@ -13,6 +13,8 @@ const initialState: ReviewActionState = { message: "", status: "idle" };
 const MAX_TRACKERS = 12;
 
 const pvCriticalFields = [
+  { label: "βVoc (%/°C)", name: "betaVocPercentPerC" },
+  { label: "βVmp (%/°C)", name: "betaVmpPercentPerC" },
   { label: "Pmax (Wp)", name: "pmaxWp" },
   { label: "Voc (V)", name: "vocV" },
   { label: "Vmp (V)", name: "vmpV" },
@@ -22,20 +24,18 @@ const pvCriticalFields = [
 ];
 
 const pvOptionalFields = [
-  { label: "βVoc (%/°C)", name: "betaVocPercentPerC" },
-  { label: "βVmp (%/°C)", name: "betaVmpPercentPerC" },
   { label: "Bifaciality (0–1)", name: "bifacialityFactor" },
 ];
 
 const inverterCriticalFields = [
   { label: "Rated AC (kW)", name: "ratedAcKw" },
   { label: "Max DC voltage (V)", name: "maxDcVoltageV" },
+  { label: "Max DC power (Wp)", name: "maxDcPowerWp" },
+  { label: "Startup voltage (V)", name: "startupVoltageV" },
 ];
 
 const inverterOptionalFields = [
-  { label: "Max DC power (Wp)", name: "maxDcPowerWp" },
   { label: "Max recommended PV (Wp)", name: "maxRecommendedPvWp" },
-  { label: "Startup voltage (V)", name: "startupVoltageV" },
 ];
 
 const trackerFields = [

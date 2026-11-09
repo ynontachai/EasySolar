@@ -12,7 +12,7 @@ export function SiteHeader({ inverse = false }: { inverse?: boolean }) {
       </Link>
       <nav className="main-nav" aria-label="เมนูหลัก">
         <Link className="role-shortcut" href="/#calculator"><span>01</span>คำนวณจับคู่</Link>
-        <Link className="role-shortcut" href="/#order"><span>02</span>สั่งซื้อผ่าน LINE</Link>
+        <Link className="role-shortcut" href="/#order"><span>02</span>ตรวจแบบกับทีมวิศวกร</Link>
       </nav>
       <details className="mobile-nav">
         <summary aria-label="เปิดเมนูหลัก">
@@ -26,7 +26,7 @@ export function SiteHeader({ inverse = false }: { inverse?: boolean }) {
           </Link>
           <Link href="/#order">
             <span>02</span>
-            สั่งซื้อผ่าน LINE
+            ตรวจแบบกับทีมวิศวกร
           </Link>
         </nav>
       </details>

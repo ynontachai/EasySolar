@@ -8099,6 +8099,12 @@ a {
   overflow-wrap: anywhere;
 }
 
+.spec-card__meta {
+  color: #667085;
+  font-size: 12px;
+  margin: -8px 0 14px;
+}
+
 .spec-card__body {
   display: grid;
   gap: 16px;
@@ -8112,6 +8118,7 @@ a {
   display: flex;
   justify-content: center;
   overflow: hidden;
+  position: relative;
 }
 
 .spec-card__image img {
@@ -8178,6 +8185,14 @@ a {
 .calc__verdict span {
   color: #667085;
   font-size: 14px;
+}
+
+.calc__verdict ul {
+  display: grid;
+  font-size: 13px;
+  gap: 3px;
+  margin: 6px 0 0;
+  padding-left: 20px;
 }
 
 .calc__steps {
@@ -8257,6 +8272,27 @@ a {
 .mark--fail {
   background: #f9d9d5;
   color: #b3261e;
+}
+
+.mark--warning {
+  background: #fff0c7;
+  color: #8a5a00;
+}
+
+.tracker-checks {
+  display: grid;
+  gap: 16px;
+}
+
+.tracker-check {
+  border-left: 3px solid var(--ink);
+  min-width: 0;
+  padding-left: 16px;
+}
+
+.tracker-check h4 {
+  font-size: 16px;
+  margin: 0 0 10px;
 }
 
 .calc__rows {
@@ -8350,6 +8386,12 @@ a {
   margin: 0;
 }
 
+.line-cta--blocked {
+  background: #f4f6fa;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
 @media (max-width: 760px) {
   .landing-calculator {
     padding: 16px 16px 56px;
@@ -8367,5 +8409,13 @@ a {
 
   .layout-card__row {
     grid-template-columns: 1fr;
+  }
+
+  .tracker-check {
+    padding-left: 12px;
+  }
+
+  .calc__rows li {
+    align-items: flex-start;
   }
 }

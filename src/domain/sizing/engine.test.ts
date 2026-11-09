@@ -23,14 +23,8 @@ describe("evaluateSizing", () => {
     }, context);
 
     expect(result.overallStatus).toBe("INSUFFICIENT_DATA");
-    expect(result.candidates[0].totalDcPowerWp).toBe(11000);
-    expect(
-      result.candidates[0].findings.some(
-        (finding) =>
-          finding.ruleId === "R10_INPUT_QUALITY" &&
-          finding.status === "INCOMPLETE",
-      ),
-    ).toBe(true);
+    expect(result.candidates).toHaveLength(0);
+    expect(result.blockingReasons).toContain("Datasheet แผงยังไม่ผ่านการตรวจสอบ");
   });
 
   it("returns the same ranked engineering candidates for the same input", () => {
@@ -73,10 +67,23 @@ describe("evaluateSizing", () => {
     const inverter = {
       ...demoInverters[0],
       maxDcVoltageV: 190,
+      datasheet: {
+        ...demoInverters[0].datasheet,
+        verificationStatus: "verified" as const,
+        verifiedAt: "2026-10-27T00:00:00.000Z",
+      },
+    };
+    const pvModule = {
+      ...demoPvModules[0],
+      datasheet: {
+        ...demoPvModules[0].datasheet,
+        verificationStatus: "verified" as const,
+        verifiedAt: "2026-10-27T00:00:00.000Z",
+      },
     };
 
     const result = evaluateSizing({
-      pvModule: demoPvModules[0],
+      pvModule,
       inverter,
       assumptions,
     }, context);
@@ -107,6 +114,124 @@ describe("evaluateSizing", () => {
     const result = evaluateSizing({ pvModule, inverter, assumptions }, context);
 
     expect(result.overallStatus).toBe("INSUFFICIENT_DATA");
+    expect(result.candidates).toHaveLength(0);
+  });
+
+  it("reproduces the engineering-approved LONGi and Deye golden calculation", () => {
+    const verifiedDatasheet = {
+      ...demoPvModules[0].datasheet,
+      verificationStatus: "verified" as const,
+      verifiedAt: "2026-11-09T00:00:00.000Z",
+    };
+    const pvModule = {
+      ...demoPvModules[0],
+      id: "98eaa963-a611-49e6-a8df-f0354f09be7a",
+      manufacturer: "LONGi",
+      model: "LR7-72HVD-645M",
+      pmaxWp: 645,
+      vocV: 53.7,
+      vmpV: 44.56,
+      iscA: 15.17,
+      impA: 14.48,
+      betaVocPerC: -0.002,
+      betaVmpPerC: -0.0031,
+      betaVmpSource: "derived" as const,
+      isBifacial: true,
+      bifacialDesignCase: {
+        approvedAt: "2026-11-09T00:00:00.000Z",
+        rearGainFraction: 0.25,
+        pmaxWp: 808,
+        vocV: 53.8,
+        vmpV: 44.66,
+        iscA: 18.96,
+        impA: 18.1,
+        sourcePage: "2",
+      },
+      datasheet: { ...verifiedDatasheet, revisionId: "d0aa8216-4bc4-419c-a597-9b9023aea741" },
+    };
+    const inverter = {
+      ...demoInverters[0],
+      id: "23c710e2-6612-4be5-a315-d8d45daad33e",
+      manufacturer: "Deye",
+      model: "SUN-12K-SG02LP1-EU-AM3",
+      ratedAcKw: 12,
+      maxDcVoltageV: 500,
+      maxDcPowerWp: 19_200,
+      maxRecommendedPvWp: 24_000,
+      startupVoltageV: 125,
+      trackers: [1, 2, 3].map((trackerIndex) => ({
+        trackerIndex,
+        mpptMinV: 150,
+        mpptMaxV: 425,
+        maxOperatingCurrentA: 26,
+        maxShortCircuitCurrentA: 44,
+        inputCount: 2,
+      })),
+      datasheet: { ...verifiedDatasheet, revisionId: "75e5da3f-264a-462c-96db-7647817add9b" },
+    };
+
+    const result = evaluateSizing({ pvModule, inverter, assumptions }, context);
+    const best = result.candidates[0];
+
+    expect(result.overallStatus).toBe("PRELIMINARY_COMPATIBLE");
+    expect(result.blockingReasons).toEqual([]);
+    expect(result.walkthrough.temperature).toEqual({
+      vmpHotV: 38.43,
+      vocColdV: 57.57,
+      vmpColdV: 49.51,
+    });
+    expect(result.walkthrough.currents).toEqual({
+      designIscA: 23.7,
+      impA: 18.1,
+      safetyFactor: 1.25,
+    });
+    expect(best.totalModules).toBe(17);
+    expect(best.totalDcPowerWp).toBe(10_965);
+    expect(best.designTotalDcPowerWp).toBe(13_736);
+    expect(best.mpptConfigurations.map((item) => [item.seriesModules, item.parallelStrings])).toEqual([
+      [6, 1],
+      [6, 1],
+      [5, 1],
+    ]);
+  });
+
+  it("fails closed without temperature coefficients", () => {
+    const result = evaluateSizing({
+      pvModule: { ...demoPvModules[0], betaVmpPerC: null },
+      inverter: demoInverters[0],
+      assumptions,
+    }, context);
+
+    expect(result.overallStatus).toBe("INSUFFICIENT_DATA");
+    expect(result.candidates).toHaveLength(0);
+    expect(result.blockingReasons).toContain("Datasheet แผงไม่มี βVmp");
+  });
+
+  it("supports different series counts for asymmetric MPPT limits", () => {
+    const verifiedDatasheet = {
+      ...demoInverters[0].datasheet,
+      verificationStatus: "verified" as const,
+      verifiedAt: "2026-10-27T00:00:00.000Z",
+    };
+    const inverter = {
+      ...demoInverters[0],
+      datasheet: verifiedDatasheet,
+      trackers: [
+        { ...demoInverters[0].trackers[0], inputCount: 1, mpptMaxV: 400 },
+        { ...demoInverters[0].trackers[1], mpptMinV: 600 },
+      ],
+    };
+    const result = evaluateSizing({
+      pvModule: {
+        ...demoPvModules[0],
+        datasheet: { ...verifiedDatasheet, revisionId: demoPvModules[0].datasheet.revisionId },
+      },
+      inverter,
+      assumptions: { ...assumptions, targetDcPowerWp: 13_750 },
+    }, context);
+
+    expect(result.candidates[0].mpptConfigurations[0].seriesModules)
+      .not.toBe(result.candidates[0].mpptConfigurations[1].seriesModules);
   });
 });
 
@@ -119,8 +244,9 @@ describe("evaluateSizing walkthrough", () => {
     }, context);
 
     expect(walkthrough.temperature?.vocColdV).toBeCloseTo(49.9 * (1 - 0.0025 * (-10 - 25)), 1);
-    expect(walkthrough.seriesRange?.maxModules).toBeGreaterThanOrEqual(walkthrough.seriesRange?.minModules ?? Infinity);
-    expect(walkthrough.currents.stringRows[0].strings).toBe(1);
-    expect(walkthrough.currents.stringRows).toHaveLength(walkthrough.inverterLimits.inputsPerMppt);
+    expect(walkthrough.trackers[0].seriesRange?.maxModules)
+      .toBeGreaterThanOrEqual(walkthrough.trackers[0].seriesRange?.minModules ?? Infinity);
+    expect(walkthrough.trackers[0].stringRows[0].strings).toBe(1);
+    expect(walkthrough.trackers[0].stringRows).toHaveLength(demoInverters[0].trackers[0].inputCount);
   });
 });

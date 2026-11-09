@@ -40,6 +40,7 @@ export interface MpptConfiguration {
   parallelStrings: number;
   moduleCount: number;
   dcPowerWp: number;
+  designDcPowerWp: number;
 }
 
 export interface SizingCandidate {
@@ -48,35 +49,63 @@ export interface SizingCandidate {
   overallStatus: OverallStatus;
   totalModules: number;
   totalDcPowerWp: number;
+  designTotalDcPowerWp: number;
   dcAcRatio: number;
+  designDcAcRatio: number;
   mpptConfigurations: MpptConfiguration[];
   findings: RuleFinding[];
 }
 
 export interface SizingWalkthrough {
-  pvModule: Pick<PvModuleSpec, "pmaxWp" | "vocV" | "vmpV" | "iscA" | "impA" | "betaVocPerC" | "betaVmpPerC">;
+  pvModule: Pick<PvModuleSpec, "pmaxWp" | "vocV" | "vmpV" | "iscA" | "impA" | "betaVocPerC" | "betaVmpPerC" | "betaVmpSource">;
+  designElectricals: {
+    impA: number;
+    iscA: number;
+    pmaxWp: number;
+    rearGainPercent: number;
+    sourcePage: string;
+    vmpV: number;
+    vocV: number;
+  } | null;
   inverterLimits: {
-    inputsPerMppt: number;
     maxDcPowerWp: number | null;
     maxDcVoltageV: number;
-    maxOperatingCurrentA: number;
     maxRecommendedPvWp: number | null;
-    maxShortCircuitCurrentA: number;
-    mpptMaxV: number;
-    mpptMinV: number;
     trackerCount: number;
   };
   /** Module cap from the manufacturer's recommended (else hard) PV power limit. */
-  maxModules: { limitWp: number; modules: number } | null;
+  maxModules: { limitWp: number; modulePowerWp: number; modules: number } | null;
   /** Null when the datasheet lacks temperature coefficients. */
   temperature: { vmpHotV: number; vocColdV: number; vmpColdV: number } | null;
-  seriesRange: { maxModules: number; minModules: number; voltageCeilingV: number } | null;
   currents: {
     designIscA: number;
     impA: number;
     safetyFactor: number;
-    stringRows: { strings: number; operatingA: number; shortCircuitA: number; pass: boolean }[];
   };
+  trackers: Array<{
+    inputCount: number;
+    maxOperatingCurrentA: number;
+    maxShortCircuitCurrentA: number;
+    mpptMaxV: number;
+    mpptMinV: number;
+    seriesRange: {
+      maxModules: number;
+      maxModulesByColdVmp: number;
+      maxModulesByColdVoc: number;
+      minModules: number;
+      voltageCeilingV: number;
+    } | null;
+    stringRows: Array<{
+      operatingA: number;
+      operatingPass: boolean;
+      pass: boolean;
+      shortCircuitA: number;
+      shortCircuitPass: boolean;
+      strings: number;
+      topologyPass: boolean;
+    }>;
+    trackerIndex: number;
+  }>;
 }
 
 export interface SizingResult {
@@ -93,6 +122,7 @@ export interface SizingResult {
     };
   };
   assumptions: SizingAssumptions;
+  blockingReasons: string[];
   candidates: SizingCandidate[];
   walkthrough: SizingWalkthrough;
   limitations: string[];

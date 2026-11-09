@@ -4,13 +4,10 @@
 
 Solar Precision: ผสม Swiss grid ที่โปร่งและเป็นระเบียบกับ engineering schematic โดยใช้ Kanit ทั้งระบบ พื้น navy/off-white, cobalt สำหรับข้อมูลและ focus, solar orange เฉพาะ CTA/energy flow และยังไม่ให้สถานะความปลอดภัยพึ่งสีเพียงอย่างเดียว
 
-## Information architecture
+## Information architecture (current production slice)
 
-- `/` — brand promise, trust model และทางแยกตามกลุ่มผู้ใช้
-- `/equipment` — source-aware catalog
-- `/checker` — inputs, candidate configurations, rule trace และ print report
-- `/solar-value` — ขอบเขตและสถานะของ Solar Value Assessment; ยังไม่แสดงผลคำนวณ
-- `/solar-value/new` — ฟอร์ม 5 ขั้นสำหรับบิล 3 เดือน, occupancy 4 ช่วง, การใช้แอร์, tariff/export และ review; บันทึก draft บนอุปกรณ์และยังไม่ส่งออกจากเครื่อง
+- `/` — EPC-first single page: equipment selection, verified spec, formula trace, per-MPPT layout และ gated engineer-review CTA
+- Public legacy routes redirect มาที่ `/` ชั่วคราว; source pages ยังอยู่เพื่อให้ rollback ได้
 - `/admin/equipment` — read-only verification workflow scaffold
 
 Public navigation แสดง `สำหรับมืออาชีพ`, `ประเมินโซลาร์` และ `คลังอุปกรณ์`; Admin ไม่อยู่ใน public navigation และจะกลับมาเมื่อมี authentication/authorization
@@ -22,6 +19,9 @@ Public navigation แสดง `สำหรับมืออาชีพ`, `�
 - Design assumptions และหน่วยอยู่ข้าง field ไม่ซ่อนใน tooltip
 - Candidate layout แสดง `Ns × Np` แยกทุก MPPT
 - Result ที่ข้อมูลไม่ครบยังแสดงค่าที่คำนวณได้ แต่ต้องคงสถานะ `INSUFFICIENT_DATA`
+- Result ที่ขาด safety-critical data ต้องไม่แสดง candidate หรือ order CTA และต้องบอก blocker เป็นข้อความ
+- Formula ใช้หน่วยตาม Datasheet (`%/°C`) และแสดง `÷100`; internal fraction ห้ามโผล่เป็นค่าที่ผู้ใช้ต้องตีความเอง
+- MPPT แสดง series range, current และ physical input แยก tracker
 - Print view ตัด navigation/controls และคง result, rule trace, revision และ disclaimer
 
 ## Responsive behavior

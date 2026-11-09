@@ -522,8 +522,17 @@ export async function findPublishedPvModule(id: string): Promise<PvModuleSpec | 
   if (!isDatabaseConfigured()) return null;
   const sql = getDb();
   const [row] = await sql<Array<{
+    betaVmpSource: "datasheet" | "derived" | null;
     betaVmpPerC: string | null;
     betaVocPerC: string | null;
+    designApprovedAt: string | null;
+    designImpA: string | null;
+    designIscA: string | null;
+    designPmaxWp: string | null;
+    designRearGainFraction: string | null;
+    designSourcePage: string | null;
+    designVmpV: string | null;
+    designVocV: string | null;
     exactModel: string;
     impA: string;
     iscA: string;
@@ -552,12 +561,23 @@ export async function findPublishedPvModule(id: string): Promise<PvModuleSpec | 
       pv_module_spec.imp_a::text AS "impA",
       pv_module_spec.beta_voc_per_c::text AS "betaVocPerC",
       pv_module_spec.beta_vmp_per_c::text AS "betaVmpPerC",
+      pv_module_spec.beta_vmp_source AS "betaVmpSource",
       pv_module_spec.max_system_voltage_v::text AS "maxSystemVoltageV",
-      pv_module_spec.bifaciality_factor::text AS "bifacialityFactor"
+      pv_module_spec.bifaciality_factor::text AS "bifacialityFactor",
+      pv_bifacial_design_case.rear_gain_fraction::text AS "designRearGainFraction",
+      pv_bifacial_design_case.pmax_wp::text AS "designPmaxWp",
+      pv_bifacial_design_case.voc_v::text AS "designVocV",
+      pv_bifacial_design_case.vmp_v::text AS "designVmpV",
+      pv_bifacial_design_case.isc_a::text AS "designIscA",
+      pv_bifacial_design_case.imp_a::text AS "designImpA",
+      pv_bifacial_design_case.source_page AS "designSourcePage",
+      pv_bifacial_design_case.approved_at::text AS "designApprovedAt"
     FROM product_model
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
     JOIN datasheet_revision ON datasheet_revision.product_model_id = product_model.id
     JOIN pv_module_spec ON pv_module_spec.datasheet_revision_id = datasheet_revision.id
+    LEFT JOIN pv_bifacial_design_case
+      ON pv_bifacial_design_case.datasheet_revision_id = datasheet_revision.id
     WHERE product_model.id = ${id}
       AND product_model.category = 'pv_module'
       AND product_model.status = 'published'
@@ -568,7 +588,28 @@ export async function findPublishedPvModule(id: string): Promise<PvModuleSpec | 
   if (!row) return null;
   return {
     betaVmpPerC: row.betaVmpPerC === null ? null : Number(row.betaVmpPerC),
+    betaVmpSource: row.betaVmpSource,
     betaVocPerC: row.betaVocPerC === null ? null : Number(row.betaVocPerC),
+    bifacialDesignCase:
+      row.designRearGainFraction === null ||
+      row.designPmaxWp === null ||
+      row.designVocV === null ||
+      row.designVmpV === null ||
+      row.designIscA === null ||
+      row.designImpA === null ||
+      row.designSourcePage === null ||
+      row.designApprovedAt === null
+        ? null
+        : {
+            approvedAt: row.designApprovedAt,
+            impA: Number(row.designImpA),
+            iscA: Number(row.designIscA),
+            pmaxWp: Number(row.designPmaxWp),
+            rearGainFraction: Number(row.designRearGainFraction),
+            sourcePage: row.designSourcePage,
+            vmpV: Number(row.designVmpV),
+            vocV: Number(row.designVocV),
+          },
     datasheet: {
       revisionId: row.revisionId,
       revisionLabel: row.revisionLabel,
