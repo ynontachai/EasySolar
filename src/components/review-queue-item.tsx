@@ -8,7 +8,6 @@ import {
   type ReviewActionState,
 } from "@/app/admin/(protected)/equipment/review-actions";
 import {
-  criticalFieldsFor,
   revisionStateLabels as stateLabels,
 } from "@/domain/catalog/review-workflow";
 import type { ReviewQueueRow } from "@/lib/server/review-repository";
@@ -16,14 +15,20 @@ import type { ReviewQueueRow } from "@/lib/server/review-repository";
 const initialState: ReviewActionState = { message: "", status: "idle" };
 
 const fieldLabels: Record<string, string> = {
+  alphaIscPercentPerC: "αIsc (%/°C)",
+  betaVmpDerivation: "วิธี derive βVmp",
   betaVmpPercentPerC: "βVmp (%/°C)",
   betaVocPercentPerC: "βVoc (%/°C)",
+  gammaPmaxPercentPerC: "γPmax (%/°C)",
   impA: "Imp",
   iscA: "Isc",
-  mpptCurrent: "MPPT current",
+  mpptOperatingCurrent: "MPPT operating current",
   mpptRange: "MPPT voltage range",
+  mpptShortCircuitCurrent: "MPPT short-circuit current",
+  mpptTopology: "จำนวน MPPT / String input",
   maxDcVoltageV: "Max DC voltage",
   maxDcPowerWp: "Max DC power",
+  maxRecommendedPvWp: "Max recommended PV",
   maxSystemVoltageV: "Max system voltage",
   pmaxWp: "Pmax",
   ratedAcKw: "Rated AC",
@@ -42,7 +47,7 @@ export function ReviewQueueItem({
   row: ReviewQueueRow;
 }) {
   const [state, action, isPending] = useActionState(reviewRevisionAction, initialState);
-  const fields = criticalFieldsFor(row.category);
+  const fields = row.criticalFields;
   const hasFile = row.assetState === "available";
   const canOpenSpec =
     canEnterSpec && (row.state === "draft" || row.state === "extracted_unverified");
@@ -106,9 +111,26 @@ export function ReviewQueueItem({
       ) : null}
 
       {row.state === "extracted_unverified" ? (
+        row.requiresEngineeringApproval ? (
+          <p className="review-item__engineering-note" role="note">
+            ค่า βVmp เป็น Derived ต้องให้ Super Admin ตรวจสูตร หน้าอ้างอิง และระบุเหตุผลอนุมัติ
+          </p>
+        ) : null
+      ) : null}
+
+      {row.state === "extracted_unverified" ? (
         <label className="review-item__wide">
-          <span>เหตุผลกรณียืนยันสเปกที่กรอกเอง (อย่างน้อย 10 ตัวอักษร)</span>
-          <input maxLength={500} name="overrideReason" placeholder="เช่น ตรวจกับ Datasheet หน้า 2 แล้ว" type="text" />
+          <span>
+            {row.requiresEngineeringApproval
+              ? "เหตุผลอนุมัติค่า Derived (อย่างน้อย 10 ตัวอักษร)"
+              : "เหตุผลกรณียืนยันสเปกที่กรอกเอง (อย่างน้อย 10 ตัวอักษร)"}
+          </span>
+          <input
+            maxLength={500}
+            name="overrideReason"
+            placeholder={row.requiresEngineeringApproval ? "เช่น ตรวจ γPmax และ αIsc หน้า 2 แล้ว อนุมัติใช้สำหรับ preliminary sizing" : "เช่น ตรวจกับ Datasheet หน้า 2 แล้ว"}
+            type="text"
+          />
         </label>
       ) : null}
 

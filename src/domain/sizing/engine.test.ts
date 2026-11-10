@@ -205,6 +205,11 @@ describe("evaluateSizing", () => {
     expect(result.overallStatus).toBe("INSUFFICIENT_DATA");
     expect(result.candidates).toHaveLength(0);
     expect(result.blockingReasons).toContain("Datasheet แผงไม่มี βVmp");
+    expect(result.walkthrough.temperature.vocColdV).not.toBeNull();
+    expect(result.walkthrough.temperature.vmpHotV).toBeNull();
+    expect(result.walkthrough.trackers[0].seriesRange.maxModulesByColdVoc).not.toBeNull();
+    expect(result.walkthrough.trackers[0].seriesRange.maxModules).toBeNull();
+    expect(result.walkthrough.trackers[0].seriesRange.minModulesByMppt).toBeNull();
   });
 
   it("supports different series counts for asymmetric MPPT limits", () => {
@@ -246,7 +251,38 @@ describe("evaluateSizing walkthrough", () => {
     expect(walkthrough.temperature?.vocColdV).toBeCloseTo(49.9 * (1 - 0.0025 * (-10 - 25)), 1);
     expect(walkthrough.trackers[0].seriesRange?.maxModules)
       .toBeGreaterThanOrEqual(walkthrough.trackers[0].seriesRange?.minModules ?? Infinity);
+    expect(walkthrough.trackers[0].seriesRange.minModules).toBe(
+      Math.max(
+        walkthrough.trackers[0].seriesRange.minModulesByMppt ?? 0,
+        walkthrough.trackers[0].seriesRange.minModulesByStartup ?? 0,
+      ),
+    );
     expect(walkthrough.trackers[0].stringRows[0].strings).toBe(1);
     expect(walkthrough.trackers[0].stringRows).toHaveLength(demoInverters[0].trackers[0].inputCount);
+  });
+
+  it("uses one approved bifacial design-current basis for Imp and Isc checks", () => {
+    const pvModule = {
+      ...demoPvModules[0],
+      bifacialDesignCase: {
+        approvedAt: "2026-11-09T00:00:00.000Z",
+        impA: 18.1,
+        iscA: 18.96,
+        pmaxWp: 808,
+        rearGainFraction: 0.25,
+        sourcePage: "2",
+        vmpV: 44.66,
+        vocV: 53.8,
+      },
+    };
+
+    const { walkthrough } = evaluateSizing({
+      pvModule,
+      inverter: demoInverters[0],
+      assumptions,
+    }, context);
+
+    expect(walkthrough.trackers[0].stringRows[0].operatingA).toBe(18.1);
+    expect(walkthrough.trackers[0].stringRows[0].shortCircuitA).toBe(23.7);
   });
 });

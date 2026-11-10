@@ -14,7 +14,6 @@ const MAX_TRACKERS = 12;
 
 const pvCriticalFields = [
   { label: "βVoc (%/°C)", name: "betaVocPercentPerC" },
-  { label: "βVmp (%/°C)", name: "betaVmpPercentPerC" },
   { label: "Pmax (Wp)", name: "pmaxWp" },
   { label: "Voc (V)", name: "vocV" },
   { label: "Vmp (V)", name: "vmpV" },
@@ -27,15 +26,20 @@ const pvOptionalFields = [
   { label: "Bifaciality (0–1)", name: "bifacialityFactor" },
 ];
 
+const pvTemperatureInputs = [
+  { label: "γPmax (%/°C)", name: "gammaPmaxPercentPerC" },
+  { label: "αIsc (%/°C)", name: "alphaIscPercentPerC" },
+];
+
 const inverterCriticalFields = [
   { label: "Rated AC (kW)", name: "ratedAcKw" },
   { label: "Max DC voltage (V)", name: "maxDcVoltageV" },
-  { label: "Max DC power (Wp)", name: "maxDcPowerWp" },
   { label: "Startup voltage (V)", name: "startupVoltageV" },
 ];
 
-const inverterOptionalFields = [
+const inverterPowerFields = [
   { label: "Max recommended PV (Wp)", name: "maxRecommendedPvWp" },
+  { label: "Max DC / PV input power (Wp)", name: "maxDcPowerWp" },
 ];
 
 const trackerFields = [
@@ -97,6 +101,9 @@ export function RevisionSpecForm({ target }: { target: RevisionSpecTarget }) {
   const [state, action, isPending] = useActionState(enterSpecAction, initialState);
   const isPv = target.category === "pv_module";
   const { values } = target;
+  const [betaVmpSource, setBetaVmpSource] = useState(
+    values.betaVmpSource ?? (values.betaVmpPercentPerC ? "datasheet" : "missing"),
+  );
 
   const initialTrackers = target.trackers.length
     ? target.trackers.map((tracker, index) => ({ id: index, values: tracker }))
@@ -144,6 +151,58 @@ export function RevisionSpecForm({ target }: { target: RevisionSpecTarget }) {
           </fieldset>
 
           <fieldset className="spec-form__section">
+            <legend>สัมประสิทธิ์อุณหภูมิของ Vmp</legend>
+            <p className="spec-form__help">
+              Datasheet ส่วนใหญ่มักไม่มี βVmp โดยตรง เลือกแหล่งค่าตามเอกสารจริง ห้ามนำ βVoc มาใช้แทน
+            </p>
+            <label>
+              <span>แหล่งค่า βVmp *</span>
+              <select
+                name="betaVmpSource"
+                onChange={(event) => setBetaVmpSource(event.target.value)}
+                value={betaVmpSource}
+              >
+                <option value="datasheet">มีระบุใน Datasheet</option>
+                <option value="derived">Derived จาก γPmax − αIsc</option>
+                <option value="missing">ไม่พบ — ให้ระบบหยุดเฉพาะสูตรที่ต้องใช้</option>
+              </select>
+            </label>
+            {pvTemperatureInputs.map((field) => (
+              <ValueWithPage
+                defaultValue={values[field.name]}
+                key={field.name}
+                label={field.label}
+                name={field.name}
+                values={values}
+              />
+            ))}
+            {betaVmpSource === "datasheet" ? (
+              <ValueWithPage
+                defaultValue={values.betaVmpPercentPerC}
+                label="βVmp (%/°C) *"
+                name="betaVmpPercentPerC"
+                values={values}
+              />
+            ) : null}
+            {betaVmpSource === "derived" ? (
+              <label>
+                <span>เหตุผลและวิธี derive *</span>
+                <textarea
+                  defaultValue={values.betaVmpDerivation}
+                  maxLength={500}
+                  name="betaVmpDerivation"
+                  placeholder="เช่น Datasheet ไม่ระบุ βVmp จึงใช้ γPmax − αIsc สำหรับ preliminary sizing"
+                  rows={3}
+                />
+                <small>ระบบคำนวณค่า βVmp ทางฝั่ง server และต้องให้ Super Admin อนุมัติก่อน Publish</small>
+              </label>
+            ) : null}
+            {betaVmpSource === "missing" ? (
+              <p className="spec-form__notice">ระบบจะยังเก็บ βVoc และแสดงผลส่วนที่ตรวจได้ แต่จะไม่สร้างช่วง String ที่ต้องใช้ βVmp</p>
+            ) : null}
+          </fieldset>
+
+          <fieldset className="spec-form__section">
             <legend>ค่าเพิ่มเติม</legend>
             {pvOptionalFields.map((field) => (
               <ValueInput
@@ -180,13 +239,17 @@ export function RevisionSpecForm({ target }: { target: RevisionSpecTarget }) {
           </fieldset>
 
           <fieldset className="spec-form__section">
-            <legend>ค่าเพิ่มเติม</legend>
-            {inverterOptionalFields.map((field) => (
-              <ValueInput
+            <legend>กำลัง PV ฝั่ง DC</legend>
+            <p className="spec-form__help">
+              กรอกตามคำที่ผู้ผลิตระบุ ต้องมีอย่างน้อยหนึ่งค่า และไม่ต้องสร้างค่าทดแทนเมื่อ Datasheet ไม่มี
+            </p>
+            {inverterPowerFields.map((field) => (
+              <ValueWithPage
                 defaultValue={values[field.name]}
                 key={field.name}
                 label={field.label}
                 name={field.name}
+                values={values}
               />
             ))}
           </fieldset>
@@ -195,11 +258,20 @@ export function RevisionSpecForm({ target }: { target: RevisionSpecTarget }) {
             <legend>MPPT (1–{MAX_TRACKERS} ตัว)</legend>
             <div className="spec-form__pages">
               <label>
-                <span>หน้า MPPT current *</span>
+                <span>หน้า MPPT operating current *</span>
                 <input
-                  defaultValue={values["sourcePages.mpptCurrent"]}
+                  defaultValue={values["sourcePages.mpptOperatingCurrent"] ?? values["sourcePages.mpptCurrent"]}
                   maxLength={40}
-                  name="sourcePages.mpptCurrent"
+                  name="sourcePages.mpptOperatingCurrent"
+                  type="text"
+                />
+              </label>
+              <label>
+                <span>หน้า MPPT short-circuit current *</span>
+                <input
+                  defaultValue={values["sourcePages.mpptShortCircuitCurrent"] ?? values["sourcePages.mpptCurrent"]}
+                  maxLength={40}
+                  name="sourcePages.mpptShortCircuitCurrent"
                   type="text"
                 />
               </label>
@@ -209,6 +281,15 @@ export function RevisionSpecForm({ target }: { target: RevisionSpecTarget }) {
                   defaultValue={values["sourcePages.mpptRange"]}
                   maxLength={40}
                   name="sourcePages.mpptRange"
+                  type="text"
+                />
+              </label>
+              <label>
+                <span>หน้า MPPT / String input *</span>
+                <input
+                  defaultValue={values["sourcePages.mpptTopology"] ?? values["sourcePages.mpptCurrent"]}
+                  maxLength={40}
+                  name="sourcePages.mpptTopology"
                   type="text"
                 />
               </label>

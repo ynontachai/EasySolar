@@ -9,6 +9,7 @@ import {
   evaluateFourEyes,
   evaluatePublishGates,
   evaluateVerifyGates,
+  reviewRequirementsFor,
   type ReviewRole,
   type RevisionAction,
   type RevisionState,
@@ -20,12 +21,14 @@ import { HttpError } from "./http-error";
 export interface ReviewQueueRow {
   assetState: string | null;
   category: "inverter" | "pv_module";
+  criticalFields: string[];
   exactModel: string;
   hasSourceUrl: boolean;
   manufacturer: string;
   productModelId: string;
   revisionId: string;
   revisionLabel: string;
+  requiresEngineeringApproval: boolean;
   specEnteredBy: string | null;
   state: RevisionState;
 }
@@ -41,7 +44,11 @@ const nextState: Record<RevisionAction, RevisionState> = {
 export async function listReviewQueue(): Promise<ReviewQueueRow[]> {
   const sql = getDb();
 
-  return sql<ReviewQueueRow[]>`
+  const rows = await sql<Array<Omit<ReviewQueueRow, "criticalFields" | "requiresEngineeringApproval"> & {
+    betaVmpSource: "datasheet" | "derived" | null;
+    hasMaxDcPower: boolean;
+    hasMaxRecommendedPv: boolean;
+  }>>`
     SELECT
       datasheet_revision.id::text AS "revisionId",
       datasheet_revision.revision_label AS "revisionLabel",
@@ -52,7 +59,13 @@ export async function listReviewQueue(): Promise<ReviewQueueRow[]> {
       product_model.id::text AS "productModelId",
       product_model.exact_model AS "exactModel",
       product_model.category::text AS category,
-      manufacturer.name AS manufacturer
+      manufacturer.name AS manufacturer,
+      COALESCE(
+        pv_module_spec.beta_vmp_source,
+        CASE WHEN pv_module_spec.beta_vmp_per_c IS NOT NULL THEN 'datasheet' END
+      ) AS "betaVmpSource",
+      (inverter_spec.max_dc_power_wp IS NOT NULL) AS "hasMaxDcPower",
+      (inverter_spec.max_recommended_pv_wp IS NOT NULL) AS "hasMaxRecommendedPv"
     FROM datasheet_revision
     JOIN product_model ON product_model.id = datasheet_revision.product_model_id
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
@@ -60,10 +73,25 @@ export async function listReviewQueue(): Promise<ReviewQueueRow[]> {
       ON datasheet_asset.datasheet_revision_id = datasheet_revision.id
       AND datasheet_asset.role = 'original'
     LEFT JOIN asset ON asset.id = datasheet_asset.asset_id
+    LEFT JOIN pv_module_spec ON pv_module_spec.datasheet_revision_id = datasheet_revision.id
+    LEFT JOIN inverter_spec ON inverter_spec.datasheet_revision_id = datasheet_revision.id
     WHERE datasheet_revision.state IN ('draft', 'extracted_unverified', 'verified')
     ORDER BY datasheet_revision.created_at DESC
     LIMIT 100
   `;
+
+  return rows.map((row) => {
+    const context = {
+      betaVmpSource: row.betaVmpSource,
+      hasMaxDcPower: row.hasMaxDcPower,
+      hasMaxRecommendedPv: row.hasMaxRecommendedPv,
+    };
+    return {
+      ...row,
+      criticalFields: reviewRequirementsFor(row.category, context).criticalFields,
+      requiresEngineeringApproval: row.betaVmpSource === "derived",
+    };
+  });
 }
 
 export async function deleteDraftRevision(input: {
@@ -245,9 +273,12 @@ export async function applyReviewAction(input: {
     const [revision] = await transaction<
       Array<{
         category: "inverter" | "pv_module";
+        betaVmpSource: "datasheet" | "derived" | null;
         hasAvailableFile: boolean;
         hasSourceUrl: boolean;
         hasSpec: boolean;
+        hasMaxDcPower: boolean;
+        hasMaxRecommendedPv: boolean;
         productModelId: string;
         sourcePages: Record<string, string | undefined>;
         specEnteredBy: string | null;
@@ -260,6 +291,22 @@ export async function applyReviewAction(input: {
         product_model.category::text AS category,
         datasheet_revision.spec_entered_by::text AS "specEnteredBy",
         datasheet_revision.spec_source_pages AS "sourcePages",
+        (
+          SELECT COALESCE(
+            beta_vmp_source,
+            CASE WHEN beta_vmp_per_c IS NOT NULL THEN 'datasheet' END
+          )
+          FROM pv_module_spec
+          WHERE datasheet_revision_id = datasheet_revision.id
+        ) AS "betaVmpSource",
+        EXISTS (
+          SELECT 1 FROM inverter_spec
+          WHERE datasheet_revision_id = datasheet_revision.id AND max_dc_power_wp IS NOT NULL
+        ) AS "hasMaxDcPower",
+        EXISTS (
+          SELECT 1 FROM inverter_spec
+          WHERE datasheet_revision_id = datasheet_revision.id AND max_recommended_pv_wp IS NOT NULL
+        ) AS "hasMaxRecommendedPv",
         (datasheet_revision.source_url IS NOT NULL) AS "hasSourceUrl",
         EXISTS (
           SELECT 1
@@ -309,9 +356,32 @@ export async function applyReviewAction(input: {
         );
       }
 
+      if (revision.betaVmpSource === "derived") {
+        const isSuperAdmin = input.actor.roles.some((role) => role.code === "super_admin");
+        if (!isSuperAdmin) {
+          throw new HttpError(
+            403,
+            "ENGINEERING_APPROVAL_REQUIRED",
+            "βVmp แบบ Derived ต้องให้ Super Admin อนุมัติ",
+          );
+        }
+        if (!input.overrideReason || input.overrideReason.trim().length < 10) {
+          throw new HttpError(
+            409,
+            "ENGINEERING_APPROVAL_NOTE_REQUIRED",
+            "กรุณาระบุเหตุผลอนุมัติค่า βVmp แบบ Derived อย่างน้อย 10 ตัวอักษร",
+          );
+        }
+      }
+
       const gate = evaluateVerifyGates({
         category: revision.category,
         confirmedFields: input.confirmedFields,
+        context: {
+          betaVmpSource: revision.betaVmpSource,
+          hasMaxDcPower: revision.hasMaxDcPower,
+          hasMaxRecommendedPv: revision.hasMaxRecommendedPv,
+        },
         sourcePages: revision.sourcePages,
         state: revision.state,
       });
@@ -350,6 +420,17 @@ export async function applyReviewAction(input: {
         review_note = COALESCE(${eventReason}, review_note)
       WHERE id = ${input.revisionId}::uuid
     `;
+
+    if (next === "verified" && revision.betaVmpSource === "derived") {
+      await transaction`
+        UPDATE pv_module_spec
+        SET
+          beta_vmp_approved_by = ${input.actor.userId}::uuid,
+          beta_vmp_approved_at = now(),
+          beta_vmp_approval_note = ${input.overrideReason}
+        WHERE datasheet_revision_id = ${input.revisionId}::uuid
+      `;
+    }
 
     if (next === "published") {
       await transaction`
@@ -400,9 +481,13 @@ export async function applyReviewAction(input: {
 }
 
 const specValueKeys = [
+  "alphaIscPercentPerC",
+  "betaVmpDerivation",
   "betaVmpPercentPerC",
+  "betaVmpSource",
   "betaVocPercentPerC",
   "bifacialityFactor",
+  "gammaPmaxPercentPerC",
   "iscA",
   "impA",
   "inverterType",
@@ -442,10 +527,14 @@ export async function getRevisionSpecTarget(revisionId: string): Promise<Revisio
       sourceUrl: string | null;
       state: RevisionState;
       betaVmpPercentPerC: string | null;
+      betaVmpDerivation: string | null;
+      betaVmpSource: "datasheet" | "derived" | null;
       betaVocPercentPerC: string | null;
+      alphaIscPercentPerC: string | null;
       bifacialityFactor: string | null;
       iscA: string | null;
       impA: string | null;
+      gammaPmaxPercentPerC: string | null;
       maxDcPowerWp: string | null;
       maxDcVoltageV: string | null;
       maxRecommendedPvWp: string | null;
@@ -468,6 +557,10 @@ export async function getRevisionSpecTarget(revisionId: string): Promise<Revisio
       datasheet_revision.spec_source_pages AS "sourcePages",
       (pv_module_spec.beta_voc_per_c * 100)::text AS "betaVocPercentPerC",
       (pv_module_spec.beta_vmp_per_c * 100)::text AS "betaVmpPercentPerC",
+      (pv_module_spec.alpha_isc_per_c * 100)::text AS "alphaIscPercentPerC",
+      (pv_module_spec.gamma_pmax_per_c * 100)::text AS "gammaPmaxPercentPerC",
+      pv_module_spec.beta_vmp_source AS "betaVmpSource",
+      pv_module_spec.beta_vmp_derivation AS "betaVmpDerivation",
       pv_module_spec.bifaciality_factor::text AS "bifacialityFactor",
       pv_module_spec.isc_a::text AS "iscA",
       pv_module_spec.imp_a::text AS "impA",
@@ -579,6 +672,10 @@ export async function enterRevisionSpec(input: EnterSpecInput) {
           imp_a,
           beta_voc_per_c,
           beta_vmp_per_c,
+          alpha_isc_per_c,
+          gamma_pmax_per_c,
+          beta_vmp_source,
+          beta_vmp_derivation,
           bifaciality_factor,
           max_system_voltage_v
         )
@@ -591,6 +688,10 @@ export async function enterRevisionSpec(input: EnterSpecInput) {
           ${spec.impA},
           ${percentToFraction(spec.betaVocPercentPerC)},
           ${percentToFraction(spec.betaVmpPercentPerC)},
+          ${percentToFraction(spec.alphaIscPercentPerC)},
+          ${percentToFraction(spec.gammaPmaxPercentPerC)},
+          ${spec.betaVmpSource},
+          ${spec.betaVmpDerivation},
           ${spec.bifacialityFactor},
           ${spec.maxSystemVoltageV}
         )

@@ -36,8 +36,25 @@ const requiredNegativeCoefficient = (label: string) =>
     message: `${label} ต้องเป็นค่าติดลบในหน่วย %/°C`,
   });
 
+const optionalNegativeCoefficient = (label: string) =>
+  optionalNumber(label, -2, 0).refine((value) => value === null || value < 0, {
+    message: `${label} ต้องเป็นค่าติดลบในหน่วย %/°C`,
+  });
+
+const optionalPositiveCoefficient = (label: string) =>
+  optionalNumber(label, 0, 2).refine((value) => value === null || value > 0, {
+    message: `${label} ต้องเป็นค่าบวกในหน่วย %/°C`,
+  });
+
 const sourcePage = (label: string) =>
   z.string().trim().min(1, `กรุณาระบุหน้าอ้างอิงของ ${label}`).max(40);
+
+const optionalSourcePage = z
+  .string()
+  .trim()
+  .optional()
+  .transform((value) => value || null)
+  .pipe(z.string().max(40).nullable());
 
 const sourceUrl = z
   .string()
@@ -55,16 +72,27 @@ const sourceUrl = z
 
 export const pvSpecInputSchema = z
   .object({
-    betaVmpPercentPerC: requiredNegativeCoefficient("βVmp"),
+    alphaIscPercentPerC: optionalPositiveCoefficient("αIsc"),
+    betaVmpDerivation: z
+      .string()
+      .trim()
+      .optional()
+      .transform((value) => value || null)
+      .pipe(z.string().max(500).nullable()),
+    betaVmpPercentPerC: optionalNegativeCoefficient("βVmp"),
+    betaVmpSource: z.enum(["datasheet", "derived", "missing"]),
     betaVocPercentPerC: requiredNegativeCoefficient("βVoc"),
     bifacialityFactor: optionalNumber("Bifaciality", 0, 1),
+    gammaPmaxPercentPerC: optionalNegativeCoefficient("γPmax"),
     impA: requiredNumber("Imp", 0, 100),
     iscA: requiredNumber("Isc", 0, 100),
     maxSystemVoltageV: requiredNumber("Max system voltage", 0, 5000),
     pmaxWp: requiredNumber("Pmax", 0, 2000),
     sourcePages: z.object({
-      betaVmpPercentPerC: sourcePage("βVmp"),
+      alphaIscPercentPerC: optionalSourcePage,
+      betaVmpPercentPerC: optionalSourcePage,
       betaVocPercentPerC: sourcePage("βVoc"),
+      gammaPmaxPercentPerC: optionalSourcePage,
       impA: sourcePage("Imp"),
       iscA: sourcePage("Isc"),
       maxSystemVoltageV: sourcePage("Max system voltage"),
@@ -83,7 +111,45 @@ export const pvSpecInputSchema = z
     if (value.impA >= value.iscA) {
       context.addIssue({ code: "custom", message: "Imp ต้องน้อยกว่า Isc", path: ["impA"] });
     }
-  });
+    if (value.betaVmpSource === "datasheet") {
+      if (value.betaVmpPercentPerC === null) {
+        context.addIssue({ code: "custom", message: "กรุณาระบุ βVmp จาก Datasheet", path: ["betaVmpPercentPerC"] });
+      }
+      if (!value.sourcePages.betaVmpPercentPerC) {
+        context.addIssue({ code: "custom", message: "กรุณาระบุหน้าอ้างอิงของ βVmp", path: ["sourcePages", "betaVmpPercentPerC"] });
+      }
+    }
+    if (value.betaVmpSource === "derived") {
+      if (value.gammaPmaxPercentPerC === null) {
+        context.addIssue({ code: "custom", message: "กรุณาระบุ γPmax เพื่อ derive βVmp", path: ["gammaPmaxPercentPerC"] });
+      }
+      if (value.alphaIscPercentPerC === null) {
+        context.addIssue({ code: "custom", message: "กรุณาระบุ αIsc เพื่อ derive βVmp", path: ["alphaIscPercentPerC"] });
+      }
+      if (!value.sourcePages.gammaPmaxPercentPerC) {
+        context.addIssue({ code: "custom", message: "กรุณาระบุหน้าอ้างอิงของ γPmax", path: ["sourcePages", "gammaPmaxPercentPerC"] });
+      }
+      if (!value.sourcePages.alphaIscPercentPerC) {
+        context.addIssue({ code: "custom", message: "กรุณาระบุหน้าอ้างอิงของ αIsc", path: ["sourcePages", "alphaIscPercentPerC"] });
+      }
+      if (!value.betaVmpDerivation || value.betaVmpDerivation.length < 10) {
+        context.addIssue({ code: "custom", message: "กรุณาระบุเหตุผลการ derive อย่างน้อย 10 ตัวอักษร", path: ["betaVmpDerivation"] });
+      }
+    }
+  })
+  .transform((value) => ({
+    ...value,
+    betaVmpDerivation: value.betaVmpSource === "derived" ? value.betaVmpDerivation : null,
+    betaVmpPercentPerC:
+      value.betaVmpSource === "derived" &&
+      value.gammaPmaxPercentPerC !== null &&
+      value.alphaIscPercentPerC !== null
+        ? value.gammaPmaxPercentPerC - value.alphaIscPercentPerC
+        : value.betaVmpSource === "missing"
+          ? null
+          : value.betaVmpPercentPerC,
+    betaVmpSource: value.betaVmpSource === "missing" ? null : value.betaVmpSource,
+  }));
 
 export const trackerInputSchema = z
   .object({
@@ -107,21 +173,35 @@ export const trackerInputSchema = z
 export const inverterSpecInputSchema = z
   .object({
     inverterType: z.enum(["string", "hybrid", "micro"], { message: "กรุณาเลือกประเภท Inverter" }),
-    maxDcPowerWp: requiredNumber("Max DC power", 0, 10_000_000),
+    maxDcPowerWp: optionalNumber("Max DC power", 0, 10_000_000),
     maxDcVoltageV: requiredNumber("Max DC voltage", 0, 5000),
     maxRecommendedPvWp: optionalNumber("Max recommended PV", 0, 10_000_000),
     ratedAcKw: requiredNumber("Rated AC", 0, 10_000),
     sourcePages: z.object({
       maxDcVoltageV: sourcePage("Max DC voltage"),
-      maxDcPowerWp: sourcePage("Max DC power"),
-      mpptCurrent: sourcePage("MPPT current"),
+      maxDcPowerWp: optionalSourcePage,
+      maxRecommendedPvWp: optionalSourcePage,
+      mpptOperatingCurrent: sourcePage("MPPT operating current"),
       mpptRange: sourcePage("MPPT voltage range"),
+      mpptShortCircuitCurrent: sourcePage("MPPT short-circuit current"),
+      mpptTopology: sourcePage("จำนวน MPPT / String input"),
       ratedAcKw: sourcePage("Rated AC"),
       startupVoltageV: sourcePage("Startup voltage"),
     }),
     sourceUrl,
     startupVoltageV: requiredNumber("Startup voltage", 0, 2000),
     trackers: z.array(trackerInputSchema).min(1, "ต้องมี MPPT อย่างน้อย 1 ตัว").max(12),
+  })
+  .superRefine((value, context) => {
+    if (value.maxDcPowerWp === null && value.maxRecommendedPvWp === null) {
+      context.addIssue({ code: "custom", message: "ต้องมี Max DC power หรือ Max recommended PV อย่างน้อยหนึ่งค่า", path: ["maxDcPowerWp"] });
+    }
+    if (value.maxDcPowerWp !== null && !value.sourcePages.maxDcPowerWp) {
+      context.addIssue({ code: "custom", message: "กรุณาระบุหน้าอ้างอิงของ Max DC power", path: ["sourcePages", "maxDcPowerWp"] });
+    }
+    if (value.maxRecommendedPvWp !== null && !value.sourcePages.maxRecommendedPvWp) {
+      context.addIssue({ code: "custom", message: "กรุณาระบุหน้าอ้างอิงของ Max recommended PV", path: ["sourcePages", "maxRecommendedPvWp"] });
+    }
   });
 
 export type PvSpecInput = z.infer<typeof pvSpecInputSchema>;

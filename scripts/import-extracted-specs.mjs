@@ -9,14 +9,19 @@ function pv(model, pmaxWp, vocV, vmpV, iscA, impA, options) {
     category: "pv_module",
     model,
     spec: {
+      alphaIscPercentPerC: options.alphaIscPercentPerC,
       betaVmpPercentPerC: null,
       betaVocPercentPerC: options.betaVocPercentPerC,
       bifacialityFactor: options.bifacialityFactor,
+      gammaPmaxPercentPerC: options.gammaPmaxPercentPerC,
       impA,
       iscA,
       maxSystemVoltageV: options.maxSystemVoltageV,
       pmaxWp,
       sourcePages: {
+        alphaIscPercentPerC: SOURCE_PAGE,
+        betaVocPercentPerC: SOURCE_PAGE,
+        gammaPmaxPercentPerC: SOURCE_PAGE,
         impA: SOURCE_PAGE,
         iscA: SOURCE_PAGE,
         maxSystemVoltageV: SOURCE_PAGE,
@@ -41,10 +46,15 @@ function inverter(model, ratedAcKw, maxDcVoltageV, trackers, options) {
       maxRecommendedPvWp: options.maxRecommendedPvWp ?? null,
       ratedAcKw,
       sourcePages: {
+        ...(options.maxDcPowerWp ? { maxDcPowerWp: SOURCE_PAGE } : {}),
+        ...(options.maxRecommendedPvWp ? { maxRecommendedPvWp: SOURCE_PAGE } : {}),
         maxDcVoltageV: SOURCE_PAGE,
-        mpptCurrent: SOURCE_PAGE,
+        mpptOperatingCurrent: SOURCE_PAGE,
         mpptRange: SOURCE_PAGE,
+        mpptShortCircuitCurrent: SOURCE_PAGE,
+        mpptTopology: SOURCE_PAGE,
         ratedAcKw: SOURCE_PAGE,
+        startupVoltageV: SOURCE_PAGE,
       },
       startupVoltageV: options.startupVoltageV ?? null,
       trackers,
@@ -63,13 +73,17 @@ function repeatedTrackers(count, inputCount, maxOperatingCurrentA, maxShortCircu
 }
 
 const aikoOptions = {
+  alphaIscPercentPerC: 0.05,
   betaVocPercentPerC: -0.22,
   bifacialityFactor: 0.8,
+  gammaPmaxPercentPerC: -0.26,
   maxSystemVoltageV: 1500,
 };
 const longiOptions = {
+  alphaIscPercentPerC: 0.05,
   betaVocPercentPerC: -0.2,
   bifacialityFactor: 0.7,
+  gammaPmaxPercentPerC: -0.26,
   maxSystemVoltageV: 1500,
 };
 
@@ -94,8 +108,10 @@ const specs = [
   pv("LR7-72HVD-640M", 640, 53.6, 44.46, 15.09, 14.4, longiOptions),
   pv("LR7-72HVD-645M", 645, 53.7, 44.56, 15.17, 14.48, longiOptions),
   pv("LP210*210-M-66-NB-715W", 715, 48.8, 40.8, 18.61, 17.52, {
+    alphaIscPercentPerC: 0.046,
     betaVocPercentPerC: -0.25,
     bifacialityFactor: 0.8,
+    gammaPmaxPercentPerC: -0.30,
     maxSystemVoltageV: 1500,
   }),
 
@@ -274,12 +290,14 @@ for (const item of targets) {
     if (item.category === "pv_module") {
       await insertOrThrow(
         client.from("pv_module_spec").insert({
+          alpha_isc_per_c: item.spec.alphaIscPercentPerC === null ? null : item.spec.alphaIscPercentPerC / 100,
           beta_vmp_per_c: item.spec.betaVmpPercentPerC === null ? null : item.spec.betaVmpPercentPerC / 100,
           beta_voc_per_c: item.spec.betaVocPercentPerC === null ? null : item.spec.betaVocPercentPerC / 100,
           bifaciality_factor: item.spec.bifacialityFactor,
           datasheet_revision_id: item.revisionId,
           imp_a: item.spec.impA,
           isc_a: item.spec.iscA,
+          gamma_pmax_per_c: item.spec.gammaPmaxPercentPerC === null ? null : item.spec.gammaPmaxPercentPerC / 100,
           max_system_voltage_v: item.spec.maxSystemVoltageV,
           pmax_wp: item.spec.pmaxWp,
           vmp_v: item.spec.vmpV,

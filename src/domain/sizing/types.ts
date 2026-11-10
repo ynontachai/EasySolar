@@ -71,12 +71,23 @@ export interface SizingWalkthrough {
     maxDcPowerWp: number | null;
     maxDcVoltageV: number;
     maxRecommendedPvWp: number | null;
+    ratedAcKw: number;
+    startupVoltageV: number | null;
     trackerCount: number;
   };
-  /** Module cap from the manufacturer's recommended (else hard) PV power limit. */
-  maxModules: { limitWp: number; modulePowerWp: number; modules: number } | null;
-  /** Null when the datasheet lacks temperature coefficients. */
-  temperature: { vmpHotV: number; vocColdV: number; vmpColdV: number } | null;
+  /** Module cap from the stricter available recommended or hard PV power limit. */
+  maxModules: {
+    basis: "MAX_DC_POWER" | "MAX_RECOMMENDED_PV";
+    limitWp: number;
+    modulePowerWp: number;
+    modules: number;
+  } | null;
+  /** Each result is independent so available Datasheet checks remain visible. */
+  temperature: {
+    vmpHotV: number | null;
+    vocColdV: number | null;
+    vmpColdV: number | null;
+  };
   currents: {
     designIscA: number;
     impA: number;
@@ -89,12 +100,14 @@ export interface SizingWalkthrough {
     mpptMaxV: number;
     mpptMinV: number;
     seriesRange: {
-      maxModules: number;
-      maxModulesByColdVmp: number;
-      maxModulesByColdVoc: number;
-      minModules: number;
+      maxModules: number | null;
+      maxModulesByColdVmp: number | null;
+      maxModulesByColdVoc: number | null;
+      minModules: number | null;
+      minModulesByMppt: number | null;
+      minModulesByStartup: number | null;
       voltageCeilingV: number;
-    } | null;
+    };
     stringRows: Array<{
       operatingA: number;
       operatingPass: boolean;

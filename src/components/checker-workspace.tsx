@@ -26,6 +26,12 @@ interface CheckerWorkspaceProps {
   pvOptions: CheckerEquipmentOption[];
 }
 
+interface SpecRow {
+  label: string;
+  source?: "DATASHEET" | "DERIVED" | "MISSING";
+  value: string;
+}
+
 const verdictCopy: Record<OverallStatus, { label: string; detail: string }> = {
   PRELIMINARY_COMPATIBLE: {
     label: "จับคู่นี้ใช้ได้เบื้องต้น",
@@ -109,7 +115,7 @@ function SpecCard({
   title,
 }: {
   option: CheckerEquipmentOption | undefined;
-  rows: [string, string][];
+  rows: SpecRow[];
   title: string;
 }) {
   return (
@@ -125,10 +131,21 @@ function SpecCard({
           ) : null}
         </div>
         <dl>
-          {rows.map(([name, value]) => (
-            <div key={name}>
-              <dt>{name}</dt>
-              <dd>{value}</dd>
+          {rows.map((row) => (
+            <div key={row.label}>
+              <dt>{row.label}</dt>
+              <dd>
+                {row.value}
+                {row.source ? (
+                  <small className={`spec-source spec-source--${row.source.toLowerCase()}`}>
+                    {row.source === "DATASHEET"
+                      ? "Datasheet"
+                      : row.source === "DERIVED"
+                        ? "Derived · อนุมัติแล้ว"
+                        : "ไม่พบ"}
+                  </small>
+                ) : null}
+              </dd>
             </div>
           ))}
         </dl>
@@ -143,6 +160,40 @@ function SpecCard({
         </p>
       )}
     </article>
+  );
+}
+
+function ConnectionLayout({ candidate }: { candidate: SizingResult["candidates"][number] }) {
+  return (
+    <div className="connection-layout">
+      {candidate.mpptConfigurations.map((configuration) => (
+        <section className="connection-mppt" key={configuration.trackerIndex}>
+          <div className="connection-mppt__strings">
+            {Array.from({ length: configuration.parallelStrings }, (_, stringIndex) => (
+              <div className="connection-string" key={stringIndex}>
+                <span>String {stringIndex + 1}</span>
+                <div
+                  aria-label={`${configuration.seriesModules} แผงต่ออนุกรม`}
+                  className="connection-string__modules"
+                  role="img"
+                >
+                  {Array.from({ length: configuration.seriesModules }, (_, moduleIndex) => (
+                    <i aria-hidden="true" key={moduleIndex} />
+                  ))}
+                </div>
+                <strong>{configuration.seriesModules} แผง</strong>
+              </div>
+            ))}
+          </div>
+          <div aria-hidden="true" className="connection-mppt__wire" />
+          <div className="connection-mppt__target">
+            <small>INVERTER</small>
+            <strong>MPPT {configuration.trackerIndex}</strong>
+            <span>{configuration.parallelStrings} String</span>
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -274,30 +325,33 @@ export function CheckerWorkspace({
         <SpecCard
           option={inverterOption}
           rows={[
-            ["Vdc สูงสุด", `${inv.maxDcVoltageV} V`],
-            ["ช่วงแรงดัน MPPT", wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.mpptMinV}–${tracker.mpptMaxV} V`).join(" · ")],
-            ["กระแสขาเข้าสูงสุด/MPPT", wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.maxOperatingCurrentA} A`).join(" · ")],
-            ["Isc สูงสุด/MPPT", wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.maxShortCircuitCurrentA} A`).join(" · ")],
-            ["กำลัง PV สูงสุดที่แนะนำ", inv.maxRecommendedPvWp === null ? "ไม่ระบุ" : `${inv.maxRecommendedPvWp.toLocaleString("en-US")} Wp`],
-            ["กำลัง PV ที่ใช้งานได้", inv.maxDcPowerWp === null ? "ไม่ระบุ" : `${inv.maxDcPowerWp.toLocaleString("en-US")} Wp`],
-            ["MPPT / จำนวน input", `${inv.trackerCount} MPPT · ${wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.inputCount}`).join(" · ")}`],
+            { label: "กำลังไฟฟ้า AC ขาออก", source: "DATASHEET", value: `${inv.ratedAcKw} kW` },
+            { label: "กำลัง PV สูงสุดที่แนะนำ", source: inv.maxRecommendedPvWp === null ? "MISSING" : "DATASHEET", value: inv.maxRecommendedPvWp === null ? "—" : `${inv.maxRecommendedPvWp.toLocaleString("en-US")} Wp` },
+            { label: "กำลัง PV สูงสุดที่ใช้งานได้", source: inv.maxDcPowerWp === null ? "MISSING" : "DATASHEET", value: inv.maxDcPowerWp === null ? "—" : `${inv.maxDcPowerWp.toLocaleString("en-US")} Wp` },
+            { label: "แรงดันขาเข้าสูงสุด", source: "DATASHEET", value: `${inv.maxDcVoltageV} Vdc` },
+            { label: "แรงดันเริ่มทำงาน", source: inv.startupVoltageV === null ? "MISSING" : "DATASHEET", value: inv.startupVoltageV === null ? "—" : `${inv.startupVoltageV} V` },
+            { label: "ช่วงแรงดัน MPPT", source: "DATASHEET", value: wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.mpptMinV}–${tracker.mpptMaxV} V`).join(" · ") },
+            { label: "กระแสขาเข้าสูงสุด/MPPT", source: "DATASHEET", value: wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.maxOperatingCurrentA} A`).join(" · ") },
+            { label: "Isc สูงสุด/MPPT", source: "DATASHEET", value: wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.maxShortCircuitCurrentA} A`).join(" · ") },
+            { label: "จำนวน MPPT / input สูงสุด", source: "DATASHEET", value: `${inv.trackerCount} MPPT · ${wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.inputCount}`).join(" · ")}` },
           ]}
           title={`${result.equipment.inverter.manufacturer} ${result.equipment.inverter.model}`}
         />
         <SpecCard
           option={pvOption}
           rows={[
-            ["Pmax", `${pv.pmaxWp} Wp`],
-            ["Voc", `${pv.vocV} V`],
-            ["Vmp", `${pv.vmpV} V`],
-            ["Isc", `${pv.iscA} A`],
-            ["Imp", `${pv.impA} A`],
-            ["βVoc / βVmp", `${pv.betaVocPerC === null ? "ไม่ระบุ" : `${(pv.betaVocPerC * 100).toFixed(3)} %/°C`} / ${pv.betaVmpPerC === null ? "ไม่ระบุ" : `${(pv.betaVmpPerC * 100).toFixed(3)} %/°C${pv.betaVmpSource === "derived" ? " (derived)" : ""}`}`],
+            { label: "กำลังไฟฟ้าสูงสุดต่อแผง (Pmax)", source: "DATASHEET", value: `${pv.pmaxWp} Wp` },
+            { label: "Open Circuit Voltage (Voc)", source: "DATASHEET", value: `${pv.vocV} V` },
+            { label: "กระแสลัดวงจร (Isc)", source: "DATASHEET", value: `${pv.iscA} A` },
+            { label: "กระแสที่กำลังสูงสุด (Imp)", source: "DATASHEET", value: `${pv.impA} A` },
+            { label: "แรงดันที่กำลังสูงสุด (Vmp)", source: "DATASHEET", value: `${pv.vmpV} V` },
+            { label: "Temp. coefficient of Voc", source: pv.betaVocPerC === null ? "MISSING" : "DATASHEET", value: pv.betaVocPerC === null ? "—" : `${(pv.betaVocPerC * 100).toFixed(3)} %/°C` },
+            { label: "βVmp (ใช้ตรวจ Vmp ตามอุณหภูมิ)", source: pv.betaVmpPerC === null ? "MISSING" : pv.betaVmpSource === "derived" ? "DERIVED" : "DATASHEET", value: pv.betaVmpPerC === null ? "—" : `${(pv.betaVmpPerC * 100).toFixed(3)} %/°C` },
             ...(design
               ? [
-                  ["Approved rear-gain case", `${design.rearGainPercent.toFixed(0)}% · Datasheet หน้า ${design.sourcePage}`],
-                  ["Pmax / Isc / Imp ที่ใช้ตรวจ", `${design.pmaxWp} W · ${design.iscA} A · ${design.impA} A`],
-                ] as [string, string][]
+                  { label: "Approved rear-gain case", source: "DATASHEET" as const, value: `${design.rearGainPercent.toFixed(0)}% · Datasheet หน้า ${design.sourcePage}` },
+                  { label: "Pmax / Isc / Imp ที่ใช้ตรวจ", source: "DATASHEET" as const, value: `${design.pmaxWp} W · ${design.iscA} A · ${design.impA} A` },
+                ]
               : []),
           ]}
           title={`${result.equipment.pvModule.manufacturer} ${result.equipment.pvModule.model}`}
@@ -318,7 +372,11 @@ export function CheckerWorkspace({
         <Step number={1} title="จำนวนแผงรวมตามกำลัง PV ที่ผู้ผลิตระบุ">
           {wt.maxModules ? (
             <div className="formula">
-              <p>ขนาด PV แนะนำสูงสุด ÷ กำลังแผง</p>
+              <p>
+                {wt.maxModules.basis === "MAX_DC_POWER"
+                  ? "กำลัง PV สูงสุดที่ใช้งานได้ (hard limit)"
+                  : "กำลัง PV สูงสุดที่แนะนำ"} ÷ กำลังแผงที่ใช้ในการออกแบบ
+              </p>
               <p>
                 {wt.maxModules.limitWp.toLocaleString("en-US")} ÷ {wt.maxModules.modulePowerWp} = {(wt.maxModules.limitWp / wt.maxModules.modulePowerWp).toFixed(1)}
               </p>
@@ -330,53 +388,67 @@ export function CheckerWorkspace({
         </Step>
 
         <Step number={2} title="แรงดันตามอุณหภูมิ">
-          {wt.temperature ? (
-            <>
+          <>
+            {wt.temperature.vmpHotV !== null ? (
               <div className="formula">
                 <p><b>Vmp ร้อน</b> = Vmp × [1 + (βVmp% ÷ 100) × (T สูงสุด − 25)]</p>
                 <p>{calculationVmpV} × [1 + ({((pv.betaVmpPerC ?? 0) * 100).toFixed(3)} ÷ 100) × ({result.assumptions.tcellMaxC} − 25)]</p>
                 <strong>{wt.temperature.vmpHotV} V</strong>
               </div>
+            ) : (
+              <p className="calc__missing">ไม่พบ βVmp ที่ตรวจสอบแล้ว จึงยังคำนวณ Vmp ร้อนไม่ได้</p>
+            )}
+            {wt.temperature.vocColdV !== null ? (
               <div className="formula">
                 <p><b>Voc เย็น</b> = Voc × [1 + (βVoc% ÷ 100) × (T ต่ำสุด − 25)]</p>
                 <p>{calculationVocV} × [1 + ({((pv.betaVocPerC ?? 0) * 100).toFixed(3)} ÷ 100) × ({result.assumptions.tcellMinC} − 25)]</p>
                 <strong>{wt.temperature.vocColdV} V</strong>
               </div>
+            ) : (
+              <p className="calc__missing">ไม่พบ βVoc ใน Datasheet จึงยังคำนวณ Voc เย็นไม่ได้</p>
+            )}
+            {wt.temperature.vmpColdV !== null ? (
               <div className="formula">
                 <p><b>Vmp เย็น</b> = Vmp × [1 + (βVmp% ÷ 100) × (T ต่ำสุด − 25)]</p>
                 <p>{calculationVmpV} × [1 + ({((pv.betaVmpPerC ?? 0) * 100).toFixed(3)} ÷ 100) × ({result.assumptions.tcellMinC} − 25)]</p>
                 <strong>{wt.temperature.vmpColdV} V</strong>
               </div>
-            </>
-          ) : (
-            <p className="calc__missing">Datasheet ไม่ระบุค่า Beta จึงคำนวณแรงดันตามอุณหภูมิไม่ได้</p>
-          )}
+            ) : (
+              <p className="calc__missing">ไม่พบ βVmp ที่ตรวจสอบแล้ว จึงยังคำนวณ Vmp เย็นไม่ได้</p>
+            )}
+          </>
         </Step>
 
         <Step number={3} title="จำนวนแผงต่ออนุกรม / สตริง">
-          {wt.temperature ? (
-            <div className="tracker-checks">
+          <div className="tracker-checks">
               {wt.trackers.map((tracker) => {
                 const range = tracker.seriesRange;
-                if (!range) return null;
-                const isValid = range.minModules <= range.maxModules;
+                const isComplete = range.minModules !== null && range.maxModules !== null;
+                const isValid =
+                  range.minModules !== null &&
+                  range.maxModules !== null &&
+                  range.minModules <= range.maxModules;
                 return (
                   <section className="tracker-check" key={tracker.trackerIndex}>
                     <h4>MPPT {tracker.trackerIndex}</h4>
                     <div className="formula">
                       <p><b>มากสุดจาก Voc</b> = Vdc สูงสุด ÷ Voc เย็น</p>
-                      <p>{range.voltageCeilingV} ÷ {wt.temperature?.vocColdV} = {range.maxModulesByColdVoc}</p>
+                      <p>{range.maxModulesByColdVoc === null ? "คำนวณไม่ได้: ไม่พบ βVoc" : `${range.voltageCeilingV} ÷ ${wt.temperature.vocColdV} = ${range.maxModulesByColdVoc}`}</p>
                       <p><b>มากสุดจาก Vmp</b> = MPPT max ÷ Vmp เย็น</p>
-                      <p>{tracker.mpptMaxV} ÷ {wt.temperature?.vmpColdV} = {range.maxModulesByColdVmp}</p>
-                      <strong>ใช้ขอบเขตที่เข้มกว่า: {range.maxModules} แผง</strong>
+                      <p>{range.maxModulesByColdVmp === null ? "คำนวณไม่ได้: ไม่พบ βVmp" : `${tracker.mpptMaxV} ÷ ${wt.temperature.vmpColdV} = ${range.maxModulesByColdVmp}`}</p>
+                      <strong>{range.maxModules === null ? "ยังสรุปจำนวนสูงสุดไม่ได้" : `ใช้ขอบเขตที่เข้มกว่า: ${range.maxModules} แผง`}</strong>
                     </div>
                     <div className="formula">
-                      <p><b>แผงน้อยสุด</b> = MPPT min ÷ Vmp ร้อน</p>
-                      <p>{tracker.mpptMinV} ÷ {wt.temperature?.vmpHotV}</p>
-                      <strong>{range.minModules} แผง <Pass ok={isValid} /></strong>
+                      <p><b>น้อยสุดจากช่วง MPPT</b> = MPPT min ÷ Vmp ร้อน</p>
+                      <p>{range.minModulesByMppt === null ? "คำนวณไม่ได้: ไม่พบ βVmp" : `${tracker.mpptMinV} ÷ ${wt.temperature.vmpHotV} = ${range.minModulesByMppt}`}</p>
+                      <p><b>น้อยสุดจากแรงดันเริ่มทำงาน</b> = Startup voltage ÷ Vmp ร้อน</p>
+                      <p>{range.minModulesByStartup === null ? "คำนวณไม่ได้: ไม่พบ βVmp หรือ Startup voltage" : `${inv.startupVoltageV} ÷ ${wt.temperature.vmpHotV} = ${range.minModulesByStartup}`}</p>
+                      <strong>{range.minModules === null ? "ยังสรุปจำนวนต่ำสุดไม่ได้" : `ใช้ขอบเขตที่เข้มกว่า: ${range.minModules} แผง`} {isComplete ? <Pass ok={isValid} /> : null}</strong>
                     </div>
                     <p className="calc__answer">
-                      {isValid
+                      {!isComplete
+                        ? `MPPT ${tracker.trackerIndex}: ข้อมูลอุณหภูมิยังไม่ครบ จึงยังไม่สร้างช่วงแนะนำ`
+                        : isValid
                         ? `MPPT ${tracker.trackerIndex}: ${range.minModules}–${range.maxModules} แผงต่อสตริง`
                         : `MPPT ${tracker.trackerIndex}: ไม่มีจำนวนแผงที่ผ่านทุกขอบเขต`}
                     </p>
@@ -384,9 +456,6 @@ export function CheckerWorkspace({
                 );
               })}
             </div>
-          ) : (
-            <p className="calc__missing">ต้องมี βVoc และ βVmp ที่ตรวจสอบแล้วจึงจะคำนวณข้อนี้ได้</p>
-          )}
         </Step>
 
         <Step number={4} title="จำนวนสตริงต่อ MPPT">
@@ -432,19 +501,7 @@ export function CheckerWorkspace({
                         : ""}
                     </span>
                   </header>
-                  {candidate.mpptConfigurations.map((configuration) => (
-                    <div className="layout-card__row" key={configuration.trackerIndex}>
-                      <span>MPPT {configuration.trackerIndex}</span>
-                      <div className="layout-card__panels" aria-hidden="true">
-                        {Array.from({ length: Math.min(configuration.seriesModules, 16) }).map((_, index) => (
-                          <i key={index} />
-                        ))}
-                      </div>
-                      <strong>
-                        {configuration.seriesModules} แผง × {configuration.parallelStrings} สตริง
-                      </strong>
-                    </div>
-                  ))}
+                  <ConnectionLayout candidate={candidate} />
                 </article>
               ))}
             </div>

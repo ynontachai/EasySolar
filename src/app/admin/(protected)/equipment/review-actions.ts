@@ -155,9 +155,13 @@ export async function reviewRevisionAction(
 }
 
 const pvFormFields = [
+  "alphaIscPercentPerC",
+  "betaVmpDerivation",
   "betaVmpPercentPerC",
+  "betaVmpSource",
   "betaVocPercentPerC",
   "bifacialityFactor",
+  "gammaPmaxPercentPerC",
   "impA",
   "iscA",
   "maxSystemVoltageV",
@@ -178,8 +182,8 @@ const inverterFormFields = [
 ] as const;
 
 const sourcePageFields = {
-  pv_module: ["betaVmpPercentPerC", "betaVocPercentPerC", "impA", "iscA", "maxSystemVoltageV", "pmaxWp", "vmpV", "vocV"],
-  inverter: ["maxDcPowerWp", "maxDcVoltageV", "mpptCurrent", "mpptRange", "ratedAcKw", "startupVoltageV"],
+  pv_module: ["alphaIscPercentPerC", "betaVmpPercentPerC", "betaVocPercentPerC", "gammaPmaxPercentPerC", "impA", "iscA", "maxSystemVoltageV", "pmaxWp", "vmpV", "vocV"],
+  inverter: ["maxDcPowerWp", "maxDcVoltageV", "maxRecommendedPvWp", "mpptOperatingCurrent", "mpptRange", "mpptShortCircuitCurrent", "mpptTopology", "ratedAcKw", "startupVoltageV"],
 } as const;
 
 const trackerFormFields = [

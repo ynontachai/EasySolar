@@ -25,21 +25,35 @@ export function buildWalkthrough(
   const trackers = inverter.trackers;
   const design = pvModule.bifacialDesignCase;
   const designPmaxWp = design?.pmaxWp ?? pvModule.pmaxWp;
-  const powerLimits = [inverter.maxRecommendedPvWp, inverter.maxDcPowerWp].filter(
-    (value): value is number => value !== null,
-  );
-  const powerLimitWp = powerLimits.length ? Math.min(...powerLimits) : null;
+  const powerLimitCandidates = [
+    inverter.maxDcPowerWp === null
+      ? null
+      : { basis: "MAX_DC_POWER" as const, limitWp: inverter.maxDcPowerWp },
+    inverter.maxRecommendedPvWp === null
+      ? null
+      : { basis: "MAX_RECOMMENDED_PV" as const, limitWp: inverter.maxRecommendedPvWp },
+  ].filter((value): value is NonNullable<typeof value> => value !== null);
+  const selectedPowerLimit = powerLimitCandidates.sort(
+    (left, right) => left.limitWp - right.limitWp,
+  )[0] ?? null;
+  const powerLimitWp = selectedPowerLimit?.limitWp ?? null;
   const maxModules = powerLimitWp === null ? null : Math.floor(powerLimitWp / designPmaxWp);
 
   const { betaVocPerC, betaVmpPerC } = pvModule;
-  const temperature =
-    betaVocPerC === null || betaVmpPerC === null
-      ? null
-      : {
-          vmpHotV: adjusted(design?.vmpV ?? pvModule.vmpV, betaVmpPerC, assumptions.tcellMaxC),
-          vocColdV: adjusted(design?.vocV ?? pvModule.vocV, betaVocPerC, assumptions.tcellMinC),
-          vmpColdV: adjusted(design?.vmpV ?? pvModule.vmpV, betaVmpPerC, assumptions.tcellMinC),
-        };
+  const temperature = {
+    vmpHotV:
+      betaVmpPerC === null
+        ? null
+        : adjusted(design?.vmpV ?? pvModule.vmpV, betaVmpPerC, assumptions.tcellMaxC),
+    vocColdV:
+      betaVocPerC === null
+        ? null
+        : adjusted(design?.vocV ?? pvModule.vocV, betaVocPerC, assumptions.tcellMinC),
+    vmpColdV:
+      betaVmpPerC === null
+        ? null
+        : adjusted(design?.vmpV ?? pvModule.vmpV, betaVmpPerC, assumptions.tcellMinC),
+  };
 
   const voltageCeilingV = Math.min(inverter.maxDcVoltageV, pvModule.maxSystemVoltageV);
   const calculationIscA = design?.iscA ?? pvModule.iscA;
@@ -72,16 +86,23 @@ export function buildWalkthrough(
       maxDcPowerWp: inverter.maxDcPowerWp,
       maxDcVoltageV: inverter.maxDcVoltageV,
       maxRecommendedPvWp: inverter.maxRecommendedPvWp,
+      ratedAcKw: inverter.ratedAcKw,
+      startupVoltageV: inverter.startupVoltageV,
       trackerCount: trackers.length,
     },
     maxModules:
       maxModules === null || powerLimitWp === null
         ? null
-        : { limitWp: powerLimitWp, modulePowerWp: designPmaxWp, modules: maxModules },
-    temperature: temperature && {
-      vmpHotV: round(temperature.vmpHotV),
-      vocColdV: round(temperature.vocColdV),
-      vmpColdV: round(temperature.vmpColdV),
+        : {
+            basis: selectedPowerLimit?.basis ?? "MAX_DC_POWER",
+            limitWp: powerLimitWp,
+            modulePowerWp: designPmaxWp,
+            modules: maxModules,
+          },
+    temperature: {
+      vmpHotV: temperature.vmpHotV === null ? null : round(temperature.vmpHotV),
+      vocColdV: temperature.vocColdV === null ? null : round(temperature.vocColdV),
+      vmpColdV: temperature.vmpColdV === null ? null : round(temperature.vmpColdV),
     },
     currents: {
       designIscA: round(designIscA),
@@ -94,22 +115,42 @@ export function buildWalkthrough(
       maxShortCircuitCurrentA: tracker.maxShortCircuitCurrentA,
       mpptMaxV: tracker.mpptMaxV,
       mpptMinV: tracker.mpptMinV,
-      seriesRange: temperature
-        ? (() => {
-            const maxModulesByColdVoc = Math.floor(voltageCeilingV / temperature.vocColdV);
-            const maxModulesByColdVmp = Math.floor(tracker.mpptMaxV / temperature.vmpColdV);
-            return {
-              maxModules: Math.min(maxModulesByColdVoc, maxModulesByColdVmp),
-              maxModulesByColdVmp,
-              maxModulesByColdVoc,
-              minModules: Math.ceil(tracker.mpptMinV / temperature.vmpHotV),
-              voltageCeilingV: round(voltageCeilingV),
-            };
-          })()
-        : null,
+      seriesRange: (() => {
+        const maxModulesByColdVoc =
+          temperature.vocColdV === null
+            ? null
+            : Math.floor(voltageCeilingV / temperature.vocColdV);
+        const maxModulesByColdVmp =
+          temperature.vmpColdV === null
+            ? null
+            : Math.floor(tracker.mpptMaxV / temperature.vmpColdV);
+        const minModulesByMppt =
+          temperature.vmpHotV === null
+            ? null
+            : Math.ceil(tracker.mpptMinV / temperature.vmpHotV);
+        const minModulesByStartup =
+          temperature.vmpHotV === null || inverter.startupVoltageV === null
+            ? null
+            : Math.ceil(inverter.startupVoltageV / temperature.vmpHotV);
+        return {
+          maxModules:
+            maxModulesByColdVoc === null || maxModulesByColdVmp === null
+              ? null
+              : Math.min(maxModulesByColdVoc, maxModulesByColdVmp),
+          maxModulesByColdVmp,
+          maxModulesByColdVoc,
+          minModules:
+            minModulesByMppt === null || minModulesByStartup === null
+              ? null
+              : Math.max(minModulesByMppt, minModulesByStartup),
+          minModulesByMppt,
+          minModulesByStartup,
+          voltageCeilingV: round(voltageCeilingV),
+        };
+      })(),
       stringRows: Array.from({ length: tracker.inputCount }, (_, index) => {
         const strings = index + 1;
-        const operatingA = strings * pvModule.impA;
+        const operatingA = strings * calculationImpA;
         const shortCircuitA = strings * designIscA;
         const operatingPass = operatingA <= tracker.maxOperatingCurrentA;
         const shortCircuitPass = shortCircuitA <= tracker.maxShortCircuitCurrentA;

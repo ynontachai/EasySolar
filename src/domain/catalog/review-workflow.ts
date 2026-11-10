@@ -45,7 +45,6 @@ export function canPerform(
 }
 
 export const pvCriticalFields = [
-  "betaVmpPercentPerC",
   "betaVocPercentPerC",
   "pmaxWp",
   "vocV",
@@ -56,16 +55,56 @@ export const pvCriticalFields = [
 ] as const;
 
 export const inverterCriticalFields = [
-  "maxDcPowerWp",
   "ratedAcKw",
   "maxDcVoltageV",
   "mpptRange",
-  "mpptCurrent",
+  "mpptOperatingCurrent",
+  "mpptShortCircuitCurrent",
+  "mpptTopology",
   "startupVoltageV",
 ] as const;
 
-export function criticalFieldsFor(category: "inverter" | "pv_module") {
-  return category === "pv_module" ? pvCriticalFields : inverterCriticalFields;
+export interface ReviewRequirementContext {
+  betaVmpSource?: "datasheet" | "derived" | null;
+  hasMaxDcPower?: boolean;
+  hasMaxRecommendedPv?: boolean;
+}
+
+export function reviewRequirementsFor(
+  category: "inverter" | "pv_module",
+  context: ReviewRequirementContext = {},
+) {
+  if (category === "pv_module") {
+    const conditional =
+      context.betaVmpSource === "datasheet"
+        ? ["betaVmpPercentPerC"]
+        : context.betaVmpSource === "derived"
+          ? ["gammaPmaxPercentPerC", "alphaIscPercentPerC", "betaVmpDerivation"]
+          : [];
+    return {
+      criticalFields: [...pvCriticalFields, ...conditional],
+      sourceRequiredFields: [
+        ...pvCriticalFields,
+        ...conditional.filter((field) => field !== "betaVmpDerivation"),
+      ],
+    };
+  }
+
+  const powerFields = [
+    context.hasMaxDcPower ? "maxDcPowerWp" : null,
+    context.hasMaxRecommendedPv ? "maxRecommendedPvWp" : null,
+  ].filter((field): field is string => field !== null);
+  return {
+    criticalFields: [...inverterCriticalFields, ...powerFields],
+    sourceRequiredFields: [...inverterCriticalFields, ...powerFields],
+  };
+}
+
+export function criticalFieldsFor(
+  category: "inverter" | "pv_module",
+  context: ReviewRequirementContext = {},
+) {
+  return reviewRequirementsFor(category, context).criticalFields;
 }
 
 export interface FourEyesResult {
@@ -101,8 +140,11 @@ export interface GateResult {
 export function missingSourcePages(
   category: "inverter" | "pv_module",
   pages: Readonly<Record<string, string | undefined>>,
+  context: ReviewRequirementContext = {},
 ) {
-  return criticalFieldsFor(category).filter((field) => !pages[field]?.trim());
+  return reviewRequirementsFor(category, context).sourceRequiredFields.filter(
+    (field) => !pages[field]?.trim(),
+  );
 }
 
 // Gate for moving extracted_unverified -> verified. The reviewer must tick every critical
@@ -110,6 +152,7 @@ export function missingSourcePages(
 export function evaluateVerifyGates(input: {
   category: "inverter" | "pv_module";
   confirmedFields: readonly string[];
+  context?: ReviewRequirementContext;
   sourcePages: Readonly<Record<string, string | undefined>>;
   state: RevisionState;
 }): GateResult {
@@ -118,11 +161,12 @@ export function evaluateVerifyGates(input: {
   if (input.state !== "extracted_unverified") {
     blockers.push("Revision ต้องมีสเปกที่รอตรวจสอบ");
   }
-  const noPage = missingSourcePages(input.category, input.sourcePages);
+  const requirements = reviewRequirementsFor(input.category, input.context);
+  const noPage = missingSourcePages(input.category, input.sourcePages, input.context);
   if (noPage.length > 0) {
     blockers.push(`ยังไม่ระบุหน้าอ้างอิงของ: ${noPage.join(", ")}`);
   }
-  const unconfirmed = criticalFieldsFor(input.category).filter(
+  const unconfirmed = requirements.criticalFields.filter(
     (field) => !input.confirmedFields.includes(field),
   );
   if (unconfirmed.length > 0) {

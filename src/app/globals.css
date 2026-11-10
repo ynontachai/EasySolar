@@ -4154,7 +4154,8 @@ a {
 
 .admin-auth-form input,
 .admin-sku-form input,
-.admin-sku-form select {
+.admin-sku-form select,
+.admin-sku-form textarea {
   background: var(--white);
   border: 1px solid var(--line);
   border-radius: 0;
@@ -4162,6 +4163,12 @@ a {
   min-height: 50px;
   padding: 0 14px;
   width: 100%;
+}
+
+.admin-sku-form textarea {
+  min-height: 96px;
+  padding: 12px 14px;
+  resize: vertical;
 }
 
 .admin-auth-form small,
@@ -7162,6 +7169,9 @@ a {
   display: grid;
   gap: 18px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 34px auto 80px;
+  max-width: calc(var(--max-width) - 48px);
+  width: calc(100% - 48px);
 }
 
 .spec-form > * {
@@ -7188,6 +7198,22 @@ a {
   font-size: 12px;
   font-weight: 700;
   padding: 0 6px;
+}
+
+.spec-form__help,
+.spec-form__notice {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.spec-form__notice,
+.review-item__engineering-note {
+  background: #fff8dc;
+  border-left: 3px solid #b88200;
+  color: #775400;
+  padding: 10px 12px;
 }
 
 .spec-form__row {
@@ -7266,6 +7292,8 @@ a {
 @media (max-width: 620px) {
   .spec-form {
     grid-template-columns: 1fr;
+    margin: 24px auto 60px;
+    width: calc(100% - 36px);
   }
 
   .spec-form__row,
@@ -8145,9 +8173,34 @@ a {
 }
 
 .spec-card dd {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
   font-weight: 600;
   margin: 0;
   text-align: right;
+}
+
+.spec-source {
+  border: 1px solid #b7dfc0;
+  border-radius: 999px;
+  color: #1f7a3a;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin-top: 3px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+
+.spec-source--derived {
+  border-color: #eed188;
+  color: #8a5a00;
+}
+
+.spec-source--missing {
+  border-color: #e7aaa3;
+  color: #b3261e;
 }
 
 .spec-card__download,
@@ -8362,6 +8415,82 @@ a {
   width: 22px;
 }
 
+.connection-layout {
+  display: grid;
+  gap: 12px;
+}
+
+.connection-mppt {
+  align-items: stretch;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px 104px;
+}
+
+.connection-mppt__strings {
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+}
+
+.connection-string {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.connection-string > span,
+.connection-string > strong {
+  font-size: 12px;
+}
+
+.connection-string__modules {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+
+.connection-string__modules i {
+  background: linear-gradient(135deg, #172133 0 45%, #2b4268 46% 54%, #172133 55%);
+  border: 1px solid #405272;
+  display: block;
+  height: 18px;
+  width: 24px;
+}
+
+.connection-mppt__wire {
+  align-self: center;
+  border-top: 2px solid var(--sun-deep);
+  height: 1px;
+}
+
+.connection-mppt__target {
+  align-items: center;
+  background: var(--ink);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 72px;
+  padding: 8px;
+  text-align: center;
+}
+
+.connection-mppt__target small,
+.connection-mppt__target span {
+  color: #c9d0dc;
+  font-size: 10px;
+}
+
+.connection-mppt__target strong {
+  font-size: 14px;
+}
+
 .calc__advanced {
   border: 1px solid var(--line);
   padding: 0 18px;
@@ -8407,8 +8536,38 @@ a {
     grid-template-columns: 72px minmax(0, 1fr);
   }
 
+  .spec-card dl > div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .spec-card dd {
+    align-items: flex-start;
+    text-align: left;
+  }
+
   .layout-card__row {
     grid-template-columns: 1fr;
+  }
+
+  .connection-mppt {
+    grid-template-columns: minmax(0, 1fr) 20px 88px;
+  }
+
+  .connection-string {
+    align-items: flex-start;
+    grid-template-columns: 1fr auto;
+  }
+
+  .connection-string__modules {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .connection-string__modules i {
+    height: 16px;
+    width: 20px;
   }
 
   .tracker-check {

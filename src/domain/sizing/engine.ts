@@ -10,7 +10,7 @@ import type {
 } from "./types";
 import { buildWalkthrough } from "./walkthrough";
 
-export const ENGINE_VERSION = "0.3.0";
+export const ENGINE_VERSION = "0.3.1";
 const STC_REFERENCE_TEMPERATURE_C = 25;
 const MAX_SERIES_MODULES_TO_ENUMERATE = 60;
 const MAX_CANDIDATES_TO_RETURN = 5;

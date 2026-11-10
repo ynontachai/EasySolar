@@ -20,6 +20,7 @@ const pvPages = {
 
 const validPv = {
   betaVmpPercentPerC: "-0.30",
+  betaVmpSource: "datasheet",
   betaVocPercentPerC: "-0.25",
   impA: "13.11",
   iscA: "13.98",
@@ -100,7 +101,57 @@ describe("verify and publish gates", () => {
     const result = evaluateVerifyGates({
       category: "pv_module",
       confirmedFields: ["betaVmpPercentPerC", "betaVocPercentPerC", "pmaxWp", "vocV", "vmpV", "iscA", "impA", "maxSystemVoltageV"],
+      context: { betaVmpSource: "datasheet" },
       sourcePages: pvPages,
+      state: "extracted_unverified",
+    });
+    expect(result.ready).toBe(true);
+  });
+
+  it("requires derived βVmp inputs but not a fake Datasheet page for the derived result", () => {
+    const confirmedFields = [
+      "betaVocPercentPerC",
+      "pmaxWp",
+      "vocV",
+      "vmpV",
+      "iscA",
+      "impA",
+      "maxSystemVoltageV",
+      "gammaPmaxPercentPerC",
+      "alphaIscPercentPerC",
+      "betaVmpDerivation",
+    ];
+    const result = evaluateVerifyGates({
+      category: "pv_module",
+      confirmedFields,
+      context: { betaVmpSource: "derived" },
+      sourcePages: {
+        ...pvPages,
+        alphaIscPercentPerC: "2",
+        gammaPmaxPercentPerC: "2",
+      },
+      state: "extracted_unverified",
+    });
+    expect(result.ready).toBe(true);
+  });
+
+  it("requires the inverter power field that is actually present", () => {
+    const confirmedFields = [
+      "ratedAcKw",
+      "maxDcVoltageV",
+      "mpptRange",
+      "mpptOperatingCurrent",
+      "mpptShortCircuitCurrent",
+      "mpptTopology",
+      "startupVoltageV",
+      "maxRecommendedPvWp",
+    ];
+    const sourcePages = Object.fromEntries(confirmedFields.map((field) => [field, "2"]));
+    const result = evaluateVerifyGates({
+      category: "inverter",
+      confirmedFields,
+      context: { hasMaxDcPower: false, hasMaxRecommendedPv: true },
+      sourcePages,
       state: "extracted_unverified",
     });
     expect(result.ready).toBe(true);
@@ -143,6 +194,37 @@ describe("PV spec schema", () => {
     expect(pvSpecInputSchema.safeParse({ ...validPv, betaVmpPercentPerC: "0" }).success).toBe(false);
   });
 
+  it("derives βVmp from γPmax minus αIsc on the server schema", () => {
+    const parsed = pvSpecInputSchema.parse({
+      ...validPv,
+      alphaIscPercentPerC: "0.05",
+      betaVmpDerivation: "Datasheet ไม่มี βVmp จึงใช้ γPmax − αIsc",
+      betaVmpPercentPerC: "",
+      betaVmpSource: "derived",
+      gammaPmaxPercentPerC: "-0.26",
+      sourcePages: {
+        ...pvPages,
+        alphaIscPercentPerC: "2",
+        betaVmpPercentPerC: "",
+        gammaPmaxPercentPerC: "2",
+      },
+    });
+
+    expect(parsed.betaVmpPercentPerC).toBeCloseTo(-0.31);
+    expect(parsed.betaVmpSource).toBe("derived");
+  });
+
+  it("accepts a missing βVmp without inventing a value", () => {
+    const parsed = pvSpecInputSchema.parse({
+      ...validPv,
+      betaVmpPercentPerC: "",
+      betaVmpSource: "missing",
+      sourcePages: { ...pvPages, betaVmpPercentPerC: "" },
+    });
+    expect(parsed.betaVmpPercentPerC).toBeNull();
+    expect(parsed.betaVmpSource).toBeNull();
+  });
+
   it("requires an https source URL when provided", () => {
     expect(pvSpecInputSchema.safeParse({ ...validPv, sourceUrl: "http://example.com/ds.pdf" }).success).toBe(false);
     expect(pvSpecInputSchema.safeParse({ ...validPv, sourceUrl: "https://example.com/ds.pdf" }).success).toBe(true);
@@ -162,7 +244,16 @@ describe("inverter spec schema", () => {
     maxDcPowerWp: "15000",
     maxDcVoltageV: "1100",
     ratedAcKw: "10",
-    sourcePages: { maxDcPowerWp: "1", maxDcVoltageV: "1", mpptCurrent: "1", mpptRange: "1", ratedAcKw: "1", startupVoltageV: "1" },
+    sourcePages: {
+      maxDcPowerWp: "1",
+      maxDcVoltageV: "1",
+      mpptOperatingCurrent: "1",
+      mpptRange: "1",
+      mpptShortCircuitCurrent: "1",
+      mpptTopology: "1",
+      ratedAcKw: "1",
+      startupVoltageV: "1",
+    },
     startupVoltageV: "200",
     trackers: [tracker],
   };
@@ -181,5 +272,27 @@ describe("inverter spec schema", () => {
 
   it("requires at least one tracker", () => {
     expect(inverterSpecInputSchema.safeParse({ ...valid, trackers: [] }).success).toBe(false);
+  });
+
+  it("accepts recommended PV when the Datasheet has no hard Max DC power", () => {
+    const result = inverterSpecInputSchema.safeParse({
+      ...valid,
+      maxDcPowerWp: "",
+      maxRecommendedPvWp: "15000",
+      sourcePages: {
+        ...valid.sourcePages,
+        maxDcPowerWp: "",
+        maxRecommendedPvWp: "1",
+      },
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects an inverter with neither PV power limit", () => {
+    expect(inverterSpecInputSchema.safeParse({
+      ...valid,
+      maxDcPowerWp: "",
+      maxRecommendedPvWp: "",
+    }).success).toBe(false);
   });
 });
