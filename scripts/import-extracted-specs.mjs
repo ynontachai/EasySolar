@@ -5,12 +5,18 @@ const IMPORT_ACTOR_ID = "d3afe4a7-cf00-41b2-a1a1-4de7acaf78cb";
 const SOURCE_PAGE = "2";
 
 function pv(model, pmaxWp, vocV, vmpV, iscA, impA, options) {
+  const betaVmpPercentPerC = Number(
+    (options.gammaPmaxPercentPerC - options.alphaIscPercentPerC).toFixed(6),
+  );
+
   return {
     category: "pv_module",
     model,
     spec: {
       alphaIscPercentPerC: options.alphaIscPercentPerC,
-      betaVmpPercentPerC: null,
+      betaVmpDerivation: "Engineering override: beta Vmp = gamma Pmax - alpha Isc",
+      betaVmpPercentPerC,
+      betaVmpSource: "derived",
       betaVocPercentPerC: options.betaVocPercentPerC,
       bifacialityFactor: options.bifacialityFactor,
       gammaPmaxPercentPerC: options.gammaPmaxPercentPerC,
@@ -20,6 +26,7 @@ function pv(model, pmaxWp, vocV, vmpV, iscA, impA, options) {
       pmaxWp,
       sourcePages: {
         alphaIscPercentPerC: SOURCE_PAGE,
+        betaVmpPercentPerC: `${SOURCE_PAGE} (derived from gamma Pmax and alpha Isc)`,
         betaVocPercentPerC: SOURCE_PAGE,
         gammaPmaxPercentPerC: SOURCE_PAGE,
         impA: SOURCE_PAGE,
@@ -291,7 +298,9 @@ for (const item of targets) {
       await insertOrThrow(
         client.from("pv_module_spec").insert({
           alpha_isc_per_c: item.spec.alphaIscPercentPerC === null ? null : item.spec.alphaIscPercentPerC / 100,
+          beta_vmp_derivation: item.spec.betaVmpDerivation,
           beta_vmp_per_c: item.spec.betaVmpPercentPerC === null ? null : item.spec.betaVmpPercentPerC / 100,
+          beta_vmp_source: item.spec.betaVmpSource,
           beta_voc_per_c: item.spec.betaVocPercentPerC === null ? null : item.spec.betaVocPercentPerC / 100,
           bifaciality_factor: item.spec.bifacialityFactor,
           datasheet_revision_id: item.revisionId,

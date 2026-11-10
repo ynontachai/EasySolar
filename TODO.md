@@ -15,13 +15,13 @@ Updated: 2026-11-10
 - Updated the inverter spec form to accept either recommended PV power, maximum PV input power, or both.
 - Split MPPT source references into voltage range, operating current, short-circuit current, and topology.
 - Added database migrations and backfill rules for the Datasheet values already extracted from AIKO, LONGi, and LP210 PDFs.
+- Applied the Datasheet alignment and approved βVmp override migrations to Production Supabase.
+- Backfilled every published PV revision with an approved derived βVmp where the Datasheet omits it; no published revision remains incomplete.
 - Updated the bulk import script and verification checklist to match the new data rules.
 - Passed type checking, 78 unit tests, lint, production build, and responsive checks at 390px, 768px, and 1440px.
 
 ## TODO
 
-- Apply `supabase/migrations/20261110000100_datasheet_spec_input_alignment.sql` to the Production Supabase project.
 - Re-open affected draft or unverified revisions and confirm the new page references.
-- Have a Super Admin approve each derived βVmp value before publishing its revision.
-- Smoke-test the Production spec form, review queue, Datasheet download, and sizing result after the migration.
+- Smoke-test the Production spec form, review queue, Datasheet download, sizing result, and connection diagram after deployment.
 - Confirm that the Production deployment uses engine version `0.3.1`.
