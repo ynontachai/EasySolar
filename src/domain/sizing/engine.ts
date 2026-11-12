@@ -10,10 +10,77 @@ import type {
 } from "./types";
 import { buildWalkthrough } from "./walkthrough";
 
-export const ENGINE_VERSION = "0.3.1";
+export const ENGINE_VERSION = "0.4.0";
 const STC_REFERENCE_TEMPERATURE_C = 25;
 const MAX_SERIES_MODULES_TO_ENUMERATE = 60;
 const MAX_CANDIDATES_TO_RETURN = 5;
+
+function getApplicableOverrides(input: SizingInput): SizingInput["overrides"] {
+  const requested = input.overrides;
+  if (!requested) return undefined;
+  const applied = {
+    ...(input.pvModule.betaVmpPerC === null && requested.betaVmpPerC !== undefined
+      ? { betaVmpPerC: requested.betaVmpPerC }
+      : {}),
+    ...(input.pvModule.betaVocPerC === null && requested.betaVocPerC !== undefined
+      ? { betaVocPerC: requested.betaVocPerC }
+      : {}),
+    ...(input.pvModule.isBifacial && input.pvModule.bifacialDesignCase === null && requested.bifacial
+      ? { bifacial: requested.bifacial }
+      : {}),
+    ...(input.inverter.maxDcPowerWp === null && requested.maxDcPowerWp !== undefined
+      ? { maxDcPowerWp: requested.maxDcPowerWp }
+      : {}),
+    ...(input.inverter.startupVoltageV === null && requested.startupVoltageV !== undefined
+      ? { startupVoltageV: requested.startupVoltageV }
+      : {}),
+  };
+  return Object.keys(applied).length ? applied : undefined;
+}
+
+function applyUserOverrides(
+  input: SizingInput,
+  calculatedAt: string,
+): SizingInput {
+  const overrides = input.overrides;
+  if (!overrides) return input;
+
+  const bifacialDesignCase = overrides.bifacial?.mode === "USER_DESIGN_CASE"
+    ? {
+        approvedAt: calculatedAt,
+        impA: overrides.bifacial.impA,
+        iscA: overrides.bifacial.iscA,
+        pmaxWp: overrides.bifacial.pmaxWp,
+        rearGainFraction: overrides.bifacial.rearGainFraction,
+        sourcePage: "ผู้ใช้กรอก",
+        vmpV: overrides.bifacial.vmpV,
+        vocV: overrides.bifacial.vocV,
+      }
+    : input.pvModule.bifacialDesignCase;
+
+  return {
+    ...input,
+    inverter: {
+      ...input.inverter,
+      maxDcPowerWp: overrides.maxDcPowerWp ?? input.inverter.maxDcPowerWp,
+      startupVoltageV: overrides.startupVoltageV ?? input.inverter.startupVoltageV,
+    },
+    pvModule: {
+      ...input.pvModule,
+      betaVmpPerC: overrides.betaVmpPerC ?? input.pvModule.betaVmpPerC,
+      betaVocPerC: overrides.betaVocPerC ?? input.pvModule.betaVocPerC,
+      bifacialDesignCase,
+    },
+  };
+}
+
+function hasResolvedBifacialCase(input: SizingInput) {
+  return (
+    !input.pvModule.isBifacial ||
+    input.pvModule.bifacialDesignCase !== null ||
+    input.overrides?.bifacial?.mode === "FRONT_SIDE_ONLY"
+  );
+}
 
 function round(value: number, digits = 2) {
   const multiplier = 10 ** digits;
@@ -187,7 +254,7 @@ function getBlockingReasons(input: SizingInput) {
   if (input.inverter.startupVoltageV === null) reasons.push("Datasheet อินเวอร์เตอร์ไม่มี Startup voltage");
   if (input.inverter.maxDcPowerWp === null) reasons.push("Datasheet อินเวอร์เตอร์ไม่มี Max DC power");
   if (input.inverter.trackers.length === 0) reasons.push("อินเวอร์เตอร์ไม่มีข้อมูล MPPT");
-  if (input.pvModule.isBifacial && input.pvModule.bifacialDesignCase === null) {
+  if (!hasResolvedBifacialCase(input)) {
     reasons.push("ยังไม่มี approved rear-side design case สำหรับแผง Bifacial");
   }
   if (input.pvModule.datasheet.verificationStatus !== "verified") {
@@ -206,7 +273,7 @@ function hasEngineeringDataBlocker(input: SizingInput) {
     input.inverter.startupVoltageV === null ||
     input.inverter.maxDcPowerWp === null ||
     input.inverter.trackers.length === 0 ||
-    (input.pvModule.isBifacial && input.pvModule.bifacialDesignCase === null) ||
+    !hasResolvedBifacialCase(input) ||
     input.pvModule.datasheet.verificationStatus !== "verified" ||
     input.inverter.datasheet.verificationStatus !== "verified"
   );
@@ -349,9 +416,15 @@ function equipmentQualityFindings(input: SizingInput): RuleFinding[] {
     input.inverter.datasheet.verificationStatus,
   ];
   const isVerified = statuses.every((status) => status === "verified");
-  const hasUnresolvedBifacialCurrent =
-    input.pvModule.isBifacial && input.pvModule.bifacialDesignCase === null;
+  const hasUnresolvedBifacialCurrent = !hasResolvedBifacialCase(input);
   const isInputComplete = isVerified && !hasUnresolvedBifacialCurrent;
+  const overrideLabels = [
+    input.overrides?.maxDcPowerWp !== undefined ? "Max DC power" : null,
+    input.overrides?.startupVoltageV !== undefined ? "Startup voltage" : null,
+    input.overrides?.betaVocPerC !== undefined ? "βVoc" : null,
+    input.overrides?.betaVmpPerC !== undefined ? "βVmp" : null,
+    input.overrides?.bifacial ? "Bifacial design basis" : null,
+  ].filter((value): value is string => value !== null);
 
   return [
     {
@@ -373,6 +446,17 @@ function equipmentQualityFindings(input: SizingInput): RuleFinding[] {
           ? "ข้อมูลอ้างอิงรุ่นและ revision ที่ผ่านการตรวจสอบ"
           : "ตัวเลขผ่านกฎไฟฟ้าได้ แต่ห้ามออกผล Compatible จนกว่าจะตรวจ datasheet จริง",
     },
+    ...(overrideLabels.length
+      ? [{
+          ruleId: "R11_USER_OVERRIDE",
+          group: "DATA" as const,
+          label: "ค่าทดแทนที่ผู้ใช้กรอก",
+          status: "WARNING" as const,
+          measured: overrideLabels.join(", "),
+          limit: "ต้องให้วิศวกรตรวจและยืนยันกับเอกสารโครงการ",
+          rationale: "ค่าชุดนี้ใช้เฉพาะผลคำนวณครั้งนี้และไม่ได้แก้ไข Datasheet ต้นทาง",
+        }]
+      : []),
     {
       ruleId: "R09_SYSTEM_COMPONENTS",
       group: "SCOPE",
@@ -439,16 +523,19 @@ export function evaluateSizing(
   input: SizingInput,
   context: CalculationContext,
 ): SizingResult {
-  const { pvModule, inverter, assumptions } = input;
-  const blockingReasons = getBlockingReasons(input);
+  const appliedOverrides = getApplicableOverrides(input);
+  const normalizedInput = { ...input, overrides: appliedOverrides };
+  const effectiveInput = applyUserOverrides(normalizedInput, context.calculatedAt);
+  const { pvModule, inverter, assumptions } = effectiveInput;
+  const blockingReasons = getBlockingReasons(effectiveInput);
   const design = getDesignElectricals(pvModule);
-  const candidates = combineTrackerOptions(input).map((state): SizingCandidate => {
+  const candidates = combineTrackerOptions(effectiveInput).map((state): SizingCandidate => {
     const totalDcPowerWp = state.totalModules * pvModule.pmaxWp;
     const designTotalDcPowerWp = state.totalModules * design.pmaxWp;
     const findings = [
       ...state.findings,
-      ...powerFindings(input, totalDcPowerWp, designTotalDcPowerWp),
-      ...equipmentQualityFindings(input),
+      ...powerFindings(effectiveInput, totalDcPowerWp, designTotalDcPowerWp),
+      ...equipmentQualityFindings(effectiveInput),
     ];
     return {
       id: state.configurations
@@ -502,13 +589,17 @@ export function evaluateSizing(
       },
     },
     assumptions,
+    overrides: appliedOverrides ?? null,
     blockingReasons,
     candidates: rankedCandidates,
-    walkthrough: buildWalkthrough(pvModule, inverter, assumptions),
+    walkthrough: buildWalkthrough(pvModule, inverter, assumptions, appliedOverrides),
     limitations: [
       "Preliminary DC-side PV module–inverter sizing aid only.",
       "ไม่ใช่แบบรับรองวิศวกรรม และไม่ทดแทนคู่มือผู้ผลิต การสำรวจไซต์ หรือวิศวกรผู้รับผิดชอบ",
       "ไม่ครอบคลุม protection, cable, connector, earthing, SPD, structure, AC และ grid code",
+      ...(appliedOverrides
+        ? ["มีค่าที่ผู้ใช้กรอกทดแทน Datasheet ผลต้องได้รับการตรวจทานก่อนนำไปใช้งาน"]
+        : []),
     ],
   };
 }

@@ -117,6 +117,108 @@ describe("evaluateSizing", () => {
     expect(result.candidates).toHaveLength(0);
   });
 
+  it("allows calculation-scoped overrides for missing inverter power and a front-side-only bifacial basis", () => {
+    const verifiedDatasheet = {
+      ...demoPvModules[0].datasheet,
+      verificationStatus: "verified" as const,
+      verifiedAt: "2026-11-10T00:00:00.000Z",
+    };
+    const pvModule = {
+      ...demoPvModules[0],
+      isBifacial: true,
+      bifacialDesignCase: null,
+      datasheet: verifiedDatasheet,
+    };
+    const inverter = {
+      ...demoInverters[0],
+      maxDcPowerWp: null,
+      datasheet: { ...verifiedDatasheet, revisionId: demoInverters[0].datasheet.revisionId },
+    };
+
+    const result = evaluateSizing({
+      pvModule,
+      inverter,
+      assumptions,
+      overrides: {
+        bifacial: { acknowledged: true, mode: "FRONT_SIDE_ONLY" },
+        maxDcPowerWp: 15_000,
+      },
+    }, context);
+
+    expect(result.overallStatus).toBe("PRELIMINARY_COMPATIBLE");
+    expect(result.blockingReasons).toEqual([]);
+    expect(result.candidates.length).toBeGreaterThan(0);
+    expect(result.walkthrough.designBasis).toBe("FRONT_SIDE_USER_OVERRIDE");
+    expect(result.walkthrough.inverterLimits.maxDcPowerSource).toBe("USER_OVERRIDE");
+    expect(result.candidates[0].findings).toContainEqual(expect.objectContaining({
+      ruleId: "R11_USER_OVERRIDE",
+      status: "WARNING",
+    }));
+  });
+
+  it("uses a complete user-entered rear-side design case without changing catalog specs", () => {
+    const verifiedDatasheet = {
+      ...demoPvModules[0].datasheet,
+      verificationStatus: "verified" as const,
+      verifiedAt: "2026-11-10T00:00:00.000Z",
+    };
+    const pvModule = {
+      ...demoPvModules[0],
+      isBifacial: true,
+      bifacialDesignCase: null,
+      datasheet: verifiedDatasheet,
+    };
+    const inverter = {
+      ...demoInverters[0],
+      datasheet: { ...verifiedDatasheet, revisionId: demoInverters[0].datasheet.revisionId },
+    };
+
+    const result = evaluateSizing({
+      pvModule,
+      inverter,
+      assumptions,
+      overrides: {
+        bifacial: {
+          impA: 18.1,
+          iscA: 18.96,
+          mode: "USER_DESIGN_CASE",
+          pmaxWp: 808,
+          rearGainFraction: 0.25,
+          vmpV: 44.66,
+          vocV: 53.8,
+        },
+      },
+    }, context);
+
+    expect(result.blockingReasons).toEqual([]);
+    expect(result.walkthrough.designBasis).toBe("USER_REAR_SIDE");
+    expect(result.walkthrough.designElectricals?.source).toBe("USER_OVERRIDE");
+    expect(result.walkthrough.currents.impA).toBe(18.1);
+    expect(result.walkthrough.currents.designIscA).toBe(23.7);
+    expect(pvModule.bifacialDesignCase).toBeNull();
+  });
+
+  it("ignores an override when the verified Datasheet value already exists", () => {
+    const verifiedDatasheet = {
+      ...demoPvModules[0].datasheet,
+      verificationStatus: "verified" as const,
+      verifiedAt: "2026-11-10T00:00:00.000Z",
+    };
+    const result = evaluateSizing({
+      pvModule: { ...demoPvModules[0], datasheet: verifiedDatasheet },
+      inverter: {
+        ...demoInverters[0],
+        datasheet: { ...verifiedDatasheet, revisionId: demoInverters[0].datasheet.revisionId },
+      },
+      assumptions,
+      overrides: { maxDcPowerWp: 100 },
+    }, context);
+
+    expect(result.overrides).toBeNull();
+    expect(result.walkthrough.inverterLimits.maxDcPowerWp).toBe(demoInverters[0].maxDcPowerWp);
+    expect(result.walkthrough.inverterLimits.maxDcPowerSource).toBe("DATASHEET");
+  });
+
   it("reproduces the engineering-approved LONGi and Deye golden calculation", () => {
     const verifiedDatasheet = {
       ...demoPvModules[0].datasheet,

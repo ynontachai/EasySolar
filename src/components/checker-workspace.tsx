@@ -28,7 +28,7 @@ interface CheckerWorkspaceProps {
 
 interface SpecRow {
   label: string;
-  source?: "DATASHEET" | "DERIVED" | "MISSING";
+  source?: "DATASHEET" | "DERIVED" | "USER_OVERRIDE" | "MISSING";
   value: string;
 }
 
@@ -142,6 +142,8 @@ function SpecCard({
                       ? "Datasheet"
                       : row.source === "DERIVED"
                         ? "Derived · อนุมัติแล้ว"
+                        : row.source === "USER_OVERRIDE"
+                          ? "ผู้ใช้กรอก"
                         : "ไม่พบ"}
                   </small>
                 ) : null}
@@ -222,6 +224,12 @@ function FindingRow({ finding }: { finding: RuleFinding }) {
   );
 }
 
+function optionalNumber(value: string) {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 export function CheckerWorkspace({
   initialInverterId,
   initialPvModuleId,
@@ -239,9 +247,36 @@ export function CheckerWorkspace({
   const [result, setResult] = useState(initialResult);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [overrideMaxDcPowerKw, setOverrideMaxDcPowerKw] = useState("");
+  const [overrideStartupVoltageV, setOverrideStartupVoltageV] = useState("");
+  const [overrideBetaVocPercent, setOverrideBetaVocPercent] = useState("");
+  const [overrideBetaVmpPercent, setOverrideBetaVmpPercent] = useState("");
+  const [bifacialMode, setBifacialMode] = useState<"" | "FRONT_SIDE_ONLY" | "USER_DESIGN_CASE">("");
+  const [bifacialAcknowledged, setBifacialAcknowledged] = useState(false);
+  const [rearGainPercent, setRearGainPercent] = useState("");
+  const [rearPmaxWp, setRearPmaxWp] = useState("");
+  const [rearVocV, setRearVocV] = useState("");
+  const [rearVmpV, setRearVmpV] = useState("");
+  const [rearIscA, setRearIscA] = useState("");
+  const [rearImpA, setRearImpA] = useState("");
   const latestRequest = useRef(0);
 
-  async function calculate(next: { inverter?: string; pvModule?: string } = {}) {
+  function clearOverrides() {
+    setOverrideMaxDcPowerKw("");
+    setOverrideStartupVoltageV("");
+    setOverrideBetaVocPercent("");
+    setOverrideBetaVmpPercent("");
+    setBifacialMode("");
+    setBifacialAcknowledged(false);
+    setRearGainPercent("");
+    setRearPmaxWp("");
+    setRearVocV("");
+    setRearVmpV("");
+    setRearIscA("");
+    setRearImpA("");
+  }
+
+  async function calculate(next: { inverter?: string; pvModule?: string; resetOverrides?: boolean } = {}) {
     const pvModuleId = next.pvModule ?? pvModule;
     const inverterId = next.inverter ?? inverter;
     const requestId = ++latestRequest.current;
@@ -249,12 +284,39 @@ export function CheckerWorkspace({
     setErrorMessage("");
 
     try {
+      const maxDcPowerKw = optionalNumber(overrideMaxDcPowerKw);
+      const startupVoltageV = optionalNumber(overrideStartupVoltageV);
+      const betaVocPercent = optionalNumber(overrideBetaVocPercent);
+      const betaVmpPercent = optionalNumber(overrideBetaVmpPercent);
+      const bifacial = bifacialMode === "FRONT_SIDE_ONLY" && bifacialAcknowledged
+        ? { acknowledged: true as const, mode: "FRONT_SIDE_ONLY" as const }
+        : bifacialMode === "USER_DESIGN_CASE"
+          ? {
+              impA: Number(rearImpA),
+              iscA: Number(rearIscA),
+              mode: "USER_DESIGN_CASE" as const,
+              pmaxWp: Number(rearPmaxWp),
+              rearGainFraction: Number(rearGainPercent) / 100,
+              vmpV: Number(rearVmpV),
+              vocV: Number(rearVocV),
+            }
+          : undefined;
+      const overrides = next.resetOverrides
+        ? undefined
+        : {
+            ...(maxDcPowerKw === undefined ? {} : { maxDcPowerWp: maxDcPowerKw * 1000 }),
+            ...(startupVoltageV === undefined ? {} : { startupVoltageV }),
+            ...(betaVocPercent === undefined ? {} : { betaVocPerC: betaVocPercent / 100 }),
+            ...(betaVmpPercent === undefined ? {} : { betaVmpPerC: betaVmpPercent / 100 }),
+            ...(bifacial ? { bifacial } : {}),
+          };
       const response = await fetch("/api/v1/sizing/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pvModuleId,
           inverterId,
+          ...(overrides && Object.keys(overrides).length ? { overrides } : {}),
           assumptions: {
             tcellMinC,
             tcellMaxC,
@@ -285,6 +347,7 @@ export function CheckerWorkspace({
   const pvOption = pvOptions.find((option) => option.value === result.equipment.pvModule.id);
   const inverterOption = inverterOptions.find((option) => option.value === result.equipment.inverter.id);
   const bestCandidate = result.candidates[0];
+  const hasUserOverrides = result.overrides !== null;
   const canOrder = result.overallStatus === "PRELIMINARY_COMPATIBLE" && Boolean(bestCandidate) && result.blockingReasons.length === 0;
 
   return (
@@ -295,7 +358,8 @@ export function CheckerWorkspace({
           label="ข้อมูลอินเวอร์เตอร์"
           onChange={(value) => {
             setInverter(value);
-            void calculate({ inverter: value });
+            clearOverrides();
+            void calculate({ inverter: value, resetOverrides: true });
           }}
           options={inverterOptions}
           value={inverter}
@@ -305,7 +369,8 @@ export function CheckerWorkspace({
           label="ข้อมูลแผง PV"
           onChange={(value) => {
             setPvModule(value);
-            void calculate({ pvModule: value });
+            clearOverrides();
+            void calculate({ pvModule: value, resetOverrides: true });
           }}
           options={pvOptions}
           value={pvModule}
@@ -327,9 +392,9 @@ export function CheckerWorkspace({
           rows={[
             { label: "กำลังไฟฟ้า AC ขาออก", source: "DATASHEET", value: `${inv.ratedAcKw} kW` },
             { label: "กำลัง PV สูงสุดที่แนะนำ", source: inv.maxRecommendedPvWp === null ? "MISSING" : "DATASHEET", value: inv.maxRecommendedPvWp === null ? "—" : `${inv.maxRecommendedPvWp.toLocaleString("en-US")} Wp` },
-            { label: "กำลัง PV สูงสุดที่ใช้งานได้", source: inv.maxDcPowerWp === null ? "MISSING" : "DATASHEET", value: inv.maxDcPowerWp === null ? "—" : `${inv.maxDcPowerWp.toLocaleString("en-US")} Wp` },
+            { label: "กำลัง PV สูงสุดที่ใช้งานได้", source: inv.maxDcPowerSource, value: inv.maxDcPowerWp === null ? "—" : `${inv.maxDcPowerWp.toLocaleString("en-US")} Wp` },
             { label: "แรงดันขาเข้าสูงสุด", source: "DATASHEET", value: `${inv.maxDcVoltageV} Vdc` },
-            { label: "แรงดันเริ่มทำงาน", source: inv.startupVoltageV === null ? "MISSING" : "DATASHEET", value: inv.startupVoltageV === null ? "—" : `${inv.startupVoltageV} V` },
+            { label: "แรงดันเริ่มทำงาน", source: inv.startupVoltageSource, value: inv.startupVoltageV === null ? "—" : `${inv.startupVoltageV} V` },
             { label: "ช่วงแรงดัน MPPT", source: "DATASHEET", value: wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.mpptMinV}–${tracker.mpptMaxV} V`).join(" · ") },
             { label: "กระแสขาเข้าสูงสุด/MPPT", source: "DATASHEET", value: wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.maxOperatingCurrentA} A`).join(" · ") },
             { label: "Isc สูงสุด/MPPT", source: "DATASHEET", value: wt.trackers.map((tracker) => `#${tracker.trackerIndex} ${tracker.maxShortCircuitCurrentA} A`).join(" · ") },
@@ -345,14 +410,20 @@ export function CheckerWorkspace({
             { label: "กระแสลัดวงจร (Isc)", source: "DATASHEET", value: `${pv.iscA} A` },
             { label: "กระแสที่กำลังสูงสุด (Imp)", source: "DATASHEET", value: `${pv.impA} A` },
             { label: "แรงดันที่กำลังสูงสุด (Vmp)", source: "DATASHEET", value: `${pv.vmpV} V` },
-            { label: "Temp. coefficient of Voc", source: pv.betaVocPerC === null ? "MISSING" : "DATASHEET", value: pv.betaVocPerC === null ? "—" : `${(pv.betaVocPerC * 100).toFixed(3)} %/°C` },
-            { label: "βVmp (ใช้ตรวจ Vmp ตามอุณหภูมิ)", source: pv.betaVmpPerC === null ? "MISSING" : pv.betaVmpSource === "derived" ? "DERIVED" : "DATASHEET", value: pv.betaVmpPerC === null ? "—" : `${(pv.betaVmpPerC * 100).toFixed(3)} %/°C` },
+            { label: "Temp. coefficient of Voc", source: pv.betaVocInputSource, value: pv.betaVocPerC === null ? "—" : `${(pv.betaVocPerC * 100).toFixed(3)} %/°C` },
+            { label: "βVmp (ใช้ตรวจ Vmp ตามอุณหภูมิ)", source: pv.betaVmpInputSource, value: pv.betaVmpPerC === null ? "—" : `${(pv.betaVmpPerC * 100).toFixed(3)} %/°C` },
             ...(design
               ? [
-                  { label: "Approved rear-gain case", source: "DATASHEET" as const, value: `${design.rearGainPercent.toFixed(0)}% · Datasheet หน้า ${design.sourcePage}` },
-                  { label: "Pmax / Isc / Imp ที่ใช้ตรวจ", source: "DATASHEET" as const, value: `${design.pmaxWp} W · ${design.iscA} A · ${design.impA} A` },
+                  { label: design.source === "USER_OVERRIDE" ? "Rear-side design case" : "Approved rear-gain case", source: design.source, value: design.source === "USER_OVERRIDE" ? `${design.rearGainPercent.toFixed(0)}% · ผู้ใช้กรอก` : `${design.rearGainPercent.toFixed(0)}% · Datasheet หน้า ${design.sourcePage}` },
+                  { label: "Pmax / Isc / Imp ที่ใช้ตรวจ", source: design.source, value: `${design.pmaxWp} W · ${design.iscA} A · ${design.impA} A` },
                 ]
-              : []),
+              : pv.isBifacial
+                ? [{
+                    label: "Bifacial design basis",
+                    source: wt.designBasis === "FRONT_SIDE_USER_OVERRIDE" ? "USER_OVERRIDE" as const : "MISSING" as const,
+                    value: wt.designBasis === "FRONT_SIDE_USER_OVERRIDE" ? "คำนวณเฉพาะ Front-side" : "ยังไม่มี rear-side design case",
+                  }]
+                : []),
           ]}
           title={`${result.equipment.pvModule.manufacturer} ${result.equipment.pvModule.model}`}
         />
@@ -365,6 +436,11 @@ export function CheckerWorkspace({
           <ul>
             {result.blockingReasons.map((reason) => <li key={reason}>{reason}</li>)}
           </ul>
+        ) : null}
+        {hasUserOverrides ? (
+          <p className="calc__override-warning">
+            ผลนี้มีค่าที่ผู้ใช้กรอกทดแทน Datasheet ต้องให้วิศวกรตรวจหลักฐานก่อนนำไปออกแบบหรือติดตั้ง
+          </p>
         ) : null}
       </div>
 
@@ -555,6 +631,106 @@ export function CheckerWorkspace({
               </div>
             </div>
           </div>
+          {(inv.maxDcPowerSource !== "DATASHEET" ||
+            inv.startupVoltageSource !== "DATASHEET" ||
+            pv.betaVocInputSource === "MISSING" || pv.betaVocInputSource === "USER_OVERRIDE" ||
+            pv.betaVmpInputSource === "MISSING" || pv.betaVmpInputSource === "USER_OVERRIDE" ||
+            (pv.isBifacial && design?.source !== "DATASHEET")) ? (
+            <section className="override-panel" aria-labelledby="override-heading">
+              <div className="override-panel__heading">
+                <div>
+                  <h3 id="override-heading">ข้อมูลทดแทนเมื่อ Datasheet ไม่ครบ</h3>
+                  <p>ใช้เฉพาะการคำนวณครั้งนี้ ระบบจะติดป้าย “ผู้ใช้กรอก” และไม่แก้ข้อมูลต้นทาง</p>
+                </div>
+                <AlertTriangle aria-hidden="true" size={22} />
+              </div>
+
+              <div className="field-row">
+                {inv.maxDcPowerSource !== "DATASHEET" ? (
+                  <div className="field-group">
+                    <label htmlFor="override-max-dc-power">Max DC power ที่ใช้ตรวจ</label>
+                    <div className="unit-input">
+                      <input id="override-max-dc-power" min={0.1} onChange={(event) => setOverrideMaxDcPowerKw(event.target.value)} required step="0.1" type="number" value={overrideMaxDcPowerKw} />
+                      <span>kWp</span>
+                    </div>
+                  </div>
+                ) : null}
+                {inv.startupVoltageSource !== "DATASHEET" ? (
+                  <div className="field-group">
+                    <label htmlFor="override-startup-voltage">Startup voltage ที่ใช้ตรวจ</label>
+                    <div className="unit-input">
+                      <input id="override-startup-voltage" max={2000} min={1} onChange={(event) => setOverrideStartupVoltageV(event.target.value)} required step="0.1" type="number" value={overrideStartupVoltageV} />
+                      <span>V</span>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="field-row">
+                {pv.betaVocInputSource === "MISSING" || pv.betaVocInputSource === "USER_OVERRIDE" ? (
+                  <div className="field-group">
+                    <label htmlFor="override-beta-voc">βVoc ที่ใช้ตรวจ</label>
+                    <div className="unit-input">
+                      <input id="override-beta-voc" max={-0.001} min={-5} onChange={(event) => setOverrideBetaVocPercent(event.target.value)} required step="0.001" type="number" value={overrideBetaVocPercent} />
+                      <span>%/°C</span>
+                    </div>
+                  </div>
+                ) : null}
+                {pv.betaVmpInputSource === "MISSING" || pv.betaVmpInputSource === "USER_OVERRIDE" ? (
+                  <div className="field-group">
+                    <label htmlFor="override-beta-vmp">βVmp ที่ใช้ตรวจ</label>
+                    <div className="unit-input">
+                      <input id="override-beta-vmp" max={-0.001} min={-5} onChange={(event) => setOverrideBetaVmpPercent(event.target.value)} required step="0.001" type="number" value={overrideBetaVmpPercent} />
+                      <span>%/°C</span>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {pv.isBifacial && design?.source !== "DATASHEET" ? (
+                <fieldset className="bifacial-override">
+                  <legend>วิธีคิดแผง Bifacial</legend>
+                  <p>อย่าใช้ Rear gain เพียงค่าเดียวเพื่อเดากระแส กรุณาเลือกฐานการออกแบบที่ตรวจสอบได้</p>
+                  <label className="override-choice">
+                    <input checked={bifacialMode === "FRONT_SIDE_ONLY"} name="bifacial-mode" onChange={() => setBifacialMode("FRONT_SIDE_ONLY")} required type="radio" />
+                    <span><strong>คำนวณเฉพาะ Front-side</strong><small>ใช้ Pmax, Voc, Vmp, Isc และ Imp หน้าแผง โดยไม่รับรองผลจากด้านหลัง</small></span>
+                  </label>
+                  <label className="override-choice">
+                    <input checked={bifacialMode === "USER_DESIGN_CASE"} name="bifacial-mode" onChange={() => setBifacialMode("USER_DESIGN_CASE")} required type="radio" />
+                    <span><strong>กรอก Rear-side design case</strong><small>ใช้ค่าจากเอกสารออกแบบหรือ Manufacturer gain table ที่ผู้ใช้รับผิดชอบ</small></span>
+                  </label>
+
+                  {bifacialMode === "FRONT_SIDE_ONLY" ? (
+                    <label className="override-acknowledgement">
+                      <input checked={bifacialAcknowledged} onChange={(event) => setBifacialAcknowledged(event.target.checked)} required type="checkbox" />
+                      <span>ยืนยันว่าจะใช้ผล Front-side only และให้วิศวกรตรวจผลกระทบจาก Rear irradiance ก่อนติดตั้ง</span>
+                    </label>
+                  ) : null}
+
+                  {bifacialMode === "USER_DESIGN_CASE" ? (
+                    <div className="bifacial-override__values">
+                      {[
+                        ["rear-gain", "Rear gain", rearGainPercent, setRearGainPercent, "%", 0.1, 100],
+                        ["rear-pmax", "Pmax design", rearPmaxWp, setRearPmaxWp, "W", 1, 10000],
+                        ["rear-voc", "Voc design", rearVocV, setRearVocV, "V", 0.01, 2000],
+                        ["rear-vmp", "Vmp design", rearVmpV, setRearVmpV, "V", 0.01, 2000],
+                        ["rear-isc", "Isc design", rearIscA, setRearIscA, "A", 0.01, 100],
+                        ["rear-imp", "Imp design", rearImpA, setRearImpA, "A", 0.01, 100],
+                      ].map(([id, label, value, setter, unit, step, max]) => (
+                        <div className="field-group" key={String(id)}>
+                          <label htmlFor={String(id)}>{String(label)}</label>
+                          <div className="unit-input">
+                            <input id={String(id)} max={Number(max)} min={Number(step)} onChange={(event) => (setter as (next: string) => void)(event.target.value)} required step={Number(step)} type="number" value={String(value)} />
+                            <span>{String(unit)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </fieldset>
+              ) : null}
+            </section>
+          ) : null}
           <button className="button button--ink" disabled={isLoading} type="submit">
             คำนวณใหม่
           </button>
@@ -578,7 +754,9 @@ export function CheckerWorkspace({
           <h2>{canOrder ? "ส่งชุดนี้ให้ทีมวิศวกรตรวจทาน" : "ยังไม่เปิดการสั่งซื้อชุดนี้"}</h2>
           <p>
             {canOrder
-              ? "ผลผ่านกฎเบื้องต้นจากข้อมูลที่ verified แล้ว ทีมงานจะตรวจแบบและ Datasheet ซ้ำก่อนเสนอราคา"
+              ? hasUserOverrides
+                ? "ผลผ่านกฎเบื้องต้นโดยมีค่าที่ผู้ใช้กรอก ทีมงานต้องตรวจเอกสารอ้างอิงและยืนยันค่าทดแทนก่อนเสนอราคา"
+                : "ผลผ่านกฎเบื้องต้นจากข้อมูลที่ verified แล้ว ทีมงานจะตรวจแบบและ Datasheet ซ้ำก่อนเสนอราคา"
               : "กรุณาแก้ข้อมูลที่ระบบแจ้งให้ครบก่อน ระบบจะไม่ใช้ผลที่ยังไม่ยืนยันเพื่อสั่งซื้อ"}
           </p>
         </div>

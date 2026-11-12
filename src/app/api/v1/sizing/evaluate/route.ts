@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       pvModule,
       inverter,
       assumptions: parsed.data.assumptions,
+      overrides: parsed.data.overrides,
     };
     const result = evaluateSizing(sizingInput, {
       calculationId: crypto.randomUUID(),

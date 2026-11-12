@@ -8198,6 +8198,11 @@ a {
   color: #8a5a00;
 }
 
+.spec-source--user_override {
+  border-color: #d7a45b;
+  color: #8a4b08;
+}
+
 .spec-source--missing {
   border-color: #e7aaa3;
   color: #b3261e;
@@ -8246,6 +8251,14 @@ a {
   gap: 3px;
   margin: 6px 0 0;
   padding-left: 20px;
+}
+
+.calc__override-warning {
+  border-top: 1px solid #e6c77a;
+  color: #7a4c00 !important;
+  font-weight: 600;
+  margin: 8px 0 0;
+  padding-top: 10px;
 }
 
 .calc__steps {
@@ -8508,6 +8521,86 @@ a {
   padding-bottom: 18px;
 }
 
+.override-panel {
+  background: #fff9eb;
+  border: 1px solid #e6c77a;
+  display: grid;
+  gap: 18px;
+  margin: 22px 0;
+  padding: 18px;
+}
+
+.override-panel__heading {
+  align-items: flex-start;
+  color: #7a4c00;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.override-panel__heading h3 {
+  font-size: 17px;
+  margin: 0;
+}
+
+.override-panel__heading p,
+.bifacial-override > p {
+  color: #765f3d;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 6px 0 0;
+}
+
+.bifacial-override {
+  border: 0;
+  border-top: 1px solid #e6c77a;
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  min-width: 0;
+  padding: 18px 0 0;
+}
+
+.bifacial-override legend {
+  font-weight: 700;
+  padding: 0;
+}
+
+.override-choice,
+.override-acknowledgement {
+  align-items: flex-start;
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+}
+
+.override-choice input,
+.override-acknowledgement input {
+  flex: none;
+  height: 20px;
+  margin: 2px 0 0;
+  width: 20px;
+}
+
+.override-choice span {
+  display: grid;
+  gap: 2px;
+}
+
+.override-choice small,
+.override-acknowledgement span {
+  color: #765f3d;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.bifacial-override__values {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 4px;
+}
+
 .calc__disclaimer {
   color: #667085;
   font-size: 13px;
@@ -8572,6 +8665,10 @@ a {
 
   .tracker-check {
     padding-left: 12px;
+  }
+
+  .bifacial-override__values {
+    grid-template-columns: 1fr;
   }
 
   .calc__rows li {

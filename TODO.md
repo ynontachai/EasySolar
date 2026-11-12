@@ -17,6 +17,8 @@ Updated: 2026-11-10
 - Added database migrations and backfill rules for the Datasheet values already extracted from AIKO, LONGi, and LP210 PDFs.
 - Applied the Datasheet alignment and approved βVmp override migrations to Production Supabase.
 - Backfilled every published PV revision with an approved derived βVmp where the Datasheet omits it; no published revision remains incomplete.
+- Added calculation-scoped user overrides for missing inverter limits and temperature coefficients without changing catalog data.
+- Added safe Bifacial handling with explicit Front-side-only acknowledgement or a complete user-entered rear-side electrical design case.
 - Updated the bulk import script and verification checklist to match the new data rules.
 - Passed type checking, 78 unit tests, lint, production build, and responsive checks at 390px, 768px, and 1440px.
 
@@ -24,4 +26,4 @@ Updated: 2026-11-10
 
 - Re-open affected draft or unverified revisions and confirm the new page references.
 - Smoke-test the Production spec form, review queue, Datasheet download, sizing result, and connection diagram after deployment.
-- Confirm that the Production deployment uses engine version `0.3.1`.
+- Confirm that the Production deployment uses engine version `0.4.0`.

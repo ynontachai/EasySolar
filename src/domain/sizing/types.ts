@@ -13,10 +13,34 @@ export interface SizingAssumptions {
   targetDcPowerWp: number;
 }
 
+export interface UserBifacialDesignCase {
+  impA: number;
+  iscA: number;
+  mode: "USER_DESIGN_CASE";
+  pmaxWp: number;
+  rearGainFraction: number;
+  vmpV: number;
+  vocV: number;
+}
+
+export interface FrontSideOnlyBifacialCase {
+  acknowledged: true;
+  mode: "FRONT_SIDE_ONLY";
+}
+
+export interface SizingOverrides {
+  betaVmpPerC?: number;
+  betaVocPerC?: number;
+  bifacial?: FrontSideOnlyBifacialCase | UserBifacialDesignCase;
+  maxDcPowerWp?: number;
+  startupVoltageV?: number;
+}
+
 export interface SizingInput {
   pvModule: PvModuleSpec;
   inverter: InverterSpec;
   assumptions: SizingAssumptions;
+  overrides?: SizingOverrides;
 }
 
 export interface CalculationContext {
@@ -57,7 +81,11 @@ export interface SizingCandidate {
 }
 
 export interface SizingWalkthrough {
-  pvModule: Pick<PvModuleSpec, "pmaxWp" | "vocV" | "vmpV" | "iscA" | "impA" | "betaVocPerC" | "betaVmpPerC" | "betaVmpSource">;
+  pvModule: Pick<PvModuleSpec, "pmaxWp" | "vocV" | "vmpV" | "iscA" | "impA" | "betaVocPerC" | "betaVmpPerC" | "betaVmpSource" | "isBifacial"> & {
+    betaVmpInputSource: "DATASHEET" | "DERIVED" | "USER_OVERRIDE" | "MISSING";
+    betaVocInputSource: "DATASHEET" | "USER_OVERRIDE" | "MISSING";
+  };
+  designBasis: "FRONT_SIDE" | "FRONT_SIDE_USER_OVERRIDE" | "APPROVED_REAR_SIDE" | "USER_REAR_SIDE";
   designElectricals: {
     impA: number;
     iscA: number;
@@ -66,13 +94,16 @@ export interface SizingWalkthrough {
     sourcePage: string;
     vmpV: number;
     vocV: number;
+    source: "DATASHEET" | "USER_OVERRIDE";
   } | null;
   inverterLimits: {
     maxDcPowerWp: number | null;
+    maxDcPowerSource: "DATASHEET" | "USER_OVERRIDE" | "MISSING";
     maxDcVoltageV: number;
     maxRecommendedPvWp: number | null;
     ratedAcKw: number;
     startupVoltageV: number | null;
+    startupVoltageSource: "DATASHEET" | "USER_OVERRIDE" | "MISSING";
     trackerCount: number;
   };
   /** Module cap from the stricter available recommended or hard PV power limit. */
@@ -135,6 +166,7 @@ export interface SizingResult {
     };
   };
   assumptions: SizingAssumptions;
+  overrides: SizingOverrides | null;
   blockingReasons: string[];
   candidates: SizingCandidate[];
   walkthrough: SizingWalkthrough;

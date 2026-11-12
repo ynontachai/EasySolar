@@ -1,5 +1,5 @@
 import type { InverterSpec, PvModuleSpec } from "@/domain/catalog/types";
-import type { SizingAssumptions, SizingWalkthrough } from "./types";
+import type { SizingAssumptions, SizingOverrides, SizingWalkthrough } from "./types";
 
 const STC_REFERENCE_TEMPERATURE_C = 25;
 
@@ -21,6 +21,7 @@ export function buildWalkthrough(
   pvModule: PvModuleSpec,
   inverter: InverterSpec,
   assumptions: SizingAssumptions,
+  overrides?: SizingOverrides,
 ): SizingWalkthrough {
   const trackers = inverter.trackers;
   const design = pvModule.bifacialDesignCase;
@@ -70,7 +71,27 @@ export function buildWalkthrough(
       betaVocPerC,
       betaVmpPerC,
       betaVmpSource: pvModule.betaVmpSource,
+      betaVocInputSource: overrides?.betaVocPerC !== undefined
+        ? "USER_OVERRIDE"
+        : betaVocPerC === null
+          ? "MISSING"
+          : "DATASHEET",
+      betaVmpInputSource: overrides?.betaVmpPerC !== undefined
+        ? "USER_OVERRIDE"
+        : betaVmpPerC === null
+          ? "MISSING"
+          : pvModule.betaVmpSource === "derived"
+            ? "DERIVED"
+            : "DATASHEET",
+      isBifacial: pvModule.isBifacial,
     },
+    designBasis: overrides?.bifacial?.mode === "USER_DESIGN_CASE"
+      ? "USER_REAR_SIDE"
+      : overrides?.bifacial?.mode === "FRONT_SIDE_ONLY"
+        ? "FRONT_SIDE_USER_OVERRIDE"
+        : design
+          ? "APPROVED_REAR_SIDE"
+          : "FRONT_SIDE",
     designElectricals: design
       ? {
           impA: design.impA,
@@ -80,14 +101,25 @@ export function buildWalkthrough(
           sourcePage: design.sourcePage,
           vmpV: design.vmpV,
           vocV: design.vocV,
+          source: overrides?.bifacial?.mode === "USER_DESIGN_CASE" ? "USER_OVERRIDE" : "DATASHEET",
         }
       : null,
     inverterLimits: {
       maxDcPowerWp: inverter.maxDcPowerWp,
+      maxDcPowerSource: overrides?.maxDcPowerWp !== undefined
+        ? "USER_OVERRIDE"
+        : inverter.maxDcPowerWp === null
+          ? "MISSING"
+          : "DATASHEET",
       maxDcVoltageV: inverter.maxDcVoltageV,
       maxRecommendedPvWp: inverter.maxRecommendedPvWp,
       ratedAcKw: inverter.ratedAcKw,
       startupVoltageV: inverter.startupVoltageV,
+      startupVoltageSource: overrides?.startupVoltageV !== undefined
+        ? "USER_OVERRIDE"
+        : inverter.startupVoltageV === null
+          ? "MISSING"
+          : "DATASHEET",
       trackerCount: trackers.length,
     },
     maxModules:

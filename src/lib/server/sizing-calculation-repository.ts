@@ -65,7 +65,10 @@ export async function enforceSizingRateLimit(request: Request): Promise<RateLimi
 export async function saveSizingCalculation(input: SizingInput, result: SizingResult) {
   if (!isDatabaseConfigured()) return;
   const sql = getDb();
-  const inputsJson = JSON.parse(JSON.stringify({ assumptions: input.assumptions }));
+  const inputsJson = JSON.parse(JSON.stringify({
+    assumptions: input.assumptions,
+    overrides: result.overrides,
+  }));
   const snapshotsJson = JSON.parse(JSON.stringify({ inverter: input.inverter, pvModule: input.pvModule }));
   const resultJson = JSON.parse(JSON.stringify(result));
   await sql`
