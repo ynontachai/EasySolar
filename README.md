@@ -1,6 +1,6 @@
 # EasySolar Equipment Intelligence
 
-Production-oriented PV module–inverter compatibility checker. Public recommendations are fail-closed: missing safety-critical values, unverified revisions, or unresolved bifacial current prevent an orderable result. Synthetic records are available only outside production and in the isolated CI browser test mode.
+Production-oriented PV module–inverter compatibility checker. Public recommendations are fail-closed for missing safety-critical values or unverified revisions. A bifacial revision without an approved rear-side design case uses an explicit Front-side-only system override and excludes rear-irradiance gain. Synthetic records are available only outside production and in the isolated CI browser test mode.
 
 ## Run locally
 

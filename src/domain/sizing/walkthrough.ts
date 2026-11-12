@@ -91,7 +91,9 @@ export function buildWalkthrough(
         ? "FRONT_SIDE_USER_OVERRIDE"
         : design
           ? "APPROVED_REAR_SIDE"
-          : "FRONT_SIDE",
+          : pvModule.isBifacial
+            ? "FRONT_SIDE_SYSTEM_OVERRIDE"
+            : "FRONT_SIDE",
     designElectricals: design
       ? {
           impA: design.impA,

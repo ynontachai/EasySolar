@@ -92,7 +92,7 @@ describe("evaluateSizing", () => {
     expect(result.overallStatus).toBe("INCOMPATIBLE");
   });
 
-  it("keeps verified bifacial data incomplete without a rear-side current model", () => {
+  it("uses the front-side-only system override for verified bifacial data without a rear-side case", () => {
     const pvModule = {
       ...demoPvModules[0],
       isBifacial: true,
@@ -113,8 +113,14 @@ describe("evaluateSizing", () => {
 
     const result = evaluateSizing({ pvModule, inverter, assumptions }, context);
 
-    expect(result.overallStatus).toBe("INSUFFICIENT_DATA");
-    expect(result.candidates).toHaveLength(0);
+    expect(result.overallStatus).toBe("PRELIMINARY_COMPATIBLE");
+    expect(result.blockingReasons).toEqual([]);
+    expect(result.candidates.length).toBeGreaterThan(0);
+    expect(result.walkthrough.designBasis).toBe("FRONT_SIDE_SYSTEM_OVERRIDE");
+    expect(result.candidates[0].findings).toContainEqual(expect.objectContaining({
+      ruleId: "R12_BIFACIAL_SYSTEM_OVERRIDE",
+      status: "WARNING",
+    }));
   });
 
   it("allows calculation-scoped overrides for missing inverter power and a front-side-only bifacial basis", () => {

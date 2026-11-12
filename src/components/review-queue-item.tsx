@@ -94,6 +94,12 @@ export function ReviewQueueItem({
         <li>{row.hasSourceUrl ? "มีลิงก์แหล่งข้อมูลทางการ" : "ไม่มีลิงก์แหล่งข้อมูลทางการ"}</li>
       </ul>
 
+      {row.isBifacial ? (
+        <p className="review-item__engineering-note" role="note">
+          Bifacial policy: หาก revision นี้ยังไม่มี approved rear-side design case ระบบจะใช้ Front-side only โดยอัตโนมัติ และบันทึกนโยบายนี้ในผลคำนวณ
+        </p>
+      ) : null}
+
       {row.state === "extracted_unverified" ? (
         <fieldset className="review-item__confirm">
           <legend>ยืนยันค่าเทียบกับ Datasheet</legend>

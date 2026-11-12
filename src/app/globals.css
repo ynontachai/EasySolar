@@ -8203,6 +8203,11 @@ a {
   color: #8a4b08;
 }
 
+.spec-source--system_override {
+  background: #fff3cd;
+  color: #765000;
+}
+
 .spec-source--missing {
   border-color: #e7aaa3;
   color: #b3261e;

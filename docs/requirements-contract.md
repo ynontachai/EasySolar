@@ -33,7 +33,7 @@ Solar Value Assessment มี input flow และ local draft แล้ว แ�
 - **BR-007:** Consumer result ต้องแสดงเป็นช่วงพร้อม confidence/missing data และห้ามสรุปความคุ้มค่าจาก simple payback ค่าเดียว
 - **BR-008:** Professional และ Consumer experiences ใช้ข้อมูลกลางร่วมกันได้ แต่ต้องแยกภาษา ระดับรายละเอียด disclaimer และ decision boundary
 - **BR-009:** βVoc, βVmp, Max DC power, Startup voltage และ MPPT limits เป็น safety-critical; ต้องมี source page และ reviewer confirmation ก่อน Publish
-- **BR-010:** Missing safety-critical data, unverified revision หรือ unresolved bifacial current ต้อง fail closed: ไม่สร้างชุดแนะนำและไม่เปิด order CTA
+- **BR-010:** Missing safety-critical data หรือ unverified revision ต้อง fail closed: ไม่สร้างชุดแนะนำและไม่เปิด order CTA; สำหรับ Bifacial ที่ยังไม่มี approved rear-side design case ให้ใช้ Front-side-only system override พร้อมคำเตือนและไม่รวมผลจาก Rear irradiance
 - **BR-011:** MPPT ที่มี limit ต่างกันต้องคำนวณและอธิบายแยก tracker; ห้ามสรุป input/current ด้วยค่าที่ทำให้ tracker ใดดูรองรับเกินจริง
 - **BR-012:** Public API ห้ามใช้ Isc design factor ต่ำกว่า 1.25; ค่าที่สูงกว่าต้องแสดงใน assumptions และ calculation snapshot
 

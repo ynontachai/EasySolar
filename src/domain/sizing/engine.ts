@@ -10,7 +10,7 @@ import type {
 } from "./types";
 import { buildWalkthrough } from "./walkthrough";
 
-export const ENGINE_VERSION = "0.4.0";
+export const ENGINE_VERSION = "0.5.0";
 const STC_REFERENCE_TEMPERATURE_C = 25;
 const MAX_SERIES_MODULES_TO_ENUMERATE = 60;
 const MAX_CANDIDATES_TO_RETURN = 5;
@@ -74,11 +74,11 @@ function applyUserOverrides(
   };
 }
 
-function hasResolvedBifacialCase(input: SizingInput) {
+function usesSystemBifacialFallback(input: SizingInput) {
   return (
-    !input.pvModule.isBifacial ||
-    input.pvModule.bifacialDesignCase !== null ||
-    input.overrides?.bifacial?.mode === "FRONT_SIDE_ONLY"
+    input.pvModule.isBifacial &&
+    input.pvModule.bifacialDesignCase === null &&
+    input.overrides?.bifacial === undefined
   );
 }
 
@@ -254,9 +254,6 @@ function getBlockingReasons(input: SizingInput) {
   if (input.inverter.startupVoltageV === null) reasons.push("Datasheet อินเวอร์เตอร์ไม่มี Startup voltage");
   if (input.inverter.maxDcPowerWp === null) reasons.push("Datasheet อินเวอร์เตอร์ไม่มี Max DC power");
   if (input.inverter.trackers.length === 0) reasons.push("อินเวอร์เตอร์ไม่มีข้อมูล MPPT");
-  if (!hasResolvedBifacialCase(input)) {
-    reasons.push("ยังไม่มี approved rear-side design case สำหรับแผง Bifacial");
-  }
   if (input.pvModule.datasheet.verificationStatus !== "verified") {
     reasons.push("Datasheet แผงยังไม่ผ่านการตรวจสอบ");
   }
@@ -273,7 +270,6 @@ function hasEngineeringDataBlocker(input: SizingInput) {
     input.inverter.startupVoltageV === null ||
     input.inverter.maxDcPowerWp === null ||
     input.inverter.trackers.length === 0 ||
-    !hasResolvedBifacialCase(input) ||
     input.pvModule.datasheet.verificationStatus !== "verified" ||
     input.inverter.datasheet.verificationStatus !== "verified"
   );
@@ -416,8 +412,8 @@ function equipmentQualityFindings(input: SizingInput): RuleFinding[] {
     input.inverter.datasheet.verificationStatus,
   ];
   const isVerified = statuses.every((status) => status === "verified");
-  const hasUnresolvedBifacialCurrent = !hasResolvedBifacialCase(input);
-  const isInputComplete = isVerified && !hasUnresolvedBifacialCurrent;
+  const hasSystemBifacialFallback = usesSystemBifacialFallback(input);
+  const isInputComplete = isVerified;
   const overrideLabels = [
     input.overrides?.maxDcPowerWp !== undefined ? "Max DC power" : null,
     input.overrides?.startupVoltageV !== undefined ? "Startup voltage" : null,
@@ -432,20 +428,29 @@ function equipmentQualityFindings(input: SizingInput): RuleFinding[] {
       group: "DATA",
       label: "แหล่งข้อมูลและการตรวจสอบ",
       status: isInputComplete ? "PASS" : "INCOMPLETE",
-      measured: hasUnresolvedBifacialCurrent
-        ? "Bifacial current model unresolved"
-        : input.pvModule.bifacialDesignCase
+      measured: input.pvModule.bifacialDesignCase
           ? `Approved ${(input.pvModule.bifacialDesignCase.rearGainFraction * 100).toFixed(0)}% rear-gain design case`
+        : hasSystemBifacialFallback
+          ? "Verified revisions · Front-side-only system override"
         : isVerified
           ? "Verified revisions"
           : "Demo / unverified",
-      limit: "ต้อง verified และครอบคลุมเงื่อนไขกระแสของเทคโนโลยีแผง",
-      rationale: hasUnresolvedBifacialCurrent
-        ? "แผง bifacial ต้องระบุ rear-side gain และวิธีคำนวณ design current ก่อนยืนยันผล"
-        : isVerified
+      limit: "Revision ต้อง verified; Bifacial ที่ไม่มี approved rear-side case ใช้ Front-side only",
+      rationale: isVerified
           ? "ข้อมูลอ้างอิงรุ่นและ revision ที่ผ่านการตรวจสอบ"
           : "ตัวเลขผ่านกฎไฟฟ้าได้ แต่ห้ามออกผล Compatible จนกว่าจะตรวจ datasheet จริง",
     },
+    ...(hasSystemBifacialFallback
+      ? [{
+          ruleId: "R12_BIFACIAL_SYSTEM_OVERRIDE",
+          group: "DATA" as const,
+          label: "นโยบายแผง Bifacial",
+          status: "WARNING" as const,
+          measured: "System override · Front-side only",
+          limit: "ไม่รวมกำลังและกระแสเพิ่มจาก Rear irradiance",
+          rationale: "ระบบใช้ค่า Pmax, Voc, Vmp, Isc และ Imp ฝั่งหน้า จนกว่าจะมี rear-side design case ที่อนุมัติ",
+        }]
+      : []),
     ...(overrideLabels.length
       ? [{
           ruleId: "R11_USER_OVERRIDE",
@@ -599,6 +604,9 @@ export function evaluateSizing(
       "ไม่ครอบคลุม protection, cable, connector, earthing, SPD, structure, AC และ grid code",
       ...(appliedOverrides
         ? ["มีค่าที่ผู้ใช้กรอกทดแทน Datasheet ผลต้องได้รับการตรวจทานก่อนนำไปใช้งาน"]
+        : []),
+      ...(usesSystemBifacialFallback(effectiveInput)
+        ? ["แผง Bifacial นี้ใช้ System override แบบ Front-side only และไม่รวมผลจาก Rear irradiance"]
         : []),
     ],
   };

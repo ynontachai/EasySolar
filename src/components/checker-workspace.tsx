@@ -28,7 +28,7 @@ interface CheckerWorkspaceProps {
 
 interface SpecRow {
   label: string;
-  source?: "DATASHEET" | "DERIVED" | "USER_OVERRIDE" | "MISSING";
+  source?: "DATASHEET" | "DERIVED" | "USER_OVERRIDE" | "SYSTEM_OVERRIDE" | "MISSING";
   value: string;
 }
 
@@ -144,7 +144,9 @@ function SpecCard({
                         ? "Derived · อนุมัติแล้ว"
                         : row.source === "USER_OVERRIDE"
                           ? "ผู้ใช้กรอก"
-                        : "ไม่พบ"}
+                          : row.source === "SYSTEM_OVERRIDE"
+                            ? "System override"
+                            : "ไม่พบ"}
                   </small>
                 ) : null}
               </dd>
@@ -251,8 +253,7 @@ export function CheckerWorkspace({
   const [overrideStartupVoltageV, setOverrideStartupVoltageV] = useState("");
   const [overrideBetaVocPercent, setOverrideBetaVocPercent] = useState("");
   const [overrideBetaVmpPercent, setOverrideBetaVmpPercent] = useState("");
-  const [bifacialMode, setBifacialMode] = useState<"" | "FRONT_SIDE_ONLY" | "USER_DESIGN_CASE">("");
-  const [bifacialAcknowledged, setBifacialAcknowledged] = useState(false);
+  const [bifacialMode, setBifacialMode] = useState<"" | "USER_DESIGN_CASE">("");
   const [rearGainPercent, setRearGainPercent] = useState("");
   const [rearPmaxWp, setRearPmaxWp] = useState("");
   const [rearVocV, setRearVocV] = useState("");
@@ -267,7 +268,6 @@ export function CheckerWorkspace({
     setOverrideBetaVocPercent("");
     setOverrideBetaVmpPercent("");
     setBifacialMode("");
-    setBifacialAcknowledged(false);
     setRearGainPercent("");
     setRearPmaxWp("");
     setRearVocV("");
@@ -288,9 +288,7 @@ export function CheckerWorkspace({
       const startupVoltageV = optionalNumber(overrideStartupVoltageV);
       const betaVocPercent = optionalNumber(overrideBetaVocPercent);
       const betaVmpPercent = optionalNumber(overrideBetaVmpPercent);
-      const bifacial = bifacialMode === "FRONT_SIDE_ONLY" && bifacialAcknowledged
-        ? { acknowledged: true as const, mode: "FRONT_SIDE_ONLY" as const }
-        : bifacialMode === "USER_DESIGN_CASE"
+      const bifacial = bifacialMode === "USER_DESIGN_CASE"
           ? {
               impA: Number(rearImpA),
               iscA: Number(rearIscA),
@@ -348,6 +346,7 @@ export function CheckerWorkspace({
   const inverterOption = inverterOptions.find((option) => option.value === result.equipment.inverter.id);
   const bestCandidate = result.candidates[0];
   const hasUserOverrides = result.overrides !== null;
+  const hasBifacialSystemOverride = wt.designBasis === "FRONT_SIDE_SYSTEM_OVERRIDE";
   const canOrder = result.overallStatus === "PRELIMINARY_COMPATIBLE" && Boolean(bestCandidate) && result.blockingReasons.length === 0;
 
   return (
@@ -420,8 +419,8 @@ export function CheckerWorkspace({
               : pv.isBifacial
                 ? [{
                     label: "Bifacial design basis",
-                    source: wt.designBasis === "FRONT_SIDE_USER_OVERRIDE" ? "USER_OVERRIDE" as const : "MISSING" as const,
-                    value: wt.designBasis === "FRONT_SIDE_USER_OVERRIDE" ? "คำนวณเฉพาะ Front-side" : "ยังไม่มี rear-side design case",
+                    source: "SYSTEM_OVERRIDE" as const,
+                    value: "Front-side only · ยังไม่รวม Rear irradiance",
                   }]
                 : []),
           ]}
@@ -440,6 +439,11 @@ export function CheckerWorkspace({
         {hasUserOverrides ? (
           <p className="calc__override-warning">
             ผลนี้มีค่าที่ผู้ใช้กรอกทดแทน Datasheet ต้องให้วิศวกรตรวจหลักฐานก่อนนำไปออกแบบหรือติดตั้ง
+          </p>
+        ) : null}
+        {hasBifacialSystemOverride ? (
+          <p className="calc__override-warning">
+            แผง Bifacial นี้ใช้ System override แบบ Front-side only ผลลัพธ์ไม่รวมกำลังและกระแสเพิ่มจาก Rear irradiance
           </p>
         ) : null}
       </div>
@@ -690,22 +694,15 @@ export function CheckerWorkspace({
               {pv.isBifacial && design?.source !== "DATASHEET" ? (
                 <fieldset className="bifacial-override">
                   <legend>วิธีคิดแผง Bifacial</legend>
-                  <p>อย่าใช้ Rear gain เพียงค่าเดียวเพื่อเดากระแส กรุณาเลือกฐานการออกแบบที่ตรวจสอบได้</p>
+                  <p>ค่าเริ่มต้นใช้ Front-side only ตาม System override หากมีเอกสารออกแบบที่ตรวจสอบได้จึงค่อยแทนด้วย Rear-side design case</p>
                   <label className="override-choice">
-                    <input checked={bifacialMode === "FRONT_SIDE_ONLY"} name="bifacial-mode" onChange={() => setBifacialMode("FRONT_SIDE_ONLY")} required type="radio" />
-                    <span><strong>คำนวณเฉพาะ Front-side</strong><small>ใช้ Pmax, Voc, Vmp, Isc และ Imp หน้าแผง โดยไม่รับรองผลจากด้านหลัง</small></span>
+                    <input checked={bifacialMode === ""} name="bifacial-mode" onChange={() => setBifacialMode("")} type="radio" />
+                    <span><strong>System override · Front-side only</strong><small>ค่าเริ่มต้น ใช้ Pmax, Voc, Vmp, Isc และ Imp หน้าแผง โดยไม่รวมผลจากด้านหลัง</small></span>
                   </label>
                   <label className="override-choice">
-                    <input checked={bifacialMode === "USER_DESIGN_CASE"} name="bifacial-mode" onChange={() => setBifacialMode("USER_DESIGN_CASE")} required type="radio" />
+                    <input checked={bifacialMode === "USER_DESIGN_CASE"} name="bifacial-mode" onChange={() => setBifacialMode("USER_DESIGN_CASE")} type="radio" />
                     <span><strong>กรอก Rear-side design case</strong><small>ใช้ค่าจากเอกสารออกแบบหรือ Manufacturer gain table ที่ผู้ใช้รับผิดชอบ</small></span>
                   </label>
-
-                  {bifacialMode === "FRONT_SIDE_ONLY" ? (
-                    <label className="override-acknowledgement">
-                      <input checked={bifacialAcknowledged} onChange={(event) => setBifacialAcknowledged(event.target.checked)} required type="checkbox" />
-                      <span>ยืนยันว่าจะใช้ผล Front-side only และให้วิศวกรตรวจผลกระทบจาก Rear irradiance ก่อนติดตั้ง</span>
-                    </label>
-                  ) : null}
 
                   {bifacialMode === "USER_DESIGN_CASE" ? (
                     <div className="bifacial-override__values">

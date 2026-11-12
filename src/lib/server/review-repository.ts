@@ -25,6 +25,7 @@ export interface ReviewQueueRow {
   exactModel: string;
   hasSourceUrl: boolean;
   manufacturer: string;
+  isBifacial: boolean;
   productModelId: string;
   revisionId: string;
   revisionLabel: string;
@@ -65,7 +66,8 @@ export async function listReviewQueue(): Promise<ReviewQueueRow[]> {
         CASE WHEN pv_module_spec.beta_vmp_per_c IS NOT NULL THEN 'datasheet' END
       ) AS "betaVmpSource",
       (inverter_spec.max_dc_power_wp IS NOT NULL) AS "hasMaxDcPower",
-      (inverter_spec.max_recommended_pv_wp IS NOT NULL) AS "hasMaxRecommendedPv"
+      (inverter_spec.max_recommended_pv_wp IS NOT NULL) AS "hasMaxRecommendedPv",
+      (COALESCE(pv_module_spec.bifaciality_factor, 0) > 0) AS "isBifacial"
     FROM datasheet_revision
     JOIN product_model ON product_model.id = datasheet_revision.product_model_id
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
@@ -279,6 +281,7 @@ export async function applyReviewAction(input: {
         hasSpec: boolean;
         hasMaxDcPower: boolean;
         hasMaxRecommendedPv: boolean;
+        isBifacial: boolean;
         productModelId: string;
         sourcePages: Record<string, string | undefined>;
         specEnteredBy: string | null;
@@ -307,6 +310,11 @@ export async function applyReviewAction(input: {
           SELECT 1 FROM inverter_spec
           WHERE datasheet_revision_id = datasheet_revision.id AND max_recommended_pv_wp IS NOT NULL
         ) AS "hasMaxRecommendedPv",
+        EXISTS (
+          SELECT 1 FROM pv_module_spec
+          WHERE datasheet_revision_id = datasheet_revision.id
+            AND COALESCE(bifaciality_factor, 0) > 0
+        ) AS "isBifacial",
         (datasheet_revision.source_url IS NOT NULL) AS "hasSourceUrl",
         EXISTS (
           SELECT 1
@@ -454,6 +462,7 @@ export async function applyReviewAction(input: {
         ${transaction.json({ state: revision.state })},
         ${transaction.json({
           confirmedFields: input.confirmedFields,
+          bifacialPolicy: revision.isBifacial ? "front_side_only_system_override" : null,
           selfVerified: input.action === "verify" && revision.specEnteredBy === input.actor.userId,
           state: next,
         })},
@@ -472,7 +481,10 @@ export async function applyReviewAction(input: {
         'datasheet_revision',
         ${input.revisionId}::uuid,
         ${transaction.json({ state: revision.state })},
-        ${transaction.json({ state: next })}
+        ${transaction.json({
+          bifacialPolicy: revision.isBifacial ? "front_side_only_system_override" : null,
+          state: next,
+        })}
       )
     `;
 

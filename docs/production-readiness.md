@@ -2,7 +2,7 @@
 
 ## Release boundary
 
-Public output is a preliminary DC-side engineering aid. It is not a final design approval. The order/contact action is available only when both equipment revisions are verified, every safety-critical input is present, no unresolved bifacial-current model exists, and at least one configuration passes every hard rule.
+Public output is a preliminary DC-side engineering aid. It is not a final design approval. The order/contact action is available only when both equipment revisions are verified, every safety-critical input is present, and at least one configuration passes every hard rule. A bifacial revision without an approved rear-side design case uses the explicit Front-side-only system override and does not include rear-irradiance gain.
 
 ## Required production configuration
 

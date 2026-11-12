@@ -54,7 +54,7 @@ The engineering owner approved both assumptions below on 2026-11-09:
 1. Use 25% rear-side power gain as the design case because the Datasheet publishes complete electrical values for that case.
 2. Use `βVmp = γPmax − αIsc = -0.260%/°C − 0.050%/°C = -0.310%/°C` as a conservative modeled coefficient. The manufacturer does not publish `βVmp`; the database and UI must label this value as derived, not measured.
 
-Other bifacial revisions remain fail-closed until the engineering owner approves a revision-specific design case.
+Other bifacial revisions use the Front-side-only system override until the engineering owner approves a revision-specific rear-side design case. The override uses the published front-side Pmax, Voc, Vmp, Isc and Imp and excludes rear-irradiance gain.
 
 ## Golden assumptions
 

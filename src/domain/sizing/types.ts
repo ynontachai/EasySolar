@@ -85,7 +85,12 @@ export interface SizingWalkthrough {
     betaVmpInputSource: "DATASHEET" | "DERIVED" | "USER_OVERRIDE" | "MISSING";
     betaVocInputSource: "DATASHEET" | "USER_OVERRIDE" | "MISSING";
   };
-  designBasis: "FRONT_SIDE" | "FRONT_SIDE_USER_OVERRIDE" | "APPROVED_REAR_SIDE" | "USER_REAR_SIDE";
+  designBasis:
+    | "FRONT_SIDE"
+    | "FRONT_SIDE_SYSTEM_OVERRIDE"
+    | "FRONT_SIDE_USER_OVERRIDE"
+    | "APPROVED_REAR_SIDE"
+    | "USER_REAR_SIDE";
   designElectricals: {
     impA: number;
     iscA: number;
