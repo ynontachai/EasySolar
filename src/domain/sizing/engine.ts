@@ -9,8 +9,12 @@ import type {
   SizingResult,
 } from "./types";
 import { buildWalkthrough } from "./walkthrough";
+import {
+  MAX_RECOMMENDED_DC_AC_RATIO,
+  MIN_RECOMMENDED_DC_AC_RATIO,
+} from "./constants";
 
-export const ENGINE_VERSION = "0.5.0";
+export const ENGINE_VERSION = "0.6.0";
 const STC_REFERENCE_TEMPERATURE_C = 25;
 const MAX_SERIES_MODULES_TO_ENUMERATE = 60;
 const MAX_CANDIDATES_TO_RETURN = 5;
@@ -559,6 +563,11 @@ export function evaluateSizing(
   });
 
   const rankedCandidates = candidates
+    .filter(
+      (candidate) =>
+        candidate.designDcAcRatio >= MIN_RECOMMENDED_DC_AC_RATIO &&
+        candidate.designDcAcRatio <= MAX_RECOMMENDED_DC_AC_RATIO,
+    )
     .sort(
       (left, right) =>
         Math.abs(left.totalDcPowerWp - assumptions.targetDcPowerWp) -

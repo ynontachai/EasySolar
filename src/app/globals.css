@@ -8233,39 +8233,6 @@ a {
   color: #667085;
 }
 
-.calc__verdict {
-  background: #f4f6fa;
-  border-left: 4px solid var(--sun-deep);
-  display: grid;
-  gap: 4px;
-  padding: 16px 20px;
-}
-
-.calc__verdict--incompatible {
-  border-left-color: #c0392b;
-}
-
-.calc__verdict span {
-  color: #667085;
-  font-size: 14px;
-}
-
-.calc__verdict ul {
-  display: grid;
-  font-size: 13px;
-  gap: 3px;
-  margin: 6px 0 0;
-  padding-left: 20px;
-}
-
-.calc__override-warning {
-  border-top: 1px solid #e6c77a;
-  color: #7a4c00 !important;
-  font-weight: 600;
-  margin: 8px 0 0;
-  padding-top: 10px;
-}
-
 .calc__steps {
   display: grid;
   gap: 32px;
@@ -8323,6 +8290,15 @@ a {
 .calc__missing {
   color: #667085;
   margin: 0;
+}
+
+.calc__missing p {
+  margin: 0;
+}
+
+.calc__missing ul {
+  margin: 8px 0 0;
+  padding-left: 20px;
 }
 
 .mark {

@@ -3,7 +3,11 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { AlertTriangle, Check, ChevronRight, Download, X } from "lucide-react";
-import type { OverallStatus, RuleFinding, RuleStatus, SizingResult } from "@/domain/sizing/types";
+import {
+  MAX_RECOMMENDED_DC_AC_RATIO,
+  MIN_RECOMMENDED_DC_AC_RATIO,
+} from "@/domain/sizing/constants";
+import type { RuleFinding, RuleStatus, SizingResult } from "@/domain/sizing/types";
 import { ThemeSelect } from "@/components/theme-select";
 
 export interface CheckerEquipmentOption {
@@ -31,21 +35,6 @@ interface SpecRow {
   source?: "DATASHEET" | "DERIVED" | "USER_OVERRIDE" | "SYSTEM_OVERRIDE" | "MISSING";
   value: string;
 }
-
-const verdictCopy: Record<OverallStatus, { label: string; detail: string }> = {
-  PRELIMINARY_COMPATIBLE: {
-    label: "จับคู่นี้ใช้ได้เบื้องต้น",
-    detail: "ผ่านเงื่อนไขไฟฟ้าที่ระบบตรวจ ควรให้วิศวกรตรวจทานก่อนติดตั้งจริง",
-  },
-  INCOMPATIBLE: {
-    label: "จับคู่นี้ใช้ไม่ได้ตามเงื่อนไข",
-    detail: "ไม่มีรูปแบบการต่อที่ผ่านเงื่อนไข ลองเปลี่ยนรุ่นอินเวอร์เตอร์หรือแผง",
-  },
-  INSUFFICIENT_DATA: {
-    label: "ข้อมูลยังไม่พอยืนยัน",
-    detail: "ระบบหยุดการแนะนำชุดจนกว่าจะมีข้อมูลสำคัญครบและตรวจสอบกับ Datasheet แล้ว",
-  },
-};
 
 function StatusMark({ status }: { status: RuleStatus }) {
   const isPass = status === "PASS";
@@ -232,6 +221,32 @@ function optionalNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+type TrackerWalkthrough = SizingResult["walkthrough"]["trackers"][number];
+
+function groupTrackersBySeriesRange(trackers: TrackerWalkthrough[]) {
+  const groups = new Map<string, TrackerWalkthrough[]>();
+
+  for (const tracker of trackers) {
+    const range = tracker.seriesRange;
+    const key = [
+      tracker.mpptMinV,
+      tracker.mpptMaxV,
+      range.voltageCeilingV,
+      range.maxModulesByColdVoc,
+      range.maxModulesByColdVmp,
+      range.maxModules,
+      range.minModulesByMppt,
+      range.minModulesByStartup,
+      range.minModules,
+    ].join("|");
+    const group = groups.get(key) ?? [];
+    group.push(tracker);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()];
+}
+
 export function CheckerWorkspace({
   initialInverterId,
   initialPvModuleId,
@@ -341,13 +356,12 @@ export function CheckerWorkspace({
   const calculationVmpV = design?.vmpV ?? pv.vmpV;
   const calculationVocV = design?.vocV ?? pv.vocV;
   const inv = wt.inverterLimits;
-  const verdict = verdictCopy[result.overallStatus];
   const pvOption = pvOptions.find((option) => option.value === result.equipment.pvModule.id);
   const inverterOption = inverterOptions.find((option) => option.value === result.equipment.inverter.id);
   const bestCandidate = result.candidates[0];
   const hasUserOverrides = result.overrides !== null;
-  const hasBifacialSystemOverride = wt.designBasis === "FRONT_SIDE_SYSTEM_OVERRIDE";
   const canOrder = result.overallStatus === "PRELIMINARY_COMPATIBLE" && Boolean(bestCandidate) && result.blockingReasons.length === 0;
+  const trackerSeriesGroups = groupTrackersBySeriesRange(wt.trackers);
 
   return (
     <div className="calc">
@@ -416,36 +430,10 @@ export function CheckerWorkspace({
                   { label: design.source === "USER_OVERRIDE" ? "Rear-side design case" : "Approved rear-gain case", source: design.source, value: design.source === "USER_OVERRIDE" ? `${design.rearGainPercent.toFixed(0)}% · ผู้ใช้กรอก` : `${design.rearGainPercent.toFixed(0)}% · Datasheet หน้า ${design.sourcePage}` },
                   { label: "Pmax / Isc / Imp ที่ใช้ตรวจ", source: design.source, value: `${design.pmaxWp} W · ${design.iscA} A · ${design.impA} A` },
                 ]
-              : pv.isBifacial
-                ? [{
-                    label: "Bifacial design basis",
-                    source: "SYSTEM_OVERRIDE" as const,
-                    value: "Front-side only · ยังไม่รวม Rear irradiance",
-                  }]
-                : []),
+              : []),
           ]}
           title={`${result.equipment.pvModule.manufacturer} ${result.equipment.pvModule.model}`}
         />
-      </div>
-
-      <div className={`calc__verdict calc__verdict--${result.overallStatus.toLowerCase()}`}>
-        <strong>{verdict.label}</strong>
-        <span>{verdict.detail}</span>
-        {result.blockingReasons.length ? (
-          <ul>
-            {result.blockingReasons.map((reason) => <li key={reason}>{reason}</li>)}
-          </ul>
-        ) : null}
-        {hasUserOverrides ? (
-          <p className="calc__override-warning">
-            ผลนี้มีค่าที่ผู้ใช้กรอกทดแทน Datasheet ต้องให้วิศวกรตรวจหลักฐานก่อนนำไปออกแบบหรือติดตั้ง
-          </p>
-        ) : null}
-        {hasBifacialSystemOverride ? (
-          <p className="calc__override-warning">
-            แผง Bifacial นี้ใช้ System override แบบ Front-side only ผลลัพธ์ไม่รวมกำลังและกระแสเพิ่มจาก Rear irradiance
-          </p>
-        ) : null}
       </div>
 
       <div className="calc__steps">
@@ -501,7 +489,8 @@ export function CheckerWorkspace({
 
         <Step number={3} title="จำนวนแผงต่ออนุกรม / สตริง">
           <div className="tracker-checks">
-              {wt.trackers.map((tracker) => {
+              {trackerSeriesGroups.map((trackers) => {
+                const tracker = trackers[0];
                 const range = tracker.seriesRange;
                 const isComplete = range.minModules !== null && range.maxModules !== null;
                 const isValid =
@@ -509,8 +498,8 @@ export function CheckerWorkspace({
                   range.maxModules !== null &&
                   range.minModules <= range.maxModules;
                 return (
-                  <section className="tracker-check" key={tracker.trackerIndex}>
-                    <h4>MPPT {tracker.trackerIndex}</h4>
+                  <section className="tracker-check" key={trackers.map(({ trackerIndex }) => trackerIndex).join("-")}>
+                    <h4>{trackers.map(({ trackerIndex }) => `MPPT ${trackerIndex}`).join(" / ")}</h4>
                     <div className="formula">
                       <p><b>มากสุดจาก Voc</b> = Vdc สูงสุด ÷ Voc เย็น</p>
                       <p>{range.maxModulesByColdVoc === null ? "คำนวณไม่ได้: ไม่พบ βVoc" : `${range.voltageCeilingV} ÷ ${wt.temperature.vocColdV} = ${range.maxModulesByColdVoc}`}</p>
@@ -527,10 +516,10 @@ export function CheckerWorkspace({
                     </div>
                     <p className="calc__answer">
                       {!isComplete
-                        ? `MPPT ${tracker.trackerIndex}: ข้อมูลอุณหภูมิยังไม่ครบ จึงยังไม่สร้างช่วงแนะนำ`
+                        ? `ข้อมูลอุณหภูมิยังไม่ครบ จึงยังไม่สร้างช่วงแนะนำ`
                         : isValid
-                        ? `MPPT ${tracker.trackerIndex}: ${range.minModules}–${range.maxModules} แผงต่อสตริง`
-                        : `MPPT ${tracker.trackerIndex}: ไม่มีจำนวนแผงที่ผ่านทุกขอบเขต`}
+                        ? `${range.minModules}–${range.maxModules} แผงต่อสตริง`
+                        : `ไม่มีจำนวนแผงที่ผ่านทุกขอบเขต`}
                     </p>
                   </section>
                 );
@@ -565,7 +554,10 @@ export function CheckerWorkspace({
           </div>
         </Step>
 
-        <Step number={5} title="รูปแบบการต่อที่เหมาะสม">
+        <Step
+          number={5}
+          title={`รูปแบบการต่อที่เหมาะสม (DC/AC ${MIN_RECOMMENDED_DC_AC_RATIO.toFixed(2)}–${MAX_RECOMMENDED_DC_AC_RATIO.toFixed(2)})`}
+        >
           {result.candidates.length ? (
             <div className="layout-list">
               {result.candidates.map((candidate) => (
@@ -575,9 +567,9 @@ export function CheckerWorkspace({
                       แบบที่ {candidate.rank} · {(candidate.totalDcPowerWp / 1000).toFixed(2)} kWp · {candidate.totalModules} แผง
                     </strong>
                     <span>
-                      DC/AC {candidate.dcAcRatio.toFixed(2)}
+                      DC/AC {candidate.designDcAcRatio.toFixed(2)}
                       {candidate.designTotalDcPowerWp !== candidate.totalDcPowerWp
-                        ? ` · design ${(candidate.designTotalDcPowerWp / 1000).toFixed(2)} kW (${candidate.designDcAcRatio.toFixed(2)})`
+                        ? ` · กำลังออกแบบ ${(candidate.designTotalDcPowerWp / 1000).toFixed(2)} kW`
                         : ""}
                     </span>
                   </header>
@@ -586,11 +578,18 @@ export function CheckerWorkspace({
               ))}
             </div>
           ) : (
-            <p className="calc__missing">
-              {result.blockingReasons.length
-                ? "ระบบไม่สร้างชุดแนะนำจนกว่าข้อมูลสำคัญจะครบและผ่านการตรวจสอบ"
-                : "ไม่พบรูปแบบการต่อที่ผ่านเงื่อนไข ลองเปลี่ยนรุ่นหรือปรับเงื่อนไขด้านล่าง"}
-            </p>
+            <div className="calc__missing">
+              <p>
+                {result.blockingReasons.length
+                  ? "ระบบไม่สร้างชุดแนะนำจนกว่าข้อมูลสำคัญจะครบและผ่านการตรวจสอบ"
+                  : `ไม่พบรูปแบบการต่อที่ผ่านเงื่อนไขและมี DC/AC อยู่ในช่วง ${MIN_RECOMMENDED_DC_AC_RATIO.toFixed(2)}–${MAX_RECOMMENDED_DC_AC_RATIO.toFixed(2)} ลองเปลี่ยนรุ่นหรือปรับเงื่อนไขด้านล่าง`}
+              </p>
+              {result.blockingReasons.length ? (
+                <ul>
+                  {result.blockingReasons.map((reason) => <li key={reason}>{reason}</li>)}
+                </ul>
+              ) : null}
+            </div>
           )}
         </Step>
       </div>

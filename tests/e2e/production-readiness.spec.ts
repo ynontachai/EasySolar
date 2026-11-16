@@ -13,7 +13,8 @@ for (const viewport of viewports) {
 
     await expect(page.getByRole("heading", { level: 1 })).toContainText("จับคู่แผงโซลาร์");
     await expect(page.locator("#calculator")).toBeVisible();
-    await expect(page.getByText("ข้อมูลยังไม่พอยืนยัน", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /รูปแบบการต่อที่เหมาะสม.*DC\/AC 1\.20–1\.50/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "MPPT 1 / MPPT 2", exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "ส่งให้ทีมวิศวกรตรวจทาน" })).toHaveCount(0);
 
     const hasOverflow = await page.evaluate(

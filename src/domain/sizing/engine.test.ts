@@ -40,6 +40,25 @@ describe("evaluateSizing", () => {
     expect(first.candidates).toEqual(second.candidates);
   });
 
+  it("returns recommendations only within the requested DC/AC ratio range", () => {
+    const verifiedDatasheet = {
+      ...demoPvModules[0].datasheet,
+      verificationStatus: "verified" as const,
+      verifiedAt: "2026-11-16T00:00:00.000Z",
+    };
+    const result = evaluateSizing({
+      pvModule: { ...demoPvModules[0], datasheet: verifiedDatasheet },
+      inverter: {
+        ...demoInverters[0],
+        datasheet: { ...verifiedDatasheet, revisionId: demoInverters[0].datasheet.revisionId },
+      },
+      assumptions,
+    }, context);
+
+    expect(result.candidates.length).toBeGreaterThan(0);
+    expect(result.candidates.every(({ designDcAcRatio }) => designDcAcRatio >= 1.2 && designDcAcRatio <= 1.5)).toBe(true);
+  });
+
   it("can issue preliminary compatible only when both revisions are verified", () => {
     const pvModule = {
       ...demoPvModules[0],
@@ -293,13 +312,15 @@ describe("evaluateSizing", () => {
       impA: 18.1,
       safetyFactor: 1.25,
     });
-    expect(best.totalModules).toBe(17);
-    expect(best.totalDcPowerWp).toBe(10_965);
-    expect(best.designTotalDcPowerWp).toBe(13_736);
+    expect(best.totalModules).toBe(18);
+    expect(best.totalDcPowerWp).toBe(11_610);
+    expect(best.designTotalDcPowerWp).toBe(14_544);
+    expect(best.designDcAcRatio).toBeGreaterThanOrEqual(1.2);
+    expect(best.designDcAcRatio).toBeLessThanOrEqual(1.5);
     expect(best.mpptConfigurations.map((item) => [item.seriesModules, item.parallelStrings])).toEqual([
       [6, 1],
       [6, 1],
-      [5, 1],
+      [6, 1],
     ]);
   });
 
