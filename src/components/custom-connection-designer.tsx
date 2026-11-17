@@ -16,13 +16,16 @@ import {
 } from "@/domain/sizing/constants";
 import type { SizingResult } from "@/domain/sizing/types";
 
-function CheckStatus({ status }: { status: CustomCheckStatus }) {
-  const label = status === "PASS" ? "ผ่าน" : status === "FAIL" ? "ไม่ผ่าน" : "ข้อมูลไม่ครบ";
+function statusLabel(status: CustomCheckStatus) {
+  return status === "PASS" ? "ผ่าน" : status === "FAIL" ? "ไม่ผ่าน" : "ข้อมูลไม่ครบ";
+}
+
+function CheckStatus({ compact = false, status }: { compact?: boolean; status: CustomCheckStatus }) {
+  const label = statusLabel(status);
   return (
     <span
       aria-label={label}
-      className={`custom-check__status custom-check__status--${status.toLowerCase()}`}
-      role="img"
+      className={`custom-check__status custom-check__status--${status.toLowerCase()}${compact ? " custom-check__status--compact" : ""}`}
     >
       {status === "PASS" ? (
         <Check aria-hidden="true" size={16} />
@@ -31,6 +34,7 @@ function CheckStatus({ status }: { status: CustomCheckStatus }) {
       ) : (
         <AlertTriangle aria-hidden="true" size={16} />
       )}
+      {compact ? null : <span>{label}</span>}
     </span>
   );
 }
@@ -47,11 +51,13 @@ function MetricRow({
   value: string;
 }) {
   return (
-    <li className="custom-check__metric">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      <span>{limit}</span>
-      <CheckStatus status={status} />
+    <li className={`custom-check__metric custom-check__metric--${status.toLowerCase()}`}>
+      <span className="custom-check__metric-label">{label}</span>
+      <div className="custom-check__metric-result">
+        <strong>{value}</strong>
+        <span>{limit}</span>
+      </div>
+      <CheckStatus compact status={status} />
     </li>
   );
 }
@@ -176,6 +182,7 @@ export function CustomConnectionDesigner({ result }: { result: SizingResult }) {
         <section aria-live="polite" className="custom-check" aria-labelledby="custom-check-heading">
           <header>
             <div>
+              <span className="custom-check__eyebrow">ผลการประเมินทางวิศวกรรม</span>
               <h4 id="custom-check-heading">ผลตรวจสอบแบบ Custom</h4>
               <p>{resultLabel(evaluation.overallStatus)}</p>
             </div>
@@ -214,7 +221,13 @@ export function CustomConnectionDesigner({ result }: { result: SizingResult }) {
           <div className="custom-check__trackers">
             {evaluation.trackers.map((tracker) => (
               <section key={tracker.trackerIndex}>
-                <h5>MPPT {tracker.trackerIndex}</h5>
+                <div className="custom-check__tracker-heading">
+                  <div>
+                    <span>ช่องรับอินเวอร์เตอร์</span>
+                    <h5>MPPT {tracker.trackerIndex}</h5>
+                  </div>
+                  <p><strong>{tracker.activeStrings}</strong> / {tracker.inputCount} String ใช้งาน</p>
+                </div>
                 <ul className="custom-check__metrics">
                   <MetricRow
                     label="จำนวน String ที่ใช้งาน"
@@ -246,7 +259,10 @@ export function CustomConnectionDesigner({ result }: { result: SizingResult }) {
 
                 {tracker.strings.map((string) => (
                   <div className="custom-check__string" key={string.stringIndex}>
-                    <h6>String {string.stringIndex}</h6>
+                    <div className="custom-check__string-heading">
+                      <span>รายละเอียดการต่ออนุกรม</span>
+                      <h6>String {string.stringIndex}</h6>
+                    </div>
                     <ul className="custom-check__metrics">
                       <MetricRow
                         label="จำนวนแผงต่อสตริง"
