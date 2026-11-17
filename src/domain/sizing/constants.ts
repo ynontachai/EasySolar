@@ -1,2 +1,3 @@
 export const MIN_RECOMMENDED_DC_AC_RATIO = 1.2;
 export const MAX_RECOMMENDED_DC_AC_RATIO = 1.5;
+export const MAX_SERIES_MODULES = 60;

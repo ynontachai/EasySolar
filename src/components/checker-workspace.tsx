@@ -8,6 +8,7 @@ import {
   MIN_RECOMMENDED_DC_AC_RATIO,
 } from "@/domain/sizing/constants";
 import type { RuleFinding, RuleStatus, SizingResult } from "@/domain/sizing/types";
+import { CustomConnectionDesigner } from "@/components/custom-connection-designer";
 import { ThemeSelect } from "@/components/theme-select";
 
 export interface CheckerEquipmentOption {
@@ -505,14 +506,14 @@ export function CheckerWorkspace({
                       <p>{range.maxModulesByColdVoc === null ? "คำนวณไม่ได้: ไม่พบ βVoc" : `${range.voltageCeilingV} ÷ ${wt.temperature.vocColdV} = ${range.maxModulesByColdVoc}`}</p>
                       <p><b>มากสุดจาก Vmp</b> = MPPT max ÷ Vmp เย็น</p>
                       <p>{range.maxModulesByColdVmp === null ? "คำนวณไม่ได้: ไม่พบ βVmp" : `${tracker.mpptMaxV} ÷ ${wt.temperature.vmpColdV} = ${range.maxModulesByColdVmp}`}</p>
-                      <strong>{range.maxModules === null ? "ยังสรุปจำนวนสูงสุดไม่ได้" : `ใช้ขอบเขตที่เข้มกว่า: ${range.maxModules} แผง`}</strong>
+                      <strong>{range.maxModules === null ? "ยังสรุปจำนวนสูงสุดไม่ได้" : `จำนวนแผงต่อสตริง มากสุด ไม่เกิน ${range.maxModules} แผง`}</strong>
                     </div>
                     <div className="formula">
                       <p><b>น้อยสุดจากช่วง MPPT</b> = MPPT min ÷ Vmp ร้อน</p>
                       <p>{range.minModulesByMppt === null ? "คำนวณไม่ได้: ไม่พบ βVmp" : `${tracker.mpptMinV} ÷ ${wt.temperature.vmpHotV} = ${range.minModulesByMppt}`}</p>
                       <p><b>น้อยสุดจากแรงดันเริ่มทำงาน</b> = Startup voltage ÷ Vmp ร้อน</p>
                       <p>{range.minModulesByStartup === null ? "คำนวณไม่ได้: ไม่พบ βVmp หรือ Startup voltage" : `${inv.startupVoltageV} ÷ ${wt.temperature.vmpHotV} = ${range.minModulesByStartup}`}</p>
-                      <strong>{range.minModules === null ? "ยังสรุปจำนวนต่ำสุดไม่ได้" : `ใช้ขอบเขตที่เข้มกว่า: ${range.minModules} แผง`} {isComplete ? <Pass ok={isValid} /> : null}</strong>
+                      <strong>{range.minModules === null ? "ยังสรุปจำนวนต่ำสุดไม่ได้" : `จำนวนแผงต่อสตริง น้อยสุด ${range.minModules} แผง`} {isComplete ? <Pass ok={isValid} /> : null}</strong>
                     </div>
                     <p className="calc__answer">
                       {!isComplete
@@ -591,6 +592,10 @@ export function CheckerWorkspace({
               ) : null}
             </div>
           )}
+        </Step>
+
+        <Step number={6} title="ออกแบบการต่อแบบ Custom">
+          <CustomConnectionDesigner key={result.calculationId} result={result} />
         </Step>
       </div>
 

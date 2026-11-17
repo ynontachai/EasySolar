@@ -15,6 +15,7 @@ for (const viewport of viewports) {
     await expect(page.locator("#calculator")).toBeVisible();
     await expect(page.getByRole("heading", { name: /รูปแบบการต่อที่เหมาะสม.*DC\/AC 1\.20–1\.50/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: "MPPT 1 / MPPT 2", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /ออกแบบการต่อแบบ Custom/ })).toBeVisible();
     await expect(page.getByRole("link", { name: "ส่งให้ทีมวิศวกรตรวจทาน" })).toHaveCount(0);
 
     const hasOverflow = await page.evaluate(
@@ -52,6 +53,15 @@ test("formula uses datasheet percent units and incomplete data blocks ordering",
   await expect(page.getByText("βVmp% ÷ 100", { exact: false }).first()).toBeVisible();
   await expect(page.getByText("ยังไม่เปิดการสั่งซื้อชุดนี้")).toBeVisible();
   await expect(page.getByText("Datasheet แผงยังไม่ผ่านการตรวจสอบ", { exact: true })).toBeVisible();
+});
+
+test("custom layout follows inverter MPPT and string input counts", async ({ page }) => {
+  await page.goto("/");
+
+  await expect(page.getByRole("spinbutton", { name: /จำนวนแผง MPPT \d String \d$/ })).toHaveCount(4);
+  await page.getByRole("button", { name: "ตรวจสอบแบบ Custom" }).click();
+  await expect(page.getByRole("heading", { name: "ผลตรวจสอบแบบ Custom" })).toBeVisible();
+  await expect(page.getByText("จำนวน String ที่ใช้งาน", { exact: true })).toHaveCount(2);
 });
 
 test("production responses include security headers", async ({ request }) => {

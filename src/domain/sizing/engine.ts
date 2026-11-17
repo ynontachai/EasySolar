@@ -10,13 +10,13 @@ import type {
 } from "./types";
 import { buildWalkthrough } from "./walkthrough";
 import {
+  MAX_SERIES_MODULES,
   MAX_RECOMMENDED_DC_AC_RATIO,
   MIN_RECOMMENDED_DC_AC_RATIO,
 } from "./constants";
 
 export const ENGINE_VERSION = "0.6.0";
 const STC_REFERENCE_TEMPERATURE_C = 25;
-const MAX_SERIES_MODULES_TO_ENUMERATE = 60;
 const MAX_CANDIDATES_TO_RETURN = 5;
 
 function getApplicableOverrides(input: SizingInput): SizingInput["overrides"] {
@@ -286,7 +286,7 @@ interface TrackerOption {
 
 function buildTrackerOptions(input: SizingInput, tracker: MpptTrackerSpec): TrackerOption[] {
   const options: TrackerOption[] = [];
-  for (let seriesModules = 1; seriesModules <= MAX_SERIES_MODULES_TO_ENUMERATE; seriesModules += 1) {
+  for (let seriesModules = 1; seriesModules <= MAX_SERIES_MODULES; seriesModules += 1) {
     for (let parallelStrings = 1; parallelStrings <= tracker.inputCount; parallelStrings += 1) {
       const findings = evaluateTracker(input, tracker, seriesModules, parallelStrings);
       if (findings.some((finding) => finding.status === "FAIL" || finding.status === "INCOMPLETE")) {
