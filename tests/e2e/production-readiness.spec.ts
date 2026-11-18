@@ -58,10 +58,14 @@ test("formula uses datasheet percent units and incomplete data blocks ordering",
 test("custom layout follows inverter MPPT and string input counts", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("spinbutton", { name: /จำนวนแผง MPPT \d String \d$/ })).toHaveCount(4);
+  await expect(page.getByRole("spinbutton", { name: /จำนวนแผง MPPT \d String \d$/ })).toHaveCount(2);
+  await expect(page.getByRole("spinbutton", { name: /String 2$/ })).toHaveCount(0);
   await page.getByRole("button", { name: "ตรวจสอบแบบ Custom" }).click();
   await expect(page.getByRole("heading", { name: "ผลตรวจสอบแบบ Custom" })).toBeVisible();
   await expect(page.getByText("จำนวน String ที่ใช้งาน", { exact: true })).toHaveCount(2);
+  const dcAcMetric = page.locator(".custom-check__metric").filter({ hasText: "DC / AC" });
+  await expect(dcAcMetric.locator(".custom-check__status")).toHaveCount(0);
+  await expect(page.locator(".custom-check").getByRole("heading", { name: "String 2" })).toHaveCount(0);
 });
 
 test("production responses include security headers", async ({ request }) => {

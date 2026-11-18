@@ -8690,6 +8690,13 @@ a {
   font-size: 12px;
 }
 
+.custom-string__unavailable {
+  color: #805b10;
+  font-size: 13px;
+  margin: 0;
+  padding: 16px;
+}
+
 .custom-layout__check-button {
   justify-self: start;
 }

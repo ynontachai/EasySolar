@@ -5,6 +5,7 @@ import { AlertTriangle, Check, Minus, Plus, X } from "lucide-react";
 import {
   createDefaultCustomLayout,
   evaluateCustomLayout,
+  getMaxUsableStrings,
   type CustomCheckStatus,
   type CustomLayoutEvaluation,
   type CustomTrackerLayout,
@@ -62,6 +63,26 @@ function MetricRow({
   );
 }
 
+function InfoMetricRow({
+  label,
+  limit,
+  value,
+}: {
+  label: string;
+  limit: string;
+  value: string;
+}) {
+  return (
+    <li className="custom-check__metric custom-check__metric--info">
+      <span className="custom-check__metric-label">{label}</span>
+      <div className="custom-check__metric-result">
+        <strong>{value}</strong>
+        <span>{limit}</span>
+      </div>
+    </li>
+  );
+}
+
 function resultLabel(status: CustomCheckStatus) {
   if (status === "PASS") return "แบบ Custom ผ่านเงื่อนไขที่ระบบตรวจ";
   if (status === "FAIL") return "แบบ Custom ยังไม่ผ่านเงื่อนไข";
@@ -94,7 +115,7 @@ export function CustomConnectionDesigner({ result }: { result: SizingResult }) {
   return (
     <div className="custom-layout">
       <p className="custom-layout__intro">
-        กำหนดจำนวนแผงในแต่ละ String ได้เอง โดยจำนวน MPPT และช่อง String อ้างอิงจากสเปกอินเวอร์เตอร์ที่เลือก ค่า 0 หมายถึงไม่ใช้ String นั้น
+        กำหนดจำนวนแผงในแต่ละ String ได้เอง ระบบแสดงเฉพาะจำนวน String ที่ผ่านข้อจำกัดกระแสของ MPPT ตามผลในข้อ 4
       </p>
 
       <form
@@ -106,9 +127,18 @@ export function CustomConnectionDesigner({ result }: { result: SizingResult }) {
         <div className="connection-layout custom-layout__connections">
           {layout.map((trackerLayout) => {
             const activeStrings = trackerLayout.seriesModules.filter((modules) => modules > 0).length;
+            const tracker = result.walkthrough.trackers.find(
+              (item) => item.trackerIndex === trackerLayout.trackerIndex,
+            );
+            const maxUsableStrings = tracker ? getMaxUsableStrings(tracker) : 0;
             return (
               <section className="connection-mppt" key={trackerLayout.trackerIndex}>
                 <div className="connection-mppt__strings">
+                  {maxUsableStrings === 0 ? (
+                    <p className="custom-string__unavailable">
+                      MPPT นี้ไม่มีจำนวน String ที่ผ่านข้อจำกัดกระแส
+                    </p>
+                  ) : null}
                   {trackerLayout.seriesModules.map((seriesModules, stringIndex) => (
                     <div className="connection-string custom-string" key={stringIndex}>
                       <span>String {stringIndex + 1}</span>
@@ -166,7 +196,8 @@ export function CustomConnectionDesigner({ result }: { result: SizingResult }) {
                 <div className="connection-mppt__target">
                   <small>INVERTER</small>
                   <strong>MPPT {trackerLayout.trackerIndex}</strong>
-                  <span>{activeStrings} / {trackerLayout.seriesModules.length} String</span>
+                  <span>{activeStrings} / {maxUsableStrings} String ใช้ได้</span>
+                  {tracker ? <small>{tracker.inputCount} physical input</small> : null}
                 </div>
               </section>
             );
@@ -198,10 +229,9 @@ export function CustomConnectionDesigner({ result }: { result: SizingResult }) {
               status={evaluation.dataStatus}
               value={evaluation.dataStatus === "PASS" ? "พร้อมตรวจ" : "ข้อมูลไม่ครบ"}
             />
-            <MetricRow
+            <InfoMetricRow
               label="DC / AC"
-              limit={`อยู่ในช่วง ${MIN_RECOMMENDED_DC_AC_RATIO.toFixed(2)}–${MAX_RECOMMENDED_DC_AC_RATIO.toFixed(2)}`}
-              status={evaluation.dcAcStatus}
+              limit={`ช่วงแนะนำ ${MIN_RECOMMENDED_DC_AC_RATIO.toFixed(2)}–${MAX_RECOMMENDED_DC_AC_RATIO.toFixed(2)}`}
               value={evaluation.dcAcRatio.toFixed(2)}
             />
             <MetricRow
@@ -226,23 +256,25 @@ export function CustomConnectionDesigner({ result }: { result: SizingResult }) {
                     <span>ช่องรับอินเวอร์เตอร์</span>
                     <h5>MPPT {tracker.trackerIndex}</h5>
                   </div>
-                  <p><strong>{tracker.activeStrings}</strong> / {tracker.inputCount} String ใช้งาน</p>
+                  <p><strong>{tracker.activeStrings}</strong> / {tracker.maxUsableStrings} String ใช้งาน</p>
                 </div>
                 <ul className="custom-check__metrics">
                   <MetricRow
                     label="จำนวน String ที่ใช้งาน"
-                    limit={`1–${tracker.inputCount} String ตามสเปก`}
+                    limit={`สูงสุด ${tracker.maxUsableStrings} String จาก ${tracker.inputCount} physical input`}
                     status={tracker.topologyStatus}
                     value={`${tracker.activeStrings} String`}
                   />
-                  <MetricRow
-                    label="จำนวนแผงของ String ขนาน"
-                    limit="ต้องเท่ากันบน MPPT เดียวกัน"
-                    status={tracker.balancedStatus}
-                    value={tracker.activeStrings > 1
-                      ? `${tracker.strings.map((string) => string.seriesModules).join(" / ")} แผง`
-                      : "1 String"}
-                  />
+                  {tracker.maxUsableStrings > 1 ? (
+                    <MetricRow
+                      label="จำนวนแผงของ String ขนาน"
+                      limit="ต้องเท่ากันบน MPPT เดียวกัน"
+                      status={tracker.balancedStatus}
+                      value={tracker.activeStrings > 1
+                        ? `${tracker.strings.map((string) => string.seriesModules).join(" / ")} แผง`
+                        : "1 String"}
+                    />
+                  ) : null}
                   <MetricRow
                     label="Imp รวม"
                     limit={`≤ ${tracker.maxOperatingCurrentA} A`}

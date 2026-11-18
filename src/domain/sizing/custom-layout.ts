@@ -1,8 +1,4 @@
-import {
-  MAX_RECOMMENDED_DC_AC_RATIO,
-  MIN_RECOMMENDED_DC_AC_RATIO,
-} from "./constants";
-import type { SizingResult } from "./types";
+import type { SizingResult, SizingWalkthrough } from "./types";
 
 export type CustomCheckStatus = "PASS" | "FAIL" | "INCOMPLETE";
 
@@ -28,6 +24,7 @@ export interface CustomTrackerEvaluation {
   inputCount: number;
   maxOperatingCurrentA: number;
   maxShortCircuitCurrentA: number;
+  maxUsableStrings: number;
   mpptMaxV: number;
   mpptMinV: number;
   operatingA: number;
@@ -46,7 +43,6 @@ export interface CustomLayoutEvaluation {
   blockingReasons: string[];
   dataStatus: CustomCheckStatus;
   dcAcRatio: number;
-  dcAcStatus: CustomCheckStatus;
   maxDcPowerWp: number | null;
   maxModules: number | null;
   moduleCountStatus: CustomCheckStatus;
@@ -55,6 +51,15 @@ export interface CustomLayoutEvaluation {
   totalDesignDcPowerWp: number;
   totalModules: number;
   trackers: CustomTrackerEvaluation[];
+}
+
+type WalkthroughTracker = SizingWalkthrough["trackers"][number];
+
+export function getMaxUsableStrings(tracker: WalkthroughTracker) {
+  return tracker.stringRows.reduce(
+    (maximum, row) => row.pass ? Math.max(maximum, row.strings) : maximum,
+    0,
+  );
 }
 
 function round(value: number, digits = 2) {
@@ -81,12 +86,16 @@ export function createDefaultCustomLayout(result: SizingResult): CustomTrackerLa
       (candidate) => candidate.trackerIndex === tracker.trackerIndex,
     );
     const defaultModules = configuration?.seriesModules ?? tracker.seriesRange.minModules ?? 0;
-    const activeStrings = configuration?.parallelStrings ?? (defaultModules > 0 ? 1 : 0);
+    const maxUsableStrings = getMaxUsableStrings(tracker);
+    const activeStrings = Math.min(
+      maxUsableStrings,
+      configuration?.parallelStrings ?? (defaultModules > 0 ? 1 : 0),
+    );
 
     return {
       trackerIndex: tracker.trackerIndex,
       seriesModules: Array.from(
-        { length: tracker.inputCount },
+        { length: maxUsableStrings },
         (_, index) => index < activeStrings ? defaultModules : 0,
       ),
     };
@@ -99,21 +108,23 @@ export function evaluateCustomLayout(
 ): CustomLayoutEvaluation {
   const walkthrough = result.walkthrough;
   const designPmaxWp = walkthrough.designElectricals?.pmaxWp ?? walkthrough.pvModule.pmaxWp;
-  const totalModules = layout.reduce(
-    (total, tracker) => total + tracker.seriesModules.reduce(
-      (trackerTotal, modules) => trackerTotal + (Number.isInteger(modules) && modules > 0 ? modules : 0),
-      0,
-    ),
+  const totalModules = walkthrough.trackers.reduce(
+    (total, tracker) => {
+      const maxUsableStrings = getMaxUsableStrings(tracker);
+      const configuredStrings = layout.find(
+        (item) => item.trackerIndex === tracker.trackerIndex,
+      )?.seriesModules ?? [];
+      return total + configuredStrings.slice(0, maxUsableStrings).reduce(
+        (trackerTotal, modules) => trackerTotal + (Number.isInteger(modules) && modules > 0 ? modules : 0),
+        0,
+      );
+    },
     0,
   );
   const totalDesignDcPowerWp = round(totalModules * designPmaxWp);
   const dcAcRatio = round(
     totalDesignDcPowerWp / (walkthrough.inverterLimits.ratedAcKw * 1000),
     3,
-  );
-  const dcAcStatus = statusFor(
-    dcAcRatio >= MIN_RECOMMENDED_DC_AC_RATIO &&
-    dcAcRatio <= MAX_RECOMMENDED_DC_AC_RATIO,
   );
   const dataStatus: CustomCheckStatus = result.blockingReasons.length > 0 ? "INCOMPLETE" : "PASS";
   const powerStatus = statusFor(
@@ -130,13 +141,22 @@ export function evaluateCustomLayout(
   const trackers = walkthrough.trackers.map((tracker): CustomTrackerEvaluation => {
     const trackerLayout = layout.find((item) => item.trackerIndex === tracker.trackerIndex);
     const configuredStrings = trackerLayout?.seriesModules ?? [];
+    const maxUsableStrings = getMaxUsableStrings(tracker);
+    const requestedActiveStrings = configuredStrings.filter(
+      (seriesModules) => Number.isInteger(seriesModules) && seriesModules > 0,
+    ).length;
     const activeEntries = configuredStrings
+      .slice(0, maxUsableStrings)
       .map((seriesModules, index) => ({ seriesModules, stringIndex: index + 1 }))
       .filter(({ seriesModules }) => Number.isInteger(seriesModules) && seriesModules > 0);
     const activeStrings = activeEntries.length;
     const operatingA = round(activeStrings * walkthrough.currents.impA);
     const shortCircuitA = round(activeStrings * walkthrough.currents.designIscA);
-    const topologyStatus = statusFor(activeStrings >= 1 && activeStrings <= tracker.inputCount);
+    const topologyStatus = statusFor(
+      activeStrings >= 1 &&
+      requestedActiveStrings === activeStrings &&
+      activeStrings <= maxUsableStrings,
+    );
     const balancedStatus = statusFor(
       activeStrings === 0
         ? false
@@ -188,6 +208,7 @@ export function evaluateCustomLayout(
       inputCount: tracker.inputCount,
       maxOperatingCurrentA: tracker.maxOperatingCurrentA,
       maxShortCircuitCurrentA: tracker.maxShortCircuitCurrentA,
+      maxUsableStrings,
       mpptMaxV: tracker.mpptMaxV,
       mpptMinV: tracker.mpptMinV,
       operatingA,
@@ -205,7 +226,6 @@ export function evaluateCustomLayout(
 
   const overallStatus = combineStatuses([
     dataStatus,
-    dcAcStatus,
     powerStatus,
     moduleCountStatus,
     ...trackers.flatMap((tracker) => [
@@ -225,7 +245,6 @@ export function evaluateCustomLayout(
     blockingReasons: result.blockingReasons,
     dataStatus,
     dcAcRatio,
-    dcAcStatus,
     maxDcPowerWp: walkthrough.inverterLimits.maxDcPowerWp,
     maxModules: walkthrough.maxModules?.modules ?? null,
     moduleCountStatus,
