@@ -1,5 +1,8 @@
 import "server-only";
-import type { CreateSkuInput } from "@/domain/catalog/admin-schemas";
+import type {
+  CreateSkuInput,
+  SpecActivationInput,
+} from "@/domain/catalog/admin-schemas";
 import {
   getPrincipalOrganizationIds,
   isSuperAdmin,
@@ -41,6 +44,19 @@ export interface CatalogSkuRow {
   variantLabel: string;
 }
 
+export interface CatalogSpecRow {
+  brandActive: boolean;
+  category: "inverter" | "pv_module";
+  exactModel: string;
+  manufacturer: string;
+  manufacturerId: string;
+  modelActive: boolean;
+  modelId: string;
+  revisionLabel: string;
+  specSummary: string;
+  updatedAt: Date;
+}
+
 function canManageOrganization(principal: AdminPrincipal, organizationId: string) {
   return (
     isSuperAdmin(principal) ||
@@ -62,8 +78,197 @@ export async function listCatalogProductOptions() {
       product_model.category::text AS category
     FROM product_model
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
+    LEFT JOIN manufacturer_category_status
+      ON manufacturer_category_status.manufacturer_id = manufacturer.id
+      AND manufacturer_category_status.category = product_model.category
+    WHERE product_model.is_active = true
+      AND COALESCE(manufacturer_category_status.is_active, true) = true
     ORDER BY manufacturer.name, product_model.exact_model
   `;
+}
+
+export async function listCatalogSpecs(
+  category: "inverter" | "pv_module",
+): Promise<CatalogSpecRow[]> {
+  const sql = getDb();
+  const rows = await sql<Array<{
+    brandActive: boolean;
+    category: "inverter" | "pv_module";
+    exactModel: string;
+    manufacturer: string;
+    manufacturerId: string;
+    maxDcVoltageV: string | null;
+    modelActive: boolean;
+    modelId: string;
+    pmaxWp: string | null;
+    ratedAcKw: string | null;
+    revisionLabel: string;
+    updatedAt: Date;
+    vocV: string | null;
+  }>>`
+    SELECT
+      COALESCE(manufacturer_category_status.is_active, true) AS "brandActive",
+      product_model.category::text AS category,
+      product_model.exact_model AS "exactModel",
+      manufacturer.name AS manufacturer,
+      manufacturer.id::text AS "manufacturerId",
+      product_model.is_active AS "modelActive",
+      product_model.id::text AS "modelId",
+      product_model.updated_at AS "updatedAt",
+      current_revision.revision_label AS "revisionLabel",
+      pv_module_spec.pmax_wp::text AS "pmaxWp",
+      pv_module_spec.voc_v::text AS "vocV",
+      inverter_spec.rated_ac_kw::text AS "ratedAcKw",
+      inverter_spec.max_dc_voltage_v::text AS "maxDcVoltageV"
+    FROM product_model
+    JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
+    JOIN LATERAL (
+      SELECT id, revision_label
+      FROM datasheet_revision
+      WHERE datasheet_revision.product_model_id = product_model.id
+        AND datasheet_revision.state = 'published'
+      ORDER BY datasheet_revision.published_at DESC NULLS LAST, datasheet_revision.created_at DESC
+      LIMIT 1
+    ) AS current_revision ON true
+    LEFT JOIN pv_module_spec
+      ON pv_module_spec.datasheet_revision_id = current_revision.id
+    LEFT JOIN inverter_spec
+      ON inverter_spec.datasheet_revision_id = current_revision.id
+    LEFT JOIN manufacturer_category_status
+      ON manufacturer_category_status.manufacturer_id = manufacturer.id
+      AND manufacturer_category_status.category = product_model.category
+    WHERE product_model.category = ${category}
+    ORDER BY manufacturer.name, product_model.exact_model
+  `;
+
+  return rows.map((row) => ({
+    brandActive: row.brandActive,
+    category: row.category,
+    exactModel: row.exactModel,
+    manufacturer: row.manufacturer,
+    manufacturerId: row.manufacturerId,
+    modelActive: row.modelActive,
+    modelId: row.modelId,
+    revisionLabel: row.revisionLabel,
+    specSummary:
+      row.category === "pv_module"
+        ? row.pmaxWp === null || row.vocV === null
+          ? "Spec ไม่ครบ"
+          : `${Number(row.pmaxWp)} Wp · ${Number(row.vocV)} Voc`
+        : row.ratedAcKw === null || row.maxDcVoltageV === null
+          ? "Spec ไม่ครบ"
+          : `${Number(row.ratedAcKw)} kW · ${Number(row.maxDcVoltageV)} Vdc max`,
+    updatedAt: row.updatedAt,
+  }));
+}
+
+export async function setCatalogSpecActivation(
+  principal: AdminPrincipal,
+  input: SpecActivationInput,
+) {
+  const sql = getDb();
+
+  await sql.begin(async (transaction) => {
+    if (input.targetType === "model") {
+      const [model] = await transaction<Array<{
+        isActive: boolean;
+        manufacturer: string;
+        model: string;
+      }>>`
+        SELECT
+          product_model.is_active AS "isActive",
+          manufacturer.name AS manufacturer,
+          product_model.exact_model AS model
+        FROM product_model
+        JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
+        WHERE product_model.id = ${input.targetId}
+          AND product_model.category = ${input.category}
+        FOR UPDATE
+      `;
+      if (!model) {
+        throw new HttpError(404, "PRODUCT_MODEL_NOT_FOUND", "ไม่พบ Model ที่เลือก");
+      }
+
+      await transaction`
+        UPDATE product_model
+        SET is_active = ${input.isActive}, updated_at = now()
+        WHERE id = ${input.targetId}
+      `;
+      await transaction`
+        INSERT INTO audit_event (
+          actor_id, action, entity_type, entity_id, before_json, after_json
+        ) VALUES (
+          ${principal.userId},
+          'catalog.spec_activation.updated',
+          'product_model',
+          ${input.targetId},
+          ${transaction.json({
+            category: input.category,
+            isActive: model.isActive,
+            manufacturer: model.manufacturer,
+            model: model.model,
+          })},
+          ${transaction.json({
+            category: input.category,
+            isActive: input.isActive,
+            manufacturer: model.manufacturer,
+            model: model.model,
+          })}
+        )
+      `;
+      return;
+    }
+
+    const [manufacturer] = await transaction<Array<{ name: string }>>`
+      SELECT name
+      FROM manufacturer
+      WHERE id = ${input.targetId}
+      FOR UPDATE
+    `;
+    if (!manufacturer) {
+      throw new HttpError(404, "MANUFACTURER_NOT_FOUND", "ไม่พบ Brand ที่เลือก");
+    }
+
+    const [existing] = await transaction<Array<{ isActive: boolean }>>`
+      SELECT is_active AS "isActive"
+      FROM manufacturer_category_status
+      WHERE manufacturer_id = ${input.targetId}
+        AND category = ${input.category}
+      FOR UPDATE
+    `;
+    await transaction`
+      INSERT INTO manufacturer_category_status (
+        manufacturer_id, category, is_active, updated_by, updated_at
+      ) VALUES (
+        ${input.targetId}, ${input.category}, ${input.isActive}, ${principal.userId}, now()
+      )
+      ON CONFLICT (manufacturer_id, category)
+      DO UPDATE SET
+        is_active = EXCLUDED.is_active,
+        updated_by = EXCLUDED.updated_by,
+        updated_at = now()
+    `;
+    await transaction`
+      INSERT INTO audit_event (
+        actor_id, action, entity_type, entity_id, before_json, after_json
+      ) VALUES (
+        ${principal.userId},
+        'catalog.brand_activation.updated',
+        'manufacturer_category_status',
+        ${input.targetId},
+        ${transaction.json({
+          category: input.category,
+          isActive: existing?.isActive ?? true,
+          manufacturer: manufacturer.name,
+        })},
+        ${transaction.json({
+          category: input.category,
+          isActive: input.isActive,
+          manufacturer: manufacturer.name,
+        })}
+      )
+    `;
+  });
 }
 
 export async function listCatalogManufacturerOptions() {

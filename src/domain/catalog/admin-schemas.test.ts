@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSkuSchema } from "./admin-schemas";
+import { createSkuSchema, specActivationSchema } from "./admin-schemas";
 
 const organizationId = "00000000-0000-4000-8000-000000000001";
 const manufacturerId = "00000000-0000-4000-8000-000000000002";
@@ -75,5 +75,30 @@ describe("create SKU schema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("spec activation schema", () => {
+  it("parses a category-scoped brand deactivation", () => {
+    expect(specActivationSchema.parse({
+      category: "inverter",
+      isActive: "false",
+      targetId: manufacturerId,
+      targetType: "brand",
+    })).toEqual({
+      category: "inverter",
+      isActive: false,
+      targetId: manufacturerId,
+      targetType: "brand",
+    });
+  });
+
+  it("rejects an unknown activation target", () => {
+    expect(specActivationSchema.safeParse({
+      category: "pv_module",
+      isActive: "true",
+      targetId: manufacturerId,
+      targetType: "revision",
+    }).success).toBe(false);
   });
 });

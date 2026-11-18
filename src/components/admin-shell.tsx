@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   LogOut,
   ShieldCheck,
+  SlidersHorizontal,
   UserRoundSearch,
   Users,
 } from "lucide-react";
@@ -37,6 +38,9 @@ export function AdminShell({
         <nav aria-label="เมนูหลังบ้าน">
           <Link href="/admin"><LayoutDashboard size={18} /> ภาพรวมงาน</Link>
           <Link href="/admin/catalog"><Boxes size={18} /> สินค้าและ SKU</Link>
+          {principal.roles.some((role) => role.code === "reviewer" || role.code === "super_admin") ? (
+            <Link href="/admin/specs"><SlidersHorizontal size={18} /> Spec Management</Link>
+          ) : null}
           <Link href="/admin/equipment"><FileCheck2 size={18} /> Datasheet</Link>
           {isSuperAdmin(principal) ? (
             <Link href="/admin/community"><UserRoundSearch size={18} /> ลูกค้า Community</Link>

@@ -60,3 +60,12 @@ export const createSkuSchema = z.object({
 });
 
 export type CreateSkuInput = z.infer<typeof createSkuSchema>;
+
+export const specActivationSchema = z.object({
+  category: z.enum(["pv_module", "inverter"]),
+  isActive: z.enum(["true", "false"]).transform((value) => value === "true"),
+  targetId: z.string().uuid(),
+  targetType: z.enum(["brand", "model"]),
+});
+
+export type SpecActivationInput = z.infer<typeof specActivationSchema>;

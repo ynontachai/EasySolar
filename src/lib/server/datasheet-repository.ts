@@ -428,6 +428,9 @@ export async function listPublishedCatalogPage(filters: {
       (COUNT(*) OVER())::text AS "totalCount"
     FROM product_model
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
+    LEFT JOIN manufacturer_category_status
+      ON manufacturer_category_status.manufacturer_id = manufacturer.id
+      AND manufacturer_category_status.category = product_model.category
     JOIN datasheet_revision ON datasheet_revision.product_model_id = product_model.id
     LEFT JOIN pv_module_spec
       ON pv_module_spec.datasheet_revision_id = datasheet_revision.id
@@ -450,6 +453,8 @@ export async function listPublishedCatalogPage(filters: {
       LIMIT 1
     ) AS primary_media ON true
     WHERE product_model.status = 'published'
+      AND product_model.is_active = true
+      AND COALESCE(manufacturer_category_status.is_active, true) = true
       AND datasheet_revision.state = 'published'
       ${searchFilter}
       ${categoryFilter}
@@ -574,6 +579,9 @@ export async function findPublishedPvModule(id: string): Promise<PvModuleSpec | 
       pv_bifacial_design_case.approved_at::text AS "designApprovedAt"
     FROM product_model
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
+    LEFT JOIN manufacturer_category_status
+      ON manufacturer_category_status.manufacturer_id = manufacturer.id
+      AND manufacturer_category_status.category = product_model.category
     JOIN datasheet_revision ON datasheet_revision.product_model_id = product_model.id
     JOIN pv_module_spec ON pv_module_spec.datasheet_revision_id = datasheet_revision.id
     LEFT JOIN pv_bifacial_design_case
@@ -581,6 +589,8 @@ export async function findPublishedPvModule(id: string): Promise<PvModuleSpec | 
     WHERE product_model.id = ${id}
       AND product_model.category = 'pv_module'
       AND product_model.status = 'published'
+      AND product_model.is_active = true
+      AND COALESCE(manufacturer_category_status.is_active, true) = true
       AND datasheet_revision.state = 'published'
     ORDER BY datasheet_revision.published_at DESC NULLS LAST
     LIMIT 1
@@ -674,12 +684,17 @@ export async function findPublishedInverter(id: string): Promise<InverterSpec | 
       mppt_tracker.input_count AS "inputCount"
     FROM product_model
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
+    LEFT JOIN manufacturer_category_status
+      ON manufacturer_category_status.manufacturer_id = manufacturer.id
+      AND manufacturer_category_status.category = product_model.category
     JOIN datasheet_revision ON datasheet_revision.product_model_id = product_model.id
     JOIN inverter_spec ON inverter_spec.datasheet_revision_id = datasheet_revision.id
     JOIN mppt_tracker ON mppt_tracker.inverter_revision_id = datasheet_revision.id
     WHERE product_model.id = ${id}
       AND product_model.category = 'inverter'
       AND product_model.status = 'published'
+      AND product_model.is_active = true
+      AND COALESCE(manufacturer_category_status.is_active, true) = true
       AND datasheet_revision.state = 'published'
     ORDER BY datasheet_revision.published_at DESC NULLS LAST, mppt_tracker.tracker_index
   `;
@@ -737,11 +752,17 @@ export async function findPublishedEquipmentRevisions(equipmentId: string) {
       datasheet_revision.verified_at::text AS "verifiedAt",
       asset.state AS "assetState"
     FROM datasheet_revision
+    JOIN product_model ON product_model.id = datasheet_revision.product_model_id
+    LEFT JOIN manufacturer_category_status
+      ON manufacturer_category_status.manufacturer_id = product_model.manufacturer_id
+      AND manufacturer_category_status.category = product_model.category
     LEFT JOIN datasheet_asset
       ON datasheet_asset.datasheet_revision_id = datasheet_revision.id
       AND datasheet_asset.role = 'original'
     LEFT JOIN asset ON asset.id = datasheet_asset.asset_id
     WHERE datasheet_revision.product_model_id = ${equipmentId}
+      AND product_model.is_active = true
+      AND COALESCE(manufacturer_category_status.is_active, true) = true
       AND datasheet_revision.state IN ('verified', 'published')
     ORDER BY datasheet_revision.issue_date DESC NULLS LAST, datasheet_revision.created_at DESC
   `;
