@@ -5,7 +5,7 @@ import {
 import { requireAdminPrincipal } from "@/lib/server/admin-auth";
 import { createExtractedImportUploadRecord } from "@/lib/server/extracted-import-repository";
 import { errorResponse, HttpError } from "@/lib/server/http-error";
-import { createDatasheetUploadUrl } from "@/lib/server/object-storage";
+import { createDatasheetUploadTarget } from "@/lib/server/object-storage";
 import { getDatasheetRuntimeCapabilities } from "@/lib/server/runtime-config";
 
 export const runtime = "nodejs";
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     }
 
     const record = await createExtractedImportUploadRecord(principal, parsed.data);
-    const uploadUrl = await createDatasheetUploadUrl({
+    const uploadTarget = await createDatasheetUploadTarget({
       assetId: record.assetId,
       checksumBase64: parsed.data.sha256Base64,
       objectKey: record.objectKey,
@@ -75,13 +75,8 @@ export async function POST(request: Request) {
         expiresInSeconds: 600,
         importId: record.importId,
         revisions: record.revisions,
-        uploadHeaders: {
-          "content-type": parsed.data.mediaType,
-          "x-amz-checksum-sha256": parsed.data.sha256Base64,
-          "x-amz-meta-assetid": record.assetId,
-          "x-amz-meta-sha256hex": parsed.data.sha256Hex,
-        },
-        uploadUrl,
+        uploadHeaders: uploadTarget.uploadHeaders,
+        uploadUrl: uploadTarget.uploadUrl,
       },
       { status: 201 },
     );

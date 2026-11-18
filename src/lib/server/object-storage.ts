@@ -11,6 +11,10 @@ import {
   DATASHEET_MEDIA_TYPE,
   type ProductImageMediaType,
 } from "@/domain/assets/config";
+import {
+  createSupabaseAdminClient,
+  isSupabaseAdminConfigured,
+} from "@/lib/supabase/admin";
 import { getStorageRuntimeConfig } from "./runtime-config";
 
 let storageClient: S3Client | null = null;
@@ -68,13 +72,39 @@ export function createProductImageObjectKey(input: {
   return `${environment}/catalog/product-media/${input.productModelId}/${input.assetId}/original.${imageExtension(input.mediaType)}`;
 }
 
-export async function createDatasheetUploadUrl(input: {
+export async function createDatasheetUploadTarget(input: {
   assetId: string;
   checksumBase64: string;
   objectKey: string;
   sha256Hex: string;
 }) {
-  const { client, config } = getStorageClient();
+  const config = getStorageRuntimeConfig();
+
+  if (isSupabaseAdminConfigured() && process.env.S3_ENDPOINT?.includes("supabase")) {
+    const supabase = createSupabaseAdminClient();
+    const { data, error } = await supabase.storage
+      .from(config.bucket)
+      .createSignedUploadUrl(input.objectKey);
+
+    if (error) throw error;
+
+    return {
+      uploadHeaders: {
+        "cache-control": "max-age=3600",
+        "content-type": DATASHEET_MEDIA_TYPE,
+        "x-metadata": Buffer.from(
+          JSON.stringify({
+            assetid: input.assetId,
+            sha256hex: input.sha256Hex,
+          }),
+        ).toString("base64"),
+        "x-upsert": "false",
+      },
+      uploadUrl: data.signedUrl,
+    };
+  }
+
+  const { client } = getStorageClient();
   const command = new PutObjectCommand({
     Bucket: config.bucket,
     Key: input.objectKey,
@@ -83,7 +113,15 @@ export async function createDatasheetUploadUrl(input: {
     Metadata: { assetid: input.assetId, sha256hex: input.sha256Hex },
   });
 
-  return getSignedUrl(client, command, { expiresIn: 10 * 60 });
+  return {
+    uploadHeaders: {
+      "content-type": DATASHEET_MEDIA_TYPE,
+      "x-amz-checksum-sha256": input.checksumBase64,
+      "x-amz-meta-assetid": input.assetId,
+      "x-amz-meta-sha256hex": input.sha256Hex,
+    },
+    uploadUrl: await getSignedUrl(client, command, { expiresIn: 10 * 60 }),
+  };
 }
 
 export async function createProductImageUploadUrl(input: {
@@ -106,6 +144,32 @@ export async function createProductImageUploadUrl(input: {
 }
 
 export async function inspectStoredObject(objectKey: string) {
+  if (isSupabaseAdminConfigured() && process.env.S3_ENDPOINT?.includes("supabase")) {
+    const config = getStorageRuntimeConfig();
+    const supabase = createSupabaseAdminClient();
+    const { data, error } = await supabase.storage.from(config.bucket).info(objectKey);
+
+    if (error) throw error;
+
+    const metadata = data.metadata as Record<string, unknown> | undefined;
+    return {
+      checksumBase64: undefined,
+      contentLength:
+        data.size ??
+        (typeof metadata?.contentLength === "number" ? metadata.contentLength : undefined),
+      contentType:
+        data.contentType ??
+        (typeof metadata?.mimetype === "string" ? metadata.mimetype : undefined),
+      etag:
+        data.etag?.replaceAll('"', "") ??
+        (typeof metadata?.eTag === "string"
+          ? metadata.eTag.replaceAll('"', "")
+          : null),
+      sha256Hex:
+        typeof metadata?.sha256hex === "string" ? metadata.sha256hex : undefined,
+    };
+  }
+
   const { client, config } = getStorageClient();
   const result = await client.send(
     new HeadObjectCommand({ Bucket: config.bucket, Key: objectKey }),
@@ -132,12 +196,16 @@ export function isStoredObjectMissingError(error: unknown) {
 
   const candidate = error as {
     name?: string;
+    status?: number;
+    statusCode?: string;
     $metadata?: { httpStatusCode?: number };
   };
 
   return (
     candidate.name === "NotFound" ||
     candidate.name === "NoSuchKey" ||
+    candidate.status === 404 ||
+    candidate.statusCode === "404" ||
     candidate.$metadata?.httpStatusCode === 404
   );
 }

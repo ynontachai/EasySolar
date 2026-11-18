@@ -20,6 +20,52 @@ export async function createExtractedImportUploadRecord(
 ): Promise<ExtractedImportUploadRecord> {
   const sql = getDb();
   const storage = getStorageRuntimeConfig();
+
+  const [pendingImport] = await sql<
+    Array<{ assetId: string; importId: string; objectKey: string }>
+  >`
+    SELECT
+      asset.id::text AS "assetId",
+      datasheet_extraction_import.id::text AS "importId",
+      asset.object_key AS "objectKey"
+    FROM datasheet_extraction_import
+    JOIN asset ON asset.id = datasheet_extraction_import.asset_id
+    WHERE datasheet_extraction_import.created_by = ${principal.userId}::uuid
+      AND datasheet_extraction_import.source_output = ${sql.json(input.extraction)}::jsonb
+      AND asset.original_filename = ${input.filename}
+      AND asset.sha256 = ${input.sha256Hex}
+      AND asset.state = 'pending_upload'
+    ORDER BY datasheet_extraction_import.created_at DESC
+    LIMIT 1
+  `;
+
+  if (pendingImport) {
+    const revisions = await sql<ExtractedImportUploadRecord["revisions"]>`
+      SELECT
+        product_model.exact_model AS "exactModel",
+        datasheet_revision.id::text AS "revisionId"
+      FROM datasheet_extraction_candidate
+      JOIN datasheet_revision
+        ON datasheet_revision.id = datasheet_extraction_candidate.revision_id
+      JOIN product_model ON product_model.id = datasheet_revision.product_model_id
+      WHERE datasheet_extraction_candidate.import_id = ${pendingImport.importId}::uuid
+        AND datasheet_revision.revision_label = ${input.revisionLabel}
+        AND datasheet_revision.language = ${input.language.toLowerCase()}
+        AND product_model.market = ${input.market.toUpperCase()}
+      ORDER BY datasheet_extraction_candidate.model_index
+    `;
+
+    if (
+      revisions.length === input.extraction.models.length &&
+      revisions.every(
+        (revision, index) =>
+          revision.exactModel === input.extraction.models[index]?.exact_model,
+      )
+    ) {
+      return { ...pendingImport, revisions };
+    }
+  }
+
   const importId = randomUUID();
   const assetId = randomUUID();
   const objectKey = createDatasheetImportObjectKey({ assetId, importId });

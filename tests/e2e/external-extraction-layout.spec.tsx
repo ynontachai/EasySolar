@@ -1,20 +1,32 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
+import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ExternalExtractionImportPanel } from "@/components/external-extraction-import-panel";
 
 const css = readFileSync(resolve(process.cwd(), "src/app/globals.css"), "utf8");
+const router = {
+  back: () => undefined,
+  bfcacheId: "test",
+  forward: () => undefined,
+  prefetch: async () => undefined,
+  push: () => undefined,
+  refresh: () => undefined,
+  replace: () => undefined,
+};
 const markup = renderToStaticMarkup(
-  <ExternalExtractionImportPanel
-    capabilities={{
-      adminAuth: true,
-      database: true,
-      ready: true,
-      scanMode: "trusted-dev",
-      storage: true,
-    }}
-  />,
+  <AppRouterContext.Provider value={router}>
+    <ExternalExtractionImportPanel
+      capabilities={{
+        adminAuth: true,
+        database: true,
+        ready: true,
+        scanMode: "trusted-dev",
+        storage: true,
+      }}
+    />
+  </AppRouterContext.Provider>,
 );
 
 const viewports = [

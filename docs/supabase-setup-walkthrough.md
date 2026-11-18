@@ -127,7 +127,9 @@ x-amz-meta-assetid
 x-amz-meta-sha256hex
 ```
 
-ถ้า browser upload ติด CORS ห้ามแก้ด้วยการทำ bucket เป็น public ให้เปลี่ยนไปใช้ Supabase signed upload API หรือรับไฟล์ผ่าน server route จนกว่าจะยืนยัน configuration ที่ปลอดภัย
+ระบบจะใช้ Supabase signed upload API อัตโนมัติเมื่อมี `SUPABASE_SECRET_KEY` หรือ
+`SUPABASE_SERVICE_ROLE_KEY` จึงไม่ต้องเปิด bucket เป็น public หากไม่มี admin key ระบบจะ
+fallback ไปใช้ S3 presigned URL ซึ่งต้องผ่าน browser preflight/CORS ตามรายการ header ด้านบน
 
 Supabase Storage S3 ยังไม่รองรับ S3 object versioning EasySolar จึงต้องใช้ immutable object key และสร้าง Datasheet revision ใหม่ทุกครั้ง ห้าม overwrite ไฟล์ที่ publish แล้ว
 

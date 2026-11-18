@@ -67,6 +67,38 @@ async function readApiResponse<T>(response: Response): Promise<T> {
   return body;
 }
 
+async function uploadPdf(intent: UploadIntentResponse, pdf: File) {
+  try {
+    const response = await fetch(intent.uploadUrl, {
+      body: pdf,
+      headers: intent.uploadHeaders,
+      method: "PUT",
+    });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as {
+        code?: string;
+        error?: string;
+        message?: string;
+      };
+      const storageError = body.code || body.error || body.message || "";
+      if (
+        (response.status === 400 || response.status === 409) &&
+        /already exists|keyalreadyexists/i.test(storageError)
+      ) {
+        return;
+      }
+      throw new Error(`Storage ปฏิเสธการอัปโหลด (${response.status})`);
+    }
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        "เชื่อมต่อ Object Storage ไม่สำเร็จ กรุณาตรวจ Storage URL/CORS แล้วลองใหม่",
+      );
+    }
+    throw error;
+  }
+}
+
 async function readExtractionFile(file: File) {
   if (!file.name.toLowerCase().endsWith(".json")) {
     throw new Error("ผลลัพธ์จาก GPT ต้องเป็นไฟล์ .json");
@@ -191,14 +223,7 @@ export function ExternalExtractionImportPanel({
       const intent = await readApiResponse<UploadIntentResponse>(intentResponse);
 
       setPhase("uploading");
-      const uploadResponse = await fetch(intent.uploadUrl, {
-        body: pdf,
-        headers: intent.uploadHeaders,
-        method: "PUT",
-      });
-      if (!uploadResponse.ok) {
-        throw new Error(`Object storage ปฏิเสธการอัปโหลด (${uploadResponse.status})`);
-      }
+      await uploadPdf(intent, pdf);
 
       setPhase("finalizing");
       const finalizeResponse = await fetch(
