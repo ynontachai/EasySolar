@@ -1,14 +1,16 @@
 {
   "schema_id": "easysolar-spec-extraction",
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "template_id": "inverter",
-  "template_version": "1.0",
-  "prompt_version": "1.0",
+  "template_version": "1.1",
+  "prompt_version": "1.1",
   "category": "inverter",
   "model_detection": {
     "required": true,
     "allow_multiple_models": true,
-    "preserve_exact_identifier": true
+    "preserve_exact_identifier": true,
+    "allow_composed_identifiers": false,
+    "allowed_composition_rules": []
   },
   "field_contract": [
     { "field_key": "inverterType", "label": "Inverter Type", "type": "string", "unit": null, "required": true, "allowed_values": ["string", "hybrid", "micro"] },
@@ -34,7 +36,8 @@
     "top_level_keys": ["schema_id", "schema_version", "template_id", "template_version", "prompt_version", "source_document", "manufacturer", "detected_model_count", "models", "unresolved_model_labels", "document_warnings"],
     "source_document": { "filename": "string", "page_count": "positive integer" },
     "manufacturer": { "value": "string", "source_page": "positive integer", "confidence": "high | medium | low" },
-    "model": { "exact_model": "string", "model_family": "string | null", "model_evidence": { "source_page": "positive integer", "source_label": "string", "evidence": "string" }, "fields": "object containing every field_key", "trackers": "tracker[]", "warnings": "string[]" },
+    "model": { "exact_model": "string", "identifier_provenance": { "method": "explicit", "composition_rule": "null", "anchor_model": "null", "anchor_power_wp": "null", "variant_power_wp": "null", "evidence": "identifier_evidence[]" }, "model_family": "string | null", "model_evidence": { "source_page": "positive integer", "source_label": "string", "evidence": "string" }, "fields": "object containing every field_key", "trackers": "tracker[]", "warnings": "string[]" },
+    "identifier_evidence": { "source_type": "pdf", "source_page": "positive integer", "source_label": "string", "evidence": "string" },
     "tracker": { "tracker_index": "positive integer starting at 1", "fields": "object containing every tracker field_key" },
     "field": { "value": "number | string | boolean | null", "unit": "string | null", "raw_value": "number | string | boolean | null", "raw_unit": "string | null", "status": "extracted | derived | shared_across_models | ambiguous | not_found | conflict", "source_page": "positive integer | null", "source_label": "string | null", "evidence": "string | null", "confidence": "high | medium | low", "formula": "string | null", "input_fields": "string[]" }
   }

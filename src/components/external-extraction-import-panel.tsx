@@ -252,13 +252,13 @@ export function ExternalExtractionImportPanel({
 
       <div className="extraction-downloads" aria-label="ไฟล์กลางสำหรับใช้งานกับ ChatGPT">
         <a download href="/easysolar-extraction/easysolar-extraction-prompt-v1.txt">
-          <Download size={16} aria-hidden="true" /> Prompt v1
+          <Download size={16} aria-hidden="true" /> Prompt v1.1
         </a>
         <a download href="/easysolar-extraction/easysolar-pv-module-extraction-v1.json">
-          <Download size={16} aria-hidden="true" /> PV Template v1
+          <Download size={16} aria-hidden="true" /> PV Template v1.1
         </a>
         <a download href="/easysolar-extraction/easysolar-inverter-extraction-v1.json">
-          <Download size={16} aria-hidden="true" /> Inverter Template v1
+          <Download size={16} aria-hidden="true" /> Inverter Template v1.1
         </a>
       </div>
 
@@ -301,7 +301,7 @@ export function ExternalExtractionImportPanel({
           <label className="datasheet-intake__file">
             <span>2. JSON ผลลัพธ์จาก EasySolar Prompt</span>
             <input accept="application/json,.json" name="extractionJson" onChange={handleJsonChange} required type="file" />
-            <small>JSON เท่านั้น · Template และ Prompt version 1.0 · ไม่เกิน 1 MB</small>
+            <small>JSON เท่านั้น · Template และ Prompt version 1.1 · ไม่เกิน 1 MB</small>
           </label>
 
           {preview ? (

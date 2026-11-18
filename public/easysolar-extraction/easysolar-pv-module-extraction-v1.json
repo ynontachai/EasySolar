@@ -1,14 +1,16 @@
 {
   "schema_id": "easysolar-spec-extraction",
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "template_id": "pv-module",
-  "template_version": "1.0",
-  "prompt_version": "1.0",
+  "template_version": "1.1",
+  "prompt_version": "1.1",
   "category": "pv_module",
   "model_detection": {
     "required": true,
     "allow_multiple_models": true,
-    "preserve_exact_identifier": true
+    "preserve_exact_identifier": true,
+    "allow_composed_identifiers": true,
+    "allowed_composition_rules": ["power_variant_substitution"]
   },
   "field_contract": [
     { "field_key": "pmaxWp", "label": "Maximum Power at STC", "type": "number", "unit": "Wp", "required": true, "aliases": ["Pmax", "Maximum Power", "Rated Maximum Power"], "validation": { "min_exclusive": 0, "max": 2000 } },
@@ -28,7 +30,8 @@
     "top_level_keys": ["schema_id", "schema_version", "template_id", "template_version", "prompt_version", "source_document", "manufacturer", "detected_model_count", "models", "unresolved_model_labels", "document_warnings"],
     "source_document": { "filename": "string", "page_count": "positive integer" },
     "manufacturer": { "value": "string", "source_page": "positive integer", "confidence": "high | medium | low" },
-    "model": { "exact_model": "string", "model_family": "string | null", "model_evidence": { "source_page": "positive integer", "source_label": "string", "evidence": "string" }, "fields": "object containing every field_key", "trackers": "empty array", "warnings": "string[]" },
-    "field": { "value": "number | string | boolean | null", "unit": "string | null", "raw_value": "number | string | boolean | null", "raw_unit": "string | null", "status": "extracted | derived | shared_across_models | ambiguous | not_found | conflict", "source_page": "positive integer | null", "source_label": "string | null", "evidence": "string | null", "confidence": "high | medium | low", "formula": "string | null, required when derived", "input_fields": "string[], required when derived" }
+    "model": { "exact_model": "string", "identifier_provenance": { "method": "explicit | composed", "composition_rule": "power_variant_substitution | null", "anchor_model": "string | null", "anchor_power_wp": "positive integer | null", "variant_power_wp": "positive integer | null", "evidence": "identifier_evidence[]" }, "model_family": "string | null", "model_evidence": { "source_page": "positive integer", "source_label": "string", "evidence": "string" }, "fields": "object containing every field_key", "trackers": "empty array", "warnings": "string[]" },
+    "identifier_evidence": { "source_type": "pdf | filename", "source_page": "positive integer for pdf | null for filename", "source_label": "string", "evidence": "string" },
+    "field": { "value": "number | string | boolean | null", "unit": "string | null", "raw_value": "number | string | boolean | null", "raw_unit": "string | null", "status": "extracted | derived | shared_across_models | ambiguous | not_found | conflict", "source_page": "positive integer | null", "source_label": "string | null", "evidence": "string | null", "confidence": "high | medium | low", "formula": "string | null", "input_fields": "string[]" }
   }
 }

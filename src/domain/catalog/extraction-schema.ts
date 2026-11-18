@@ -5,8 +5,8 @@ import {
 } from "@/domain/assets/config";
 
 export const EXTRACTION_SCHEMA_ID = "easysolar-spec-extraction";
-export const EXTRACTION_SCHEMA_VERSION = "1.0";
-export const EXTRACTION_PROMPT_VERSION = "1.0";
+export const EXTRACTION_SCHEMA_VERSION = "1.1";
+export const EXTRACTION_PROMPT_VERSION = "1.1";
 export const MAX_EXTRACTION_JSON_SIZE_BYTES = 1024 * 1024;
 export const MAX_EXTRACTED_MODELS = 50;
 
@@ -14,12 +14,12 @@ export const extractionTemplates = {
   inverter: {
     category: "inverter",
     templateId: "inverter",
-    templateVersion: "1.0",
+    templateVersion: "1.1",
   },
   "pv-module": {
     category: "pv_module",
     templateId: "pv-module",
-    templateVersion: "1.0",
+    templateVersion: "1.1",
   },
 } as const;
 
@@ -161,9 +161,110 @@ const extractedTrackerSchema = z
   })
   .strict();
 
+const identifierEvidenceSchema = z
+  .object({
+    source_type: z.enum(["pdf", "filename"]),
+    source_page: z.number().int().positive().nullable(),
+    source_label: z.string().trim().min(1).max(240),
+    evidence: z.string().trim().min(1).max(500),
+  })
+  .strict()
+  .superRefine((item, context) => {
+    if (item.source_type === "pdf" && item.source_page === null) {
+      context.addIssue({
+        code: "custom",
+        message: "หลักฐานจาก PDF ต้องระบุ source_page",
+        path: ["source_page"],
+      });
+    }
+    if (item.source_type === "filename" && item.source_page !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "หลักฐานจากชื่อไฟล์ต้องมี source_page เป็น null",
+        path: ["source_page"],
+      });
+    }
+  });
+
+const identifierProvenanceSchema = z
+  .object({
+    method: z.enum(["explicit", "composed"]),
+    composition_rule: z.enum(["power_variant_substitution"]).nullable(),
+    anchor_model: z.string().trim().min(1).max(200).nullable(),
+    anchor_power_wp: z.number().int().positive().max(2000).nullable(),
+    variant_power_wp: z.number().int().positive().max(2000).nullable(),
+    evidence: z.array(identifierEvidenceSchema).min(1).max(10),
+  })
+  .strict()
+  .superRefine((provenance, context) => {
+    if (provenance.method === "explicit" && provenance.composition_rule !== null) {
+      context.addIssue({
+        code: "custom",
+        message: "Model ที่ระบุชัดเจนต้องไม่มี composition_rule",
+        path: ["composition_rule"],
+      });
+    }
+    if (
+      provenance.method === "explicit" &&
+      (provenance.anchor_model !== null ||
+        provenance.anchor_power_wp !== null ||
+        provenance.variant_power_wp !== null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Model ที่ระบุชัดเจนต้องไม่มีค่าการประกอบ identifier",
+        path: ["anchor_model"],
+      });
+    }
+    if (
+      provenance.method === "composed" &&
+      provenance.composition_rule !== "power_variant_substitution"
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Model ที่ประกอบขึ้นต้องใช้ composition_rule ที่รองรับ",
+        path: ["composition_rule"],
+      });
+    }
+    if (
+      provenance.method === "composed" &&
+      (provenance.anchor_model === null ||
+        provenance.anchor_power_wp === null ||
+        provenance.variant_power_wp === null)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Model ที่ประกอบขึ้นต้องระบุ anchor_model, anchor_power_wp และ variant_power_wp",
+        path: ["anchor_model"],
+      });
+    }
+    if (!provenance.evidence.some((item) => item.source_type === "pdf")) {
+      context.addIssue({
+        code: "custom",
+        message: "หลักฐาน Model ต้องมีข้อมูลจาก PDF อย่างน้อยหนึ่งรายการ",
+        path: ["evidence"],
+      });
+    }
+  });
+
+function normalizeFamilyIdentifier(value: string) {
+  return value
+    .toLocaleLowerCase("en-US")
+    .replace(/[×x*]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function familyFromPowerAnchor(anchorModel: string, anchorPowerWp: number) {
+  const power = String(anchorPowerWp);
+  const occurrences = anchorModel.split(power).length - 1;
+  if (occurrences !== 1) return null;
+  return anchorModel.replace(new RegExp(`${power}w?`, "i"), "");
+}
+
 export const extractedModelSchema = z
   .object({
     exact_model: z.string().trim().min(1).max(200),
+    identifier_provenance: identifierProvenanceSchema,
     model_family: z.string().trim().max(200).nullable().optional(),
     model_evidence: z
       .object({
@@ -183,7 +284,7 @@ export const extractedSpecSchema = z
     schema_id: z.literal(EXTRACTION_SCHEMA_ID),
     schema_version: z.literal(EXTRACTION_SCHEMA_VERSION),
     template_id: z.enum(["pv-module", "inverter"]),
-    template_version: z.literal("1.0"),
+    template_version: z.literal("1.1"),
     prompt_version: z.literal(EXTRACTION_PROMPT_VERSION),
     source_document: z
       .object({
@@ -231,6 +332,17 @@ export const extractedSpecSchema = z
 
     const modelNames = new Set<string>();
     output.models.forEach((model, modelIndex) => {
+      if (
+        template.category === "inverter" &&
+        model.identifier_provenance.method === "composed"
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "Inverter template ไม่อนุญาตให้ประกอบ Model identifier",
+          path: ["models", modelIndex, "identifier_provenance", "method"],
+        });
+      }
+
       const normalizedModel = model.exact_model.toLocaleLowerCase("en-US");
       if (modelNames.has(normalizedModel)) {
         context.addIssue({
@@ -247,6 +359,70 @@ export const extractedSpecSchema = z
           message: "หน้าอ้างอิง Model เกินจำนวนหน้า PDF",
           path: ["models", modelIndex, "model_evidence", "source_page"],
         });
+      }
+
+      model.identifier_provenance.evidence.forEach((item, evidenceIndex) => {
+        if (
+          item.source_page !== null &&
+          item.source_page > output.source_document.page_count
+        ) {
+          context.addIssue({
+            code: "custom",
+            message: "หน้าหลักฐาน Model เกินจำนวนหน้า PDF",
+            path: [
+              "models",
+              modelIndex,
+              "identifier_provenance",
+              "evidence",
+              evidenceIndex,
+              "source_page",
+            ],
+          });
+        }
+      });
+
+      const provenance = model.identifier_provenance;
+      if (
+        provenance.method === "composed" &&
+        provenance.anchor_model !== null &&
+        provenance.anchor_power_wp !== null &&
+        provenance.variant_power_wp !== null
+      ) {
+        const anchorFamily = familyFromPowerAnchor(
+          provenance.anchor_model,
+          provenance.anchor_power_wp,
+        );
+        const expectedModel = provenance.anchor_model.replace(
+          String(provenance.anchor_power_wp),
+          String(provenance.variant_power_wp),
+        );
+        if (expectedModel !== model.exact_model) {
+          context.addIssue({
+            code: "custom",
+            message: "exact_model ไม่ตรงกับการแทน rated-power token ใน anchor_model",
+            path: ["models", modelIndex, "exact_model"],
+          });
+        }
+        if (
+          anchorFamily === null ||
+          !model.model_family ||
+          normalizeFamilyIdentifier(anchorFamily) !==
+            normalizeFamilyIdentifier(model.model_family)
+        ) {
+          context.addIssue({
+            code: "custom",
+            message: "anchor_model และ anchor_power_wp ไม่สอดคล้องกับ model_family",
+            path: ["models", modelIndex, "identifier_provenance", "anchor_model"],
+          });
+        }
+        const pmax = model.fields.pmaxWp?.value;
+        if (typeof pmax !== "number" || pmax !== provenance.variant_power_wp) {
+          context.addIssue({
+            code: "custom",
+            message: "variant_power_wp ต้องตรงกับ pmaxWp ที่ STC",
+            path: ["models", modelIndex, "identifier_provenance", "variant_power_wp"],
+          });
+        }
       }
 
       const suppliedFieldKeys = Object.keys(model.fields);

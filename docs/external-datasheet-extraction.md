@@ -23,10 +23,17 @@ EasySolar ไม่เปลี่ยนค่าจาก GPT เป็น veri
 
 Prompt, template และ output schema ใช้ version แยกกัน ผลลัพธ์ต้องระบุ `schema_version`, `template_version` และ `prompt_version` ที่ระบบรองรับ
 
+เวอร์ชัน 1.1 รองรับการประกอบ exact model สำหรับ PV Module ด้วยกฎ
+`power_variant_substitution` เท่านั้น โดยต้องมี product family, คอลัมน์กำลังไฟของแต่ละรุ่น
+และ complete anchor model จากเนื้อหา PDF หรือชื่อไฟล์ PDF ระบบเก็บ `identifier_provenance`
+ไว้ใน raw JSON และผู้ดูแลต้องตรวจ model ที่มี `method: "composed"` ก่อนบันทึกสเปก
+Inverter template ไม่อนุญาตให้ประกอบ model identifier
+
 ## กติกาข้อมูล
 
 - PDF หนึ่งไฟล์สร้าง asset เดียว แต่ asset เชื่อมกับ Draft revision ได้หลายรายการ
 - `exact_model` ต้องไม่ซ้ำภายในไฟล์ผลลัพธ์
+- ทุก model ต้องระบุ `identifier_provenance`; model ที่ประกอบขึ้นต้องใช้กฎที่ template อนุญาตและมีหลักฐานจาก PDF
 - ทุก field ใน Template ต้องอยู่ในผลลัพธ์ แม้ AI ไม่พบค่า
 - ค่าที่ไม่พบใช้ `value: null` และ `status: "not_found"`
 - ค่าที่คลุมเครือหรือขัดแย้งไม่ถูกนำไป prefill
