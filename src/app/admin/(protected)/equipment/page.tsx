@@ -4,6 +4,7 @@ import { ShieldAlert } from "lucide-react";
 import { DatasheetUploadPanel } from "@/components/datasheet-upload-panel";
 import { ExternalExtractionImportPanel } from "@/components/external-extraction-import-panel";
 import { ReviewQueueItem } from "@/components/review-queue-item";
+import { ScanQueueStatus } from "@/components/scan-queue-status";
 import { isDatabaseConfigured } from "@/lib/server/db";
 import { requireAdminPage } from "@/lib/server/admin-auth";
 import { listReviewQueue } from "@/lib/server/review-repository";
@@ -46,6 +47,8 @@ export default async function AdminEquipmentPage() {
           <h2 id="review-queue-title">คิวตรวจสอบ</h2>
           <span>{queue.length} รายการ</span>
         </div>
+
+        <ScanQueueStatus waiting={queue.some((row) => row.assetState === "scanning")} />
 
         {!canReview ? (
           <div className="admin-form-blocker" role="status">

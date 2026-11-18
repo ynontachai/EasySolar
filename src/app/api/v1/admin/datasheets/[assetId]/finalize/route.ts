@@ -11,6 +11,7 @@ import {
 } from "@/lib/server/object-storage";
 import { requireAdminRequest } from "@/lib/server/request-auth";
 import { getDatasheetRuntimeCapabilities } from "@/lib/server/runtime-config";
+import { dispatchDatasheetScanner } from "@/lib/server/scan-dispatch";
 
 export const runtime = "nodejs";
 
@@ -76,13 +77,18 @@ export async function POST(_request: Request, context: RouteContext) {
       etag: storedObject.etag,
       state: nextState,
     });
+    const scanDispatch =
+      state === "scanning" ? await dispatchDatasheetScanner() : null;
 
     return Response.json({
       assetId: asset.assetId,
       message:
         state === "available"
           ? "อัปโหลดสำเร็จและพร้อมสำหรับการตรวจข้อมูล"
-          : "อัปโหลดสำเร็จและกำลังรอผลตรวจไฟล์",
+          : scanDispatch?.queued
+            ? "อัปโหลดสำเร็จและส่งไฟล์เข้าคิว Malware scan แล้ว"
+            : "อัปโหลดสำเร็จ แต่เรียก Malware scanner อัตโนมัติไม่สำเร็จ กรุณาสั่งสแกนอีกครั้งจากคิวตรวจสอบ",
+      scanDispatch: scanDispatch?.reason ?? null,
       state,
     });
   } catch (error) {

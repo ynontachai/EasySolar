@@ -1,5 +1,6 @@
 import { getDatasheetRuntimeCapabilities } from "@/lib/server/runtime-config";
 import { getDb, isDatabaseConfigured } from "@/lib/server/db";
+import { isScannerDispatchConfigured } from "@/lib/server/scan-dispatch";
 
 export async function GET() {
   const capabilities = getDatasheetRuntimeCapabilities();
@@ -9,6 +10,7 @@ export async function GET() {
     database: false,
     rateLimit: (process.env.RATE_LIMIT_SALT?.length ?? 0) >= 32,
     scannerToken: scannerToken.length >= 32 && !scannerToken.startsWith("replace-with"),
+    scannerDispatch: isScannerDispatchConfigured(),
     serviceRole: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
     storage: capabilities.storage,
   };

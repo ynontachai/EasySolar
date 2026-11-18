@@ -17,6 +17,7 @@ import { requireAdminPrincipal } from "@/lib/server/admin-auth";
 import { HttpError } from "@/lib/server/http-error";
 import { applyReviewAction, deleteDraftRevision, enterRevisionSpec } from "@/lib/server/review-repository";
 import { deleteStoredObject } from "@/lib/server/object-storage";
+import { dispatchDatasheetScanner } from "@/lib/server/scan-dispatch";
 
 export interface ReviewActionState {
   message: string;
@@ -92,6 +93,25 @@ export async function reviewRevisionAction(
   formData: FormData,
 ): Promise<ReviewActionState> {
   const intent = formData.get("intent");
+
+  if (intent === "dispatch_scan") {
+    try {
+      await requireAdminPrincipal(["account_admin", "reviewer", "super_admin"]);
+      const result = await dispatchDatasheetScanner();
+      revalidatePath("/admin/equipment");
+      return result.queued
+        ? { message: "ส่งงานเข้า Malware scanner แล้ว กรุณาตรวจสถานะอีกครั้งในสักครู่", status: "success" }
+        : {
+            message:
+              result.reason === "not_configured"
+                ? "ยังไม่ได้ตั้งค่า GitHub scanner dispatch ใน Production"
+                : "เรียก Malware scanner ไม่สำเร็จ กรุณาลองใหม่หรือตรวจ GitHub Actions",
+            status: "error",
+          };
+    } catch {
+      return { message: "ไม่มีสิทธิ์เรียก Malware scanner", status: "error" };
+    }
+  }
 
   if (intent === "delete_draft") {
     const revisionId = z.string().uuid().safeParse(formData.get("revisionId"));

@@ -18,12 +18,13 @@ import {
   type RevisionAction,
   type RevisionState,
 } from "@/domain/catalog/review-workflow";
+import type { AssetState } from "@/domain/assets/config";
 import type { AdminPrincipal } from "./admin-auth";
 import { getDb } from "./db";
 import { HttpError } from "./http-error";
 
 export interface ReviewQueueRow {
-  assetState: string | null;
+  assetState: AssetState | null;
   category: "inverter" | "pv_module";
   criticalFields: string[];
   exactModel: string;

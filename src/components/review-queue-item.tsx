@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
-import { CheckCircle2, LoaderCircle, MoreHorizontal, Trash2 } from "lucide-react";
+import { CheckCircle2, LoaderCircle, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
 import {
   reviewRevisionAction,
   type ReviewActionState,
 } from "@/app/admin/(protected)/equipment/review-actions";
 import {
+  assetReviewStatus,
   revisionStateLabels as stateLabels,
 } from "@/domain/catalog/review-workflow";
 import type { ReviewQueueRow } from "@/lib/server/review-repository";
@@ -48,7 +49,7 @@ export function ReviewQueueItem({
 }) {
   const [state, action, isPending] = useActionState(reviewRevisionAction, initialState);
   const fields = row.criticalFields;
-  const hasFile = row.assetState === "available";
+  const assetStatus = assetReviewStatus(row.assetState, row.hasSourceUrl);
   const canOpenSpec =
     canEnterSpec && (row.state === "draft" || row.state === "extracted_unverified");
 
@@ -90,7 +91,7 @@ export function ReviewQueueItem({
       </div>
 
       <ul className="review-item__sources" aria-label="แหล่งข้อมูล">
-        <li>{hasFile ? "มี Datasheet ที่สแกนแล้ว" : "ยังไม่มี Datasheet ที่สแกนแล้ว"}</li>
+        <li data-tone={assetStatus.tone}>{assetStatus.label}</li>
         <li>{row.hasSourceUrl ? "มีลิงก์แหล่งข้อมูลทางการ" : "ไม่มีลิงก์แหล่งข้อมูลทางการ"}</li>
       </ul>
 
@@ -157,8 +158,27 @@ export function ReviewQueueItem({
           </button>
         ) : null}
         {row.state === "verified" ? (
-          <button className="button button--sun" disabled={isPending} name="intent" type="submit" value="publish">
+          <button
+            className="button button--sun"
+            disabled={isPending || !assetStatus.publishReady}
+            name="intent"
+            title={assetStatus.publishReady ? undefined : assetStatus.label}
+            type="submit"
+            value="publish"
+          >
             Publish
+          </button>
+        ) : null}
+        {row.assetState === "scanning" ? (
+          <button
+            className="button button--outline"
+            disabled={isPending}
+            name="intent"
+            type="submit"
+            value="dispatch_scan"
+          >
+            <RefreshCw size={16} aria-hidden="true" />
+            สั่งสแกนอีกครั้ง
           </button>
         ) : null}
         {row.state === "extracted_unverified" || row.state === "verified" ? (
@@ -173,6 +193,12 @@ export function ReviewQueueItem({
         ) : null}
         {isPending ? <LoaderCircle className="spin" size={17} aria-hidden="true" /> : null}
       </div>
+
+      {row.state === "verified" && !assetStatus.publishReady ? (
+        <p className="review-item__publish-blocker" role="status">
+          Publish จะเปิดใช้งานเมื่อ Datasheet สแกนผ่าน หรือมีลิงก์แหล่งข้อมูลทางการ
+        </p>
+      ) : null}
 
       <p data-status={state.status} role={state.status === "error" ? "alert" : "status"} className="review-item__message">
         {state.status === "success" ? <CheckCircle2 size={15} aria-hidden="true" /> : null}

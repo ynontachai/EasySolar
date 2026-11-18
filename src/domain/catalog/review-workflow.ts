@@ -1,5 +1,7 @@
 // Pure rules for the Datasheet review workflow. No database, HTTP, or clock access.
 
+import type { AssetState } from "@/domain/assets/config";
+
 export type RevisionState =
   | "draft"
   | "extracted_unverified"
@@ -135,6 +137,51 @@ export function evaluateFourEyes(input: {
 export interface GateResult {
   blockers: string[];
   ready: boolean;
+}
+
+export interface AssetReviewStatus {
+  label: string;
+  publishReady: boolean;
+  tone: "danger" | "neutral" | "success" | "warning";
+}
+
+export function assetReviewStatus(
+  assetState: AssetState | null,
+  hasSourceUrl: boolean,
+): AssetReviewStatus {
+  if (assetState === "available") {
+    return { label: "Datasheet สแกนผ่านแล้ว", publishReady: true, tone: "success" };
+  }
+  if (assetState === "scanning") {
+    return {
+      label: "อัปโหลดแล้ว · กำลังรอ Malware scan",
+      publishReady: hasSourceUrl,
+      tone: "warning",
+    };
+  }
+  if (assetState === "quarantined") {
+    return {
+      label: hasSourceUrl
+        ? "ไฟล์แนบไม่ผ่าน Malware scan · ใช้ลิงก์แหล่งข้อมูลทางการแทน"
+        : "ไฟล์ไม่ผ่าน Malware scan · Publish ไม่ได้",
+      publishReady: hasSourceUrl,
+      tone: "danger",
+    };
+  }
+  if (assetState === "pending_upload" || assetState === "uploaded") {
+    return {
+      label: "การอัปโหลดหรือยืนยันไฟล์ยังไม่เสร็จ",
+      publishReady: hasSourceUrl,
+      tone: "warning",
+    };
+  }
+  return {
+    label: hasSourceUrl
+      ? "ไม่มีไฟล์แนบ · ใช้ลิงก์แหล่งข้อมูลทางการ"
+      : "ยังไม่มี Datasheet ที่พร้อมใช้งาน",
+    publishReady: hasSourceUrl,
+    tone: "neutral",
+  };
 }
 
 export function missingSourcePages(

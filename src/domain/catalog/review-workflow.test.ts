@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assetReviewStatus,
   canPerform,
   evaluateFourEyes,
   evaluatePublishGates,
@@ -55,6 +56,35 @@ describe("role and state permissions", () => {
     expect(canPerform("publish", "extracted_unverified", ["super_admin"])).toBe(false);
     expect(canPerform("recall", "verified", ["super_admin"])).toBe(false);
     expect(canPerform("recall", "published", ["super_admin"])).toBe(true);
+  });
+});
+
+describe("asset review status", () => {
+  it("distinguishes upload, scan, and available states", () => {
+    expect(assetReviewStatus("pending_upload", false)).toMatchObject({
+      publishReady: false,
+      tone: "warning",
+    });
+    expect(assetReviewStatus("scanning", false)).toEqual({
+      label: "อัปโหลดแล้ว · กำลังรอ Malware scan",
+      publishReady: false,
+      tone: "warning",
+    });
+    expect(assetReviewStatus("available", false)).toMatchObject({
+      publishReady: true,
+      tone: "success",
+    });
+    expect(assetReviewStatus("quarantined", false)).toMatchObject({
+      publishReady: false,
+      tone: "danger",
+    });
+  });
+
+  it("allows an official source URL when no scanned file is available", () => {
+    expect(assetReviewStatus("scanning", true)).toMatchObject({
+      publishReady: true,
+      tone: "warning",
+    });
   });
 });
 

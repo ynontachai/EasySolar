@@ -11,6 +11,8 @@ Public output is a preliminary DC-side engineering aid. It is not a final design
 - Supabase Auth public configuration and server-only `SUPABASE_SERVICE_ROLE_KEY`
 - `FILE_SCAN_MODE=external`
 - Unique `EASYSOLAR_SCANNER_TOKEN`
+- `EASYSOLAR_SCANNER_GITHUB_TOKEN` with Actions read/write permission for only this repository
+- `EASYSOLAR_SCANNER_GITHUB_REPOSITORY` and `EASYSOLAR_SCANNER_GITHUB_REF` for immediate scan dispatch
 - Random server-only `RATE_LIMIT_SALT` of at least 32 bytes
 - `SIZING_RATE_LIMIT_PER_MINUTE` (default policy: 30)
 - Correct `NEXT_PUBLIC_SITE_URL` and optional LINE OA URL
@@ -42,6 +44,7 @@ Apply every timestamped migration, including `20261109000100_production_sizing_g
 - A verified golden pair reproduces the approved hot Vmp, cold Voc, cold Vmp, per-MPPT Ns/Np, current and total power.
 - Security headers include CSP, HSTS, frame denial and content-type protection.
 - Scanner claim/callback and signed Datasheet download work with production storage.
+- Upload finalize dispatches `datasheet-scanner.yml`; the scheduled workflow remains a fallback only.
 
 ## Rollback
 
