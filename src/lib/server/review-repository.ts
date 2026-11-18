@@ -5,6 +5,10 @@ import {
   type PvSpecInput,
 } from "@/domain/catalog/spec-schemas";
 import {
+  extractedModelSchema,
+  extractionModelToSpecDefaults,
+} from "@/domain/catalog/extraction-schema";
+import {
   canPerform,
   evaluateFourEyes,
   evaluatePublishGates,
@@ -533,6 +537,7 @@ export async function getRevisionSpecTarget(revisionId: string): Promise<Revisio
     Array<{
       category: "inverter" | "pv_module";
       exactModel: string;
+      extractionModel: unknown | null;
       manufacturer: string;
       revisionLabel: string;
       sourcePages: Record<string, string>;
@@ -567,6 +572,7 @@ export async function getRevisionSpecTarget(revisionId: string): Promise<Revisio
       datasheet_revision.state::text AS state,
       datasheet_revision.source_url AS "sourceUrl",
       datasheet_revision.spec_source_pages AS "sourcePages",
+      extraction_candidate.model_json AS "extractionModel",
       (pv_module_spec.beta_voc_per_c * 100)::text AS "betaVocPercentPerC",
       (pv_module_spec.beta_vmp_per_c * 100)::text AS "betaVmpPercentPerC",
       (pv_module_spec.alpha_isc_per_c * 100)::text AS "alphaIscPercentPerC",
@@ -591,12 +597,14 @@ export async function getRevisionSpecTarget(revisionId: string): Promise<Revisio
     JOIN manufacturer ON manufacturer.id = product_model.manufacturer_id
     LEFT JOIN pv_module_spec ON pv_module_spec.datasheet_revision_id = datasheet_revision.id
     LEFT JOIN inverter_spec ON inverter_spec.datasheet_revision_id = datasheet_revision.id
+    LEFT JOIN datasheet_extraction_candidate AS extraction_candidate
+      ON extraction_candidate.revision_id = datasheet_revision.id
     WHERE datasheet_revision.id = ${revisionId}::uuid
   `;
 
   if (!row) return null;
 
-  const trackerRows = await sql<Array<Record<string, string>>>`
+  const storedTrackerRows = await sql<Array<Record<string, string>>>`
     SELECT
       input_count::text AS "inputCount",
       max_operating_current_a::text AS "maxOperatingCurrentA",
@@ -607,6 +615,7 @@ export async function getRevisionSpecTarget(revisionId: string): Promise<Revisio
     WHERE inverter_revision_id = ${revisionId}::uuid
     ORDER BY tracker_index
   `;
+  let trackerRows: Array<Record<string, string>> = [...storedTrackerRows];
 
   const { category, exactModel, manufacturer, revisionLabel, sourcePages, sourceUrl, state } = row;
   const values: Record<string, string> = {};
@@ -617,6 +626,15 @@ export async function getRevisionSpecTarget(revisionId: string): Promise<Revisio
   if (sourceUrl) values.sourceUrl = sourceUrl;
   for (const [key, value] of Object.entries(sourcePages ?? {})) {
     if (typeof value === "string") values[`sourcePages.${key}`] = value;
+  }
+
+  const proposal = extractedModelSchema.safeParse(row.extractionModel);
+  if (proposal.success) {
+    const defaults = extractionModelToSpecDefaults(proposal.data);
+    for (const [key, value] of Object.entries(defaults.values)) {
+      if (!(key in values)) values[key] = value;
+    }
+    if (trackerRows.length === 0) trackerRows = defaults.trackers;
   }
 
   return {

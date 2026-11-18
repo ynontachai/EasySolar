@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { ShieldAlert } from "lucide-react";
 import { DatasheetUploadPanel } from "@/components/datasheet-upload-panel";
+import { ExternalExtractionImportPanel } from "@/components/external-extraction-import-panel";
 import { ReviewQueueItem } from "@/components/review-queue-item";
 import { isDatabaseConfigured } from "@/lib/server/db";
 import { requireAdminPage } from "@/lib/server/admin-auth";
@@ -33,7 +34,12 @@ export default async function AdminEquipmentPage() {
         <span className="admin-mode">{canReview ? "REVIEWER" : "INTAKE"}</span>
       </div>
 
-      <DatasheetUploadPanel capabilities={capabilities} />
+      {canEnterSpec ? <ExternalExtractionImportPanel capabilities={capabilities} /> : null}
+
+      <details className="legacy-datasheet-intake">
+        <summary>เพิ่ม Datasheet แบบ 1 Model และกรอกสเปกเอง</summary>
+        <DatasheetUploadPanel capabilities={capabilities} />
+      </details>
 
       <section className="review-queue" aria-labelledby="review-queue-title">
         <div className="review-queue__head">

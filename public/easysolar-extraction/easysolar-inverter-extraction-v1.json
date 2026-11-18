@@ -1,0 +1,41 @@
+{
+  "schema_id": "easysolar-spec-extraction",
+  "schema_version": "1.0",
+  "template_id": "inverter",
+  "template_version": "1.0",
+  "prompt_version": "1.0",
+  "category": "inverter",
+  "model_detection": {
+    "required": true,
+    "allow_multiple_models": true,
+    "preserve_exact_identifier": true
+  },
+  "field_contract": [
+    { "field_key": "inverterType", "label": "Inverter Type", "type": "string", "unit": null, "required": true, "allowed_values": ["string", "hybrid", "micro"] },
+    { "field_key": "ratedAcKw", "label": "Rated AC Power", "type": "number", "unit": "kW", "required": true, "aliases": ["Rated Output Power", "Nominal AC Power"], "validation": { "min_exclusive": 0, "max": 10000 } },
+    { "field_key": "maxDcVoltageV", "label": "Maximum DC Input Voltage", "type": "number", "unit": "V", "required": true, "aliases": ["Max. Input Voltage", "Maximum DC Voltage"], "validation": { "min_exclusive": 0, "max": 5000 } },
+    { "field_key": "startupVoltageV", "label": "Startup Voltage", "type": "number", "unit": "V", "required": true, "aliases": ["Start-up Voltage", "Starting Voltage"], "validation": { "min_exclusive": 0, "max": 2000 } },
+    { "field_key": "maxRecommendedPvWp", "label": "Maximum Recommended PV Power", "type": "number", "unit": "Wp", "required": false, "aliases": ["Recommended Max. PV Power", "Max. Recommended PV Power"], "validation": { "min_exclusive": 0, "max": 10000000 } },
+    { "field_key": "maxDcPowerWp", "label": "Maximum DC/PV Input Power", "type": "number", "unit": "Wp", "required": false, "aliases": ["Max. DC Input Power", "Max. PV Input Power"], "validation": { "min_exclusive": 0, "max": 10000000 } }
+  ],
+  "tracker_contract": [
+    { "field_key": "inputCount", "label": "String Inputs per MPPT", "type": "number", "unit": "count", "required": true, "validation": { "min": 1, "max": 12, "integer": true } },
+    { "field_key": "mpptMinV", "label": "MPPT Minimum Voltage", "type": "number", "unit": "V", "required": true, "validation": { "min_exclusive": 0, "max": 2000 } },
+    { "field_key": "mpptMaxV", "label": "MPPT Maximum Voltage", "type": "number", "unit": "V", "required": true, "validation": { "min_exclusive": 0, "max": 2000 } },
+    { "field_key": "maxOperatingCurrentA", "label": "Maximum Operating/Input Current per MPPT", "type": "number", "unit": "A", "required": true, "validation": { "min_exclusive": 0, "max": 200 } },
+    { "field_key": "maxShortCircuitCurrentA", "label": "Maximum Short Circuit Current per MPPT", "type": "number", "unit": "A", "required": true, "validation": { "min_exclusive": 0, "max": 300 } }
+  ],
+  "rules": [
+    "At least one of maxRecommendedPvWp or maxDcPowerWp should be extracted when present.",
+    "Do not merge different MPPT groups when the datasheet gives them different limits.",
+    "Every tracker object must contain every tracker field key."
+  ],
+  "output_contract": {
+    "top_level_keys": ["schema_id", "schema_version", "template_id", "template_version", "prompt_version", "source_document", "manufacturer", "detected_model_count", "models", "unresolved_model_labels", "document_warnings"],
+    "source_document": { "filename": "string", "page_count": "positive integer" },
+    "manufacturer": { "value": "string", "source_page": "positive integer", "confidence": "high | medium | low" },
+    "model": { "exact_model": "string", "model_family": "string | null", "model_evidence": { "source_page": "positive integer", "source_label": "string", "evidence": "string" }, "fields": "object containing every field_key", "trackers": "tracker[]", "warnings": "string[]" },
+    "tracker": { "tracker_index": "positive integer starting at 1", "fields": "object containing every tracker field_key" },
+    "field": { "value": "number | string | boolean | null", "unit": "string | null", "raw_value": "number | string | boolean | null", "raw_unit": "string | null", "status": "extracted | derived | shared_across_models | ambiguous | not_found | conflict", "source_page": "positive integer | null", "source_label": "string | null", "evidence": "string | null", "confidence": "high | medium | low", "formula": "string | null", "input_fields": "string[]" }
+  }
+}

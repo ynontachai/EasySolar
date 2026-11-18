@@ -45,6 +45,14 @@ export function createDatasheetObjectKey(input: {
   return `${environment}/catalog/datasheets/${input.productModelId}/${input.revisionId}/${input.assetId}/original.pdf`;
 }
 
+export function createDatasheetImportObjectKey(input: {
+  assetId: string;
+  importId: string;
+}) {
+  const environment = process.env.APP_ENVIRONMENT || process.env.NODE_ENV || "development";
+  return `${environment}/catalog/datasheet-imports/${input.importId}/${input.assetId}/original.pdf`;
+}
+
 function imageExtension(mediaType: ProductImageMediaType) {
   if (mediaType === "image/png") return "png";
   if (mediaType === "image/webp") return "webp";

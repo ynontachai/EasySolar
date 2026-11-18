@@ -1,0 +1,34 @@
+{
+  "schema_id": "easysolar-spec-extraction",
+  "schema_version": "1.0",
+  "template_id": "pv-module",
+  "template_version": "1.0",
+  "prompt_version": "1.0",
+  "category": "pv_module",
+  "model_detection": {
+    "required": true,
+    "allow_multiple_models": true,
+    "preserve_exact_identifier": true
+  },
+  "field_contract": [
+    { "field_key": "pmaxWp", "label": "Maximum Power at STC", "type": "number", "unit": "Wp", "required": true, "aliases": ["Pmax", "Maximum Power", "Rated Maximum Power"], "validation": { "min_exclusive": 0, "max": 2000 } },
+    { "field_key": "vocV", "label": "Open Circuit Voltage at STC", "type": "number", "unit": "V", "required": true, "aliases": ["Voc", "Open Circuit Voltage"], "validation": { "min_exclusive": 0, "max": 500 } },
+    { "field_key": "vmpV", "label": "Voltage at Maximum Power at STC", "type": "number", "unit": "V", "required": true, "aliases": ["Vmp", "Vmpp", "Maximum Power Voltage"], "validation": { "min_exclusive": 0, "max": 500 } },
+    { "field_key": "iscA", "label": "Short Circuit Current at STC", "type": "number", "unit": "A", "required": true, "aliases": ["Isc", "Short Circuit Current"], "validation": { "min_exclusive": 0, "max": 100 } },
+    { "field_key": "impA", "label": "Current at Maximum Power at STC", "type": "number", "unit": "A", "required": true, "aliases": ["Imp", "Impp", "Maximum Power Current"], "validation": { "min_exclusive": 0, "max": 100 } },
+    { "field_key": "maxSystemVoltageV", "label": "Maximum System Voltage", "type": "number", "unit": "V", "required": true, "aliases": ["Max System Voltage", "Maximum System Voltage"], "validation": { "min_exclusive": 0, "max": 5000 } },
+    { "field_key": "betaVocPercentPerC", "label": "Temperature Coefficient of Voc", "type": "number", "unit": "%/°C", "required": true, "aliases": ["Temperature Coefficient of Voc", "βVoc"], "validation": { "min_exclusive": -2, "max_exclusive": 0 } },
+    { "field_key": "betaVmpPercentPerC", "label": "Temperature Coefficient of Vmp", "type": "number", "unit": "%/°C", "required": false, "aliases": ["Temperature Coefficient of Vmp", "βVmp"], "derivation": { "allowed": true, "formula": "gammaPmaxPercentPerC - alphaIscPercentPerC", "requires": ["gammaPmaxPercentPerC", "alphaIscPercentPerC"] } },
+    { "field_key": "gammaPmaxPercentPerC", "label": "Temperature Coefficient of Pmax", "type": "number", "unit": "%/°C", "required": false, "aliases": ["Temperature Coefficient of Pmax", "γPmax"], "validation": { "min": -2, "max_exclusive": 0 } },
+    { "field_key": "alphaIscPercentPerC", "label": "Temperature Coefficient of Isc", "type": "number", "unit": "%/°C", "required": false, "aliases": ["Temperature Coefficient of Isc", "αIsc"], "validation": { "min_exclusive": 0, "max": 2 } },
+    { "field_key": "bifacialityFactor", "label": "Bifaciality Factor", "type": "number", "unit": "ratio", "required": false, "aliases": ["Bifaciality", "Bifaciality Factor"], "validation": { "min": 0, "max": 1 } }
+  ],
+  "tracker_contract": [],
+  "output_contract": {
+    "top_level_keys": ["schema_id", "schema_version", "template_id", "template_version", "prompt_version", "source_document", "manufacturer", "detected_model_count", "models", "unresolved_model_labels", "document_warnings"],
+    "source_document": { "filename": "string", "page_count": "positive integer" },
+    "manufacturer": { "value": "string", "source_page": "positive integer", "confidence": "high | medium | low" },
+    "model": { "exact_model": "string", "model_family": "string | null", "model_evidence": { "source_page": "positive integer", "source_label": "string", "evidence": "string" }, "fields": "object containing every field_key", "trackers": "empty array", "warnings": "string[]" },
+    "field": { "value": "number | string | boolean | null", "unit": "string | null", "raw_value": "number | string | boolean | null", "raw_unit": "string | null", "status": "extracted | derived | shared_across_models | ambiguous | not_found | conflict", "source_page": "positive integer | null", "source_label": "string | null", "evidence": "string | null", "confidence": "high | medium | low", "formula": "string | null, required when derived", "input_fields": "string[], required when derived" }
+  }
+}

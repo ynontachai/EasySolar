@@ -3124,6 +3124,130 @@ a {
   gap: 8px;
 }
 
+.extraction-intake {
+  border-color: #a8b8e8;
+}
+
+.extraction-downloads {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 26px;
+  padding-top: 22px;
+}
+
+.extraction-downloads a {
+  align-items: center;
+  background: #f1f4ff;
+  color: #244ac7;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 13px;
+  text-decoration: none;
+}
+
+.extraction-downloads a:focus-visible {
+  outline: 3px solid #244ac7;
+  outline-offset: 2px;
+}
+
+.extraction-guidance {
+  background: var(--paper-deep);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: center;
+  min-height: 46px;
+  padding: 9px 12px;
+}
+
+.extraction-guidance strong {
+  font-size: 12px;
+}
+
+.extraction-guidance span {
+  color: #667085;
+  font-size: 11px;
+}
+
+.extraction-preview {
+  background: #f7f9ff;
+  border: 1px solid #cbd5f2;
+  grid-column: 1 / -1;
+  padding: 18px;
+}
+
+.extraction-preview > div:first-child {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.extraction-preview > div:first-child span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.extraction-preview small,
+.extraction-preview p,
+.extraction-preview dt {
+  color: #667085;
+  font-size: 12px;
+}
+
+.extraction-preview dl {
+  display: grid;
+  gap: 1px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 16px 0 0;
+}
+
+.extraction-preview dl > div {
+  background: var(--white);
+  padding: 10px 12px;
+}
+
+.extraction-preview dt,
+.extraction-preview dd {
+  margin: 0;
+}
+
+.extraction-preview dd {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 3px;
+}
+
+.extraction-preview p {
+  line-height: 1.65;
+  margin: 14px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.legacy-datasheet-intake {
+  margin: 0 auto 28px;
+  max-width: calc(var(--max-width) - 48px);
+}
+
+.legacy-datasheet-intake > summary {
+  color: #53627b;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 13px 0;
+}
+
+.legacy-datasheet-intake > .datasheet-intake {
+  margin: 10px 0 0;
+  max-width: none;
+}
+
 .spin {
   animation: spin 900ms linear infinite;
 }
@@ -3471,6 +3595,28 @@ a {
   .datasheet-intake__token,
   .datasheet-intake__action {
     grid-column: 1;
+  }
+
+  .extraction-preview {
+    grid-column: 1;
+  }
+
+  .extraction-preview dl {
+    grid-template-columns: 1fr;
+  }
+
+  .extraction-downloads {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .extraction-downloads a {
+    justify-content: center;
+  }
+
+  .legacy-datasheet-intake {
+    margin-left: 18px;
+    margin-right: 18px;
   }
 
   .intake-state {
