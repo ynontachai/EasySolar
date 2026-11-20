@@ -116,7 +116,14 @@ export function ThemeSelect({
         role="combobox"
         type="button"
       >
-        <span>{selectedOption?.label ?? placeholder}</span>
+        {selectedOption?.description ? (
+          <span className="theme-select__value">
+            <strong>{selectedOption.label}</strong>
+            <small>{selectedOption.description}</small>
+          </span>
+        ) : (
+          <span>{selectedOption?.label ?? placeholder}</span>
+        )}
         <ChevronDown aria-hidden="true" size={19} />
       </button>
       {isOpen ? (

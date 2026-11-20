@@ -18,7 +18,9 @@ export interface CheckerEquipmentOption {
   isDemo: boolean;
   manufacturer: string;
   model: string;
+  primarySpec: string;
   revisionLabel: string;
+  secondarySpec: string;
   value: string;
 }
 
@@ -89,8 +91,12 @@ function EquipmentPicker({
           <ThemeSelect
             id={`${idPrefix}-model`}
             onValueChange={onChange}
-            options={models.map((option) => ({ label: option.model, value: option.value }))}
-            searchable={models.length > 8}
+            options={models.map((option) => ({
+              description: `${option.primarySpec} · ${option.secondarySpec}`,
+              label: option.model,
+              value: option.value,
+            }))}
+            searchable
             value={value}
           />
         </div>

@@ -628,11 +628,22 @@ export const extractedImportUploadIntentSchema = z
     }
   });
 
+export const extractedImportPreflightSchema = z
+  .object({
+    extraction: extractedSpecSchema,
+    market: z.string().trim().min(2).max(16).default("TH"),
+    revisionLabel: z.string().trim().min(1).max(100),
+  })
+  .strict();
+
 export type ExtractedField = z.infer<typeof extractedFieldSchema>;
 export type ExtractedModel = z.infer<typeof extractedModelSchema>;
 export type ExtractedSpec = z.infer<typeof extractedSpecSchema>;
 export type ExtractedImportUploadIntent = z.infer<
   typeof extractedImportUploadIntentSchema
+>;
+export type ExtractedImportPreflightInput = z.infer<
+  typeof extractedImportPreflightSchema
 >;
 
 function fieldValue(field: ExtractedField | undefined) {

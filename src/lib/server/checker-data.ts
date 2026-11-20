@@ -11,7 +11,10 @@ export const DEFAULT_ASSUMPTIONS = {
   targetDcPowerWp: 11000,
 };
 
-function toDemoOption(item: { id: string; manufacturer: string; model: string }): CheckerEquipmentOption {
+function toDemoOption(
+  item: (typeof demoPvModules)[number] | (typeof demoInverters)[number],
+): CheckerEquipmentOption {
+  const isPvModule = "pmaxWp" in item;
   return {
     datasheetPath: null,
     imageAlt: null,
@@ -19,7 +22,11 @@ function toDemoOption(item: { id: string; manufacturer: string; model: string })
     isDemo: true,
     manufacturer: item.manufacturer,
     model: item.model,
+    primarySpec: isPvModule ? `${item.pmaxWp} Wp` : `${item.ratedAcKw} kW`,
     revisionLabel: "Demo",
+    secondarySpec: isPvModule
+      ? `Voc ${item.vocV} V · Vmp ${item.vmpV} V`
+      : `${item.trackers.length} MPPT · Max DC ${item.maxDcVoltageV} V`,
     value: item.id,
   };
 }
@@ -38,7 +45,9 @@ export async function loadCheckerData() {
     isDemo: false,
     manufacturer: item.manufacturer,
     model: item.exactModel,
+    primarySpec: item.primarySpec,
     revisionLabel: item.revisionLabel,
+    secondarySpec: item.secondarySpec,
     value: item.id,
   });
 

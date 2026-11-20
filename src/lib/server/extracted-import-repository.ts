@@ -1,6 +1,12 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { ExtractedImportUploadIntent } from "@/domain/catalog/extraction-schema";
+import type { ExtractedImportPreflightInput } from "@/domain/catalog/extraction-schema";
+import {
+  classifyImportModels,
+  type ExtractedImportPreflightResult,
+  type ExistingImportModel,
+} from "@/domain/catalog/import-preflight";
 import type { AdminPrincipal } from "./admin-auth";
 import { getDb } from "./db";
 import { HttpError } from "./http-error";
@@ -12,6 +18,84 @@ export interface ExtractedImportUploadRecord {
   importId: string;
   objectKey: string;
   revisions: Array<{ exactModel: string; revisionId: string }>;
+}
+
+export async function previewExtractedImport(
+  input: ExtractedImportPreflightInput,
+): Promise<ExtractedImportPreflightResult> {
+  const sql = getDb();
+  const category = input.extraction.template_id === "pv-module" ? "pv_module" : "inverter";
+  const market = input.market.toUpperCase();
+  const [manufacturer] = await sql<Array<{ id: string; name: string }>>`
+    SELECT id::text AS id, name
+    FROM manufacturer
+    WHERE lower(name) = lower(${input.extraction.manufacturer.value})
+    LIMIT 1
+  `;
+
+  let existingModels: ExistingImportModel[] = [];
+  if (manufacturer) {
+    const normalizedModels = input.extraction.models.map((model) =>
+      model.exact_model.toLocaleLowerCase("en-US"),
+    );
+    const rows = await sql<
+      Array<{
+        category: "inverter" | "pv_module";
+        exactModel: string;
+        revisionLabel: string | null;
+      }>
+    >`
+      SELECT
+        product_model.category::text AS category,
+        product_model.exact_model AS "exactModel",
+        datasheet_revision.revision_label AS "revisionLabel"
+      FROM product_model
+      LEFT JOIN datasheet_revision ON datasheet_revision.product_model_id = product_model.id
+      WHERE product_model.manufacturer_id = ${manufacturer.id}::uuid
+        AND product_model.market = ${market}
+        AND lower(product_model.exact_model) IN ${sql(normalizedModels)}
+      ORDER BY product_model.exact_model, datasheet_revision.created_at
+    `;
+    const grouped = new Map<string, ExistingImportModel>();
+    for (const row of rows) {
+      const key = row.exactModel.toLocaleLowerCase("en-US");
+      const current = grouped.get(key) ?? {
+        category: row.category,
+        exactModel: row.exactModel,
+        revisionLabels: [],
+      };
+      if (row.revisionLabel) current.revisionLabels.push(row.revisionLabel);
+      grouped.set(key, current);
+    }
+    existingModels = [...grouped.values()];
+  }
+
+  const models = classifyImportModels({
+    category,
+    exactModels: input.extraction.models.map((model) => model.exact_model),
+    existingModels,
+    revisionLabel: input.revisionLabel,
+  });
+  const blocked = models.filter((model) =>
+    model.status === "REVISION_EXISTS" || model.status === "CATEGORY_CONFLICT"
+  ).length;
+
+  return {
+    canImport: blocked === 0,
+    manufacturer: {
+      inputName: input.extraction.manufacturer.value,
+      matchedName: manufacturer?.name ?? null,
+      status: manufacturer ? "EXISTING" : "NEW",
+    },
+    market,
+    models,
+    revisionLabel: input.revisionLabel,
+    summary: {
+      blocked,
+      newModels: models.filter((model) => model.status === "NEW_MODEL").length,
+      newRevisions: models.filter((model) => model.status === "NEW_REVISION").length,
+    },
+  };
 }
 
 export async function createExtractedImportUploadRecord(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -20,6 +20,10 @@ import {
   MAX_EXTRACTION_JSON_SIZE_BYTES,
   type ExtractedSpec,
 } from "@/domain/catalog/extraction-schema";
+import type {
+  ExtractedImportPreflightResult,
+  ImportPreflightModelStatus,
+} from "@/domain/catalog/import-preflight";
 import { ThemeSelect } from "@/components/theme-select";
 
 interface UploadIntentResponse {
@@ -47,6 +51,61 @@ type ImportPhase =
 
 interface ExternalExtractionImportPanelProps {
   capabilities: DatasheetRuntimeCapabilities;
+}
+
+const preflightStatusLabels: Record<ImportPreflightModelStatus, string> = {
+  CATEGORY_CONFLICT: "ประเภทขัดแย้ง",
+  NEW_MODEL: "เพิ่ม Model",
+  NEW_REVISION: "เพิ่ม Revision",
+  REVISION_EXISTS: "Revision ซ้ำ",
+};
+
+export function ImportPreflightPreview({
+  preflight,
+}: {
+  preflight: ExtractedImportPreflightResult;
+}) {
+  return (
+    <section
+      aria-labelledby="preflight-title"
+      className={`extraction-preflight extraction-preflight--${preflight.canImport ? "ready" : "blocked"}`}
+    >
+      <div className="extraction-preflight__head">
+        <div>
+          <p className="eyebrow eyebrow--dark">IMPORT PREFLIGHT</p>
+          <h3 id="preflight-title">ผลตรวจก่อนสร้าง Draft</h3>
+          <p>
+            Manufacturer: <strong>{preflight.manufacturer.matchedName ?? preflight.manufacturer.inputName}</strong>
+            {preflight.manufacturer.status === "EXISTING" ? " · ใช้รายการเดิม" : " · จะสร้างใหม่"}
+          </p>
+        </div>
+        <span className={`preflight-state preflight-state--${preflight.canImport ? "ready" : "blocked"}`}>
+          {preflight.canImport ? "พร้อมนำเข้า" : `ติดปัญหา ${preflight.summary.blocked} รายการ`}
+        </span>
+      </div>
+      <dl className="extraction-preflight__summary">
+        <div><dt>เพิ่ม Model</dt><dd>{preflight.summary.newModels}</dd></div>
+        <div><dt>เพิ่ม Revision</dt><dd>{preflight.summary.newRevisions}</dd></div>
+        <div><dt>ต้องแก้ไข</dt><dd>{preflight.summary.blocked}</dd></div>
+      </dl>
+      <ul className="extraction-preflight__models">
+        {preflight.models.map((model) => (
+          <li key={model.exactModel}>
+            <div>
+              <strong>{model.exactModel}</strong>
+              <small>{model.message}</small>
+            </div>
+            <span className={`preflight-model-state preflight-model-state--${model.status.toLowerCase()}`}>
+              {preflightStatusLabels[model.status]}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="extraction-preflight__note">
+        ระบบจะตรวจซ้ำอีกครั้งตอนสร้าง Draft เพื่อป้องกันข้อมูลเปลี่ยนระหว่างการตรวจ
+      </p>
+    </section>
+  );
 }
 
 function formatMegabytes(bytes: number) {
@@ -141,11 +200,25 @@ export function ExternalExtractionImportPanel({
   const [phase, setPhase] = useState<ImportPhase>("idle");
   const [message, setMessage] = useState("");
   const [preview, setPreview] = useState<ExtractedSpec | null>(null);
+  const [preflight, setPreflight] = useState<ExtractedImportPreflightResult | null>(null);
+  const [preflightError, setPreflightError] = useState("");
+  const [isPreflighting, setIsPreflighting] = useState(false);
+  const [revisionLabel, setRevisionLabel] = useState("");
+  const [market, setMarket] = useState("TH");
   const [language, setLanguage] = useState("en");
+  const latestPreflightRequest = useRef(0);
+
+  function clearPreflight() {
+    latestPreflightRequest.current += 1;
+    setPreflight(null);
+    setPreflightError("");
+    setIsPreflighting(false);
+  }
 
   async function handleJsonChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     setPreview(null);
+    clearPreflight();
     setMessage("");
     if (!file) return;
 
@@ -161,6 +234,45 @@ export function ExternalExtractionImportPanel({
     }
   }
 
+  async function handlePreflight() {
+    if (!preview) return;
+    if (!revisionLabel.trim()) {
+      setPreflightError("กรุณาระบุ Revision label ก่อนตรวจรายการ");
+      return;
+    }
+    if (market.trim().length < 2) {
+      setPreflightError("กรุณาระบุ Market อย่างน้อย 2 ตัวอักษร");
+      return;
+    }
+
+    const requestId = ++latestPreflightRequest.current;
+    setIsPreflighting(true);
+    setPreflightError("");
+    setMessage("");
+    try {
+      const response = await fetch(
+        "/api/v1/admin/datasheets/extracted-imports/preflight",
+        {
+          body: JSON.stringify({ extraction: preview, market, revisionLabel }),
+          headers: { "content-type": "application/json" },
+          method: "POST",
+        },
+      );
+      const result = await readApiResponse<ExtractedImportPreflightResult>(response);
+      if (requestId === latestPreflightRequest.current) {
+        setPreflight(result);
+        setPhase("idle");
+      }
+    } catch (error) {
+      if (requestId === latestPreflightRequest.current) {
+        setPreflight(null);
+        setPreflightError(error instanceof Error ? error.message : "ตรวจรายการเดิมไม่สำเร็จ");
+      }
+    } finally {
+      if (requestId === latestPreflightRequest.current) setIsPreflighting(false);
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
@@ -169,6 +281,16 @@ export function ExternalExtractionImportPanel({
     const formData = new FormData(form);
     const pdf = formData.get("datasheet");
     const json = formData.get("extractionJson");
+    if (!preflight) {
+      setPhase("error");
+      setMessage("กรุณากดตรวจรายการเดิมก่อนสร้าง Draft");
+      return;
+    }
+    if (!preflight.canImport) {
+      setPhase("error");
+      setMessage("ยังสร้าง Draft ไม่ได้ กรุณาแก้รายการที่ซ้ำหรือขัดแย้งก่อน");
+      return;
+    }
     if (!(pdf instanceof File) || pdf.size === 0) {
       setPhase("error");
       setMessage("กรุณาเลือก Datasheet PDF ต้นฉบับ");
@@ -237,6 +359,9 @@ export function ExternalExtractionImportPanel({
         `สร้าง Draft ${intent.revisions.length} Models แล้ว · เปิดแต่ละรายการในคิวเพื่อตรวจและบันทึกสเปก`,
       );
       setPreview(null);
+      setPreflight(null);
+      setRevisionLabel("");
+      setMarket("TH");
       form.reset();
       setLanguage("en");
       router.refresh();
@@ -296,11 +421,29 @@ export function ExternalExtractionImportPanel({
         <form className="datasheet-intake__form" onSubmit={handleSubmit}>
           <label>
             <span>Revision label</span>
-            <input name="revisionLabel" placeholder="เช่น Rev. 2026-11" required />
+            <input
+              name="revisionLabel"
+              onChange={(event) => {
+                setRevisionLabel(event.target.value);
+                clearPreflight();
+              }}
+              placeholder="เช่น Rev. 2026-11"
+              required
+              value={revisionLabel}
+            />
           </label>
           <label>
             <span>Market</span>
-            <input defaultValue="TH" maxLength={16} name="market" required />
+            <input
+              maxLength={16}
+              name="market"
+              onChange={(event) => {
+                setMarket(event.target.value);
+                clearPreflight();
+              }}
+              required
+              value={market}
+            />
           </label>
           <div className="datasheet-intake__field">
             <span>ภาษาใน Datasheet</span>
@@ -344,8 +487,25 @@ export function ExternalExtractionImportPanel({
                 <div><dt>คำเตือน</dt><dd>{preview.document_warnings.length}</dd></div>
               </dl>
               <p>{preview.models.map((model) => model.exact_model).join(" · ")}</p>
+              <div className="extraction-preview__action">
+                <span>ตรวจ Manufacturer, Model และ Revision กับฐานข้อมูลก่อนสร้าง Draft</span>
+                <button
+                  className="button button--outline"
+                  disabled={isPreflighting}
+                  onClick={() => void handlePreflight()}
+                  type="button"
+                >
+                  {isPreflighting ? "กำลังตรวจ…" : "ตรวจรายการเดิม"}
+                </button>
+              </div>
             </div>
           ) : null}
+
+          {preflightError ? (
+            <p className="extraction-preflight__error" role="alert">{preflightError}</p>
+          ) : null}
+
+          {preflight ? <ImportPreflightPreview preflight={preflight} /> : null}
 
           <div className="datasheet-intake__action">
             <div aria-live="polite">
@@ -354,7 +514,11 @@ export function ExternalExtractionImportPanel({
               {isBusy ? <LoaderCircle className="spin" size={17} /> : null}
               <span>{message || phaseLabel}</span>
             </div>
-            <button className="button button--ink" disabled={isBusy || !preview} type="submit">
+            <button
+              className="button button--ink"
+              disabled={isBusy || isPreflighting || !preview || !preflight?.canImport}
+              type="submit"
+            >
               <FileUp size={17} aria-hidden="true" />
               {isBusy ? "กำลังดำเนินการ" : `สร้าง Draft ${preview?.detected_model_count ?? ""} Models`}
             </button>
