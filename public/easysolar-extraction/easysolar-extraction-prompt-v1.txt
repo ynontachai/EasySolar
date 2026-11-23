@@ -1,10 +1,20 @@
 You are extracting engineering specifications for the EasySolar equipment catalog.
 
 Attached files:
-1. One manufacturer datasheet PDF.
+1. One ZIP archive containing manufacturer datasheet PDFs.
 2. One EasySolar extraction template JSON.
 
-Your task is to read the complete PDF, identify every exact product model explicitly stated or safely composed under the rules below, and produce one JSON output conforming to the attached EasySolar template.
+Your task is to extract the ZIP archive, process every PDF independently, and create one downloadable JSON file for each PDF. Each JSON file must conform to the attached EasySolar template.
+
+ZIP ARCHIVE RULES
+
+- Search every folder in the ZIP archive for files whose names end with .pdf, case-insensitively.
+- Ignore directories, __MACOSX metadata, hidden system files, and non-PDF files.
+- Sort PDFs by their relative archive path before processing them.
+- Treat each PDF as a separate source document. Never copy values, models, evidence, warnings, or assumptions between PDFs.
+- Use the PDF's leaf filename, not its archive path, as source_document.filename.
+- Require every PDF leaf filename in the archive to be unique. If duplicate PDF filenames exist in different folders, stop and identify the duplicates instead of overwriting an output file.
+- Folder names may organize the archive, but they are not engineering evidence. Do not derive manufacturer, model, inverter type, or field values from a folder name.
 
 SECURITY AND SOURCE RULES
 
@@ -75,16 +85,25 @@ MODEL-SPECIFIC RULES
 - If a unit conversion is required by the template, retain both normalized and original units.
 - Do not replace a missing engineering value with a typical industry value.
 - For PV modules, trackers must be an empty array.
+- For inverterType, return only "string", "hybrid", "micro", or null.
+- Normalize an explicitly stated on-grid, grid-tied, or grid-connected inverter to "string".
+- Normalize an explicitly stated hybrid inverter to "hybrid" and an explicitly stated microinverter to "micro".
+- Preserve the manufacturer's original type wording in raw_value. Cite the PDF page and label that establish the type.
+- Do not infer inverterType from the model name, PDF filename, folder name, product similarity, or industry knowledge. Use status "ambiguous" or "not_found" with value null when the PDF does not establish the type.
 - For inverters, create one tracker entry for each distinct MPPT configuration explicitly shown. Use tracker_index starting at 1.
 
-OUTPUT REQUIREMENTS
+OUTPUT FILE REQUIREMENTS
 
-- Return valid JSON only.
-- Do not wrap the JSON in Markdown code fences.
-- Do not add explanations before or after the JSON.
+- Create one actual downloadable .json file for each PDF in the ZIP archive.
+- Name each output file <original PDF filename without the final .pdf>.easysolar.json.
+- The number of downloadable JSON files must equal the number of PDFs in the ZIP archive.
+- Do not combine results from different PDFs into one JSON file, array, object, ZIP, or Markdown response.
+- Do not paste JSON content into the conversation. Use the environment's file-creation capability and attach the generated .json files.
+- Return only the downloadable .json file attachments. Do not add explanations before or after them.
+- Each output file must contain one valid JSON object. Do not wrap it in Markdown code fences.
 - Follow output_contract in the attached template exactly.
 - Copy schema_id, schema_version, template_id, template_version, and prompt_version from the template.
-- Include the original PDF filename exactly as attached and the detected page count.
+- Include the source PDF's leaf filename exactly in source_document.filename and record that PDF's page count.
 - detected_model_count must equal the number of model objects.
 - Each exact model must appear only once.
 - Every model must include identifier_provenance exactly as defined by output_contract.
@@ -93,18 +112,20 @@ OUTPUT REQUIREMENTS
 - Use JSON numbers for normalized numeric values, not formatted strings.
 - Do not add keys that are not defined in output_contract.
 
-FINAL VALIDATION BEFORE RESPONDING
+FINAL VALIDATION BEFORE CREATING THE FILE ATTACHMENTS
 
-Check that:
+For every PDF, check that:
 
-1. The output is syntactically valid JSON.
-2. The output follows the attached template.
-3. detected_model_count equals the number of model objects.
-4. Every model identifier is explicit in the PDF or satisfies the approved composition rule with complete provenance.
-5. Every non-null field has a source page.
-6. No unsupported field keys were added.
-7. No missing value was guessed.
-8. No model received a value from another model's table column.
-9. All warnings and ambiguities are explicitly represented.
+1. One and only one output file exists for the PDF.
+2. The output file is syntactically valid JSON.
+3. The output follows the attached template.
+4. source_document.filename matches the PDF leaf filename exactly.
+5. detected_model_count equals the number of model objects.
+6. Every model identifier is explicit in the same PDF or satisfies the approved composition rule with complete provenance.
+7. Every non-null field has a source page from the same PDF.
+8. No unsupported field keys were added.
+9. No missing value was guessed.
+10. No model received a value from another model column or another PDF.
+11. All warnings and ambiguities are explicitly represented.
 
-Now process the attached PDF and return the JSON output only.
+After validating all outputs, attach the separate JSON files and return no inline JSON or explanatory text.

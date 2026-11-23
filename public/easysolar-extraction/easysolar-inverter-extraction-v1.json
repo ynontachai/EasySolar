@@ -3,7 +3,7 @@
   "schema_version": "1.1",
   "template_id": "inverter",
   "template_version": "1.1",
-  "prompt_version": "1.1",
+  "prompt_version": "1.2",
   "category": "inverter",
   "model_detection": {
     "required": true,
@@ -13,7 +13,7 @@
     "allowed_composition_rules": []
   },
   "field_contract": [
-    { "field_key": "inverterType", "label": "Inverter Type", "type": "string", "unit": null, "required": true, "allowed_values": ["string", "hybrid", "micro"] },
+    { "field_key": "inverterType", "label": "Inverter Type", "type": "string", "unit": null, "required": true, "allowed_values": ["string", "hybrid", "micro"], "value_mapping": { "string": ["on-grid", "on grid", "grid-tied", "grid tied", "grid-connected", "grid connected"], "hybrid": ["hybrid"], "micro": ["microinverter", "micro inverter"] } },
     { "field_key": "ratedAcKw", "label": "Rated AC Power", "type": "number", "unit": "kW", "required": true, "aliases": ["Rated Output Power", "Nominal AC Power"], "validation": { "min_exclusive": 0, "max": 10000 } },
     { "field_key": "maxDcVoltageV", "label": "Maximum DC Input Voltage", "type": "number", "unit": "V", "required": true, "aliases": ["Max. Input Voltage", "Maximum DC Voltage"], "validation": { "min_exclusive": 0, "max": 5000 } },
     { "field_key": "startupVoltageV", "label": "Startup Voltage", "type": "number", "unit": "V", "required": true, "aliases": ["Start-up Voltage", "Starting Voltage"], "validation": { "min_exclusive": 0, "max": 2000 } },
@@ -28,6 +28,9 @@
     { "field_key": "maxShortCircuitCurrentA", "label": "Maximum Short Circuit Current per MPPT", "type": "number", "unit": "A", "required": true, "validation": { "min_exclusive": 0, "max": 300 } }
   ],
   "rules": [
+    "Normalize an explicitly stated on-grid, grid-tied, or grid-connected inverter type to string; normalize hybrid to hybrid; normalize microinverter to micro.",
+    "For inverterType, preserve the manufacturer's wording in raw_value and return only string, hybrid, micro, or null in value.",
+    "Do not infer inverterType from the model name, PDF filename, product similarity, or industry knowledge. Use ambiguous or not_found when the PDF does not establish the type.",
     "At least one of maxRecommendedPvWp or maxDcPowerWp should be extracted when present.",
     "Do not merge different MPPT groups when the datasheet gives them different limits.",
     "Every tracker object must contain every tracker field key."

@@ -34,6 +34,40 @@ const markup = renderToStaticMarkup(
 const preflightMarkup = renderToStaticMarkup(
   <section className="datasheet-intake">
     <form className="datasheet-intake__form">
+      <section className="extraction-batch" aria-labelledby="sample-batch-title">
+        <div className="extraction-batch__head">
+          <div>
+            <p className="eyebrow eyebrow--dark">BATCH PAIRING</p>
+            <h3 id="sample-batch-title">คู่ PDF–JSON</h3>
+          </div>
+          <dl>
+            <div><dt>พร้อมจับคู่</dt><dd>12</dd></div>
+            <div><dt>ต้องแก้</dt><dd>1</dd></div>
+            <div><dt>สำเร็จ</dt><dd>0</dd></div>
+          </dl>
+        </div>
+        <div className="extraction-batch__list">
+          <article data-status="invalid">
+            <div className="extraction-batch__files">
+              <span>LONG-RESPONSIVE-DATASHEET-FILENAME-S6-GR1P5K-S.pdf</span>
+              <small>LONG-RESPONSIVE-EXTRACTION-FILENAME-S6-GR1P5K-S.json</small>
+            </div>
+            <div className="extraction-batch__models">
+              <strong>Solis</strong>
+              <small>S6-GR1P5K-S-LONG-RESPONSIVE-MODEL-NAME</small>
+            </div>
+            <div className="extraction-batch__metrics"><span>1 Models</span></div>
+            <div className="extraction-batch__result">
+              <span>จับคู่ไม่ได้</span>
+              <small>ไม่พบ JSON ที่อ้างถึง PDF นี้</small>
+            </div>
+          </article>
+        </div>
+        <div className="extraction-batch__action">
+          <span>ตรวจ Manufacturer, Model, Market และ Revision ทุกคู่ก่อนสร้าง Draft</span>
+          <button className="button button--outline" type="button">ตรวจรายการ 12 PDF</button>
+        </div>
+      </section>
       <ImportPreflightPreview
         preflight={{
           canImport: false,
@@ -69,8 +103,9 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.setContent(`<style>${css}</style><main class="admin-page">${markup}${preflightMarkup}</main>`);
 
-    await expect(page.getByRole("heading", { name: "นำเข้า PDF หลาย Model จาก JSON" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "นำเข้า PDF หลายไฟล์จาก JSON" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Prompt v1" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "คู่ PDF–JSON" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "ผลตรวจก่อนสร้าง Draft" })).toBeVisible();
     await expect(page.getByText("Revision ซ้ำ", { exact: true })).toBeVisible();
 

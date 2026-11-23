@@ -6,7 +6,7 @@ import {
 
 export const EXTRACTION_SCHEMA_ID = "easysolar-spec-extraction";
 export const EXTRACTION_SCHEMA_VERSION = "1.1";
-export const EXTRACTION_PROMPT_VERSION = "1.1";
+export const EXTRACTION_PROMPT_VERSION = "1.2";
 export const MAX_EXTRACTION_JSON_SIZE_BYTES = 1024 * 1024;
 export const MAX_EXTRACTED_MODELS = 50;
 

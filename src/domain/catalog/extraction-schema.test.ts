@@ -66,7 +66,7 @@ function pvOutput(): ExtractedSpec {
         warnings: [],
       },
     ],
-    prompt_version: "1.1",
+    prompt_version: "1.2",
     schema_id: "easysolar-spec-extraction",
     schema_version: "1.1",
     source_document: { filename: "datasheet.pdf", page_count: 2 },
@@ -221,6 +221,58 @@ describe("external datasheet extraction schema", () => {
     ]) {
       const path = resolve(process.cwd(), "public", "easysolar-extraction", filename);
       expect(() => JSON.parse(readFileSync(path, "utf8"))).not.toThrow();
+    }
+  });
+
+  it("documents the canonical inverter type mapping in the template and prompt", () => {
+    const templatePath = resolve(
+      process.cwd(),
+      "public",
+      "easysolar-extraction",
+      "easysolar-inverter-extraction-v1.json",
+    );
+    const template = JSON.parse(readFileSync(templatePath, "utf8")) as {
+      field_contract: Array<{
+        allowed_values?: string[];
+        field_key: string;
+        value_mapping?: Record<string, string[]>;
+      }>;
+      rules: string[];
+    };
+    const inverterType = template.field_contract.find(
+      (field) => field.field_key === "inverterType",
+    );
+    expect(inverterType?.allowed_values).toEqual(["string", "hybrid", "micro"]);
+    expect(inverterType?.value_mapping?.string).toContain("on-grid");
+    expect(inverterType?.value_mapping?.hybrid).toContain("hybrid");
+    expect(inverterType?.value_mapping?.micro).toContain("microinverter");
+    expect(template.rules.some((rule) => rule.includes("grid-tied") && rule.includes("string"))).toBe(true);
+
+    const promptPath = resolve(
+      process.cwd(),
+      "public",
+      "easysolar-extraction",
+      "easysolar-extraction-prompt-v1.txt",
+    );
+    const prompt = readFileSync(promptPath, "utf8");
+    expect(prompt).toContain("One ZIP archive containing manufacturer datasheet PDFs");
+    expect(prompt).toContain("one actual downloadable .json file for each PDF");
+    expect(prompt).toContain("Do not paste JSON content into the conversation");
+    expect(prompt).toContain("must equal the number of PDFs in the ZIP archive");
+    expect(prompt).toContain('grid-connected inverter to "string"');
+    expect(prompt).toContain('hybrid inverter to "hybrid"');
+    expect(prompt).toContain('microinverter to "micro"');
+    expect(prompt).toContain("Do not infer inverterType from the model name");
+  });
+
+  it("requires prompt v1.2 in both extraction templates", () => {
+    for (const filename of [
+      "easysolar-pv-module-extraction-v1.json",
+      "easysolar-inverter-extraction-v1.json",
+    ]) {
+      const path = resolve(process.cwd(), "public", "easysolar-extraction", filename);
+      const template = JSON.parse(readFileSync(path, "utf8")) as { prompt_version: string };
+      expect(template.prompt_version).toBe("1.2");
     }
   });
 });

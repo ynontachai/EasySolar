@@ -6,12 +6,12 @@ import {
   AlertTriangle,
   CheckCircle2,
   Download,
+  FileText,
   FileJson2,
-  FileUp,
+  Files,
   LoaderCircle,
 } from "lucide-react";
 import {
-  DATASHEET_MEDIA_TYPE,
   MAX_DATASHEET_SIZE_BYTES,
   type DatasheetRuntimeCapabilities,
 } from "@/domain/assets/config";
@@ -20,6 +20,11 @@ import {
   MAX_EXTRACTION_JSON_SIZE_BYTES,
   type ExtractedSpec,
 } from "@/domain/catalog/extraction-schema";
+import {
+  buildExtractionBatchPlan,
+  MAX_EXTRACTION_BATCH_FILES,
+  type ParsedExtractionBatchFile,
+} from "@/domain/catalog/extraction-batch";
 import type {
   ExtractedImportPreflightResult,
   ImportPreflightModelStatus,
@@ -48,6 +53,26 @@ type ImportPhase =
   | "finalizing"
   | "success"
   | "error";
+
+type BatchItemStatus =
+  | "blocked"
+  | "checking"
+  | "error"
+  | "importing"
+  | "invalid"
+  | "ready"
+  | "success";
+
+interface ExtractionBatchItem {
+  error: string;
+  extraction: ExtractedSpec | null;
+  json: File | null;
+  key: string;
+  pairingError: string;
+  pdf: File | null;
+  preflight: ExtractedImportPreflightResult | null;
+  status: BatchItemStatus;
+}
 
 interface ExternalExtractionImportPanelProps {
   capabilities: DatasheetRuntimeCapabilities;
@@ -199,43 +224,112 @@ export function ExternalExtractionImportPanel({
   const router = useRouter();
   const [phase, setPhase] = useState<ImportPhase>("idle");
   const [message, setMessage] = useState("");
-  const [preview, setPreview] = useState<ExtractedSpec | null>(null);
-  const [preflight, setPreflight] = useState<ExtractedImportPreflightResult | null>(null);
+  const [items, setItems] = useState<ExtractionBatchItem[]>([]);
+  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
+  const [jsonFiles, setJsonFiles] = useState<File[]>([]);
   const [preflightError, setPreflightError] = useState("");
   const [isPreflighting, setIsPreflighting] = useState(false);
   const [revisionLabel, setRevisionLabel] = useState("");
   const [market, setMarket] = useState("TH");
   const [language, setLanguage] = useState("en");
   const latestPreflightRequest = useRef(0);
+  const latestPreparationRequest = useRef(0);
 
   function clearPreflight() {
     latestPreflightRequest.current += 1;
-    setPreflight(null);
     setPreflightError("");
     setIsPreflighting(false);
+    setItems((current) => current.map((item) => item.status === "success" ? item : {
+      ...item,
+      error: item.pairingError,
+      preflight: null,
+      status: item.pairingError ? "invalid" : "ready",
+    }));
   }
 
-  async function handleJsonChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    setPreview(null);
-    clearPreflight();
+  function updateItem(key: string, update: Partial<ExtractionBatchItem>) {
+    setItems((current) => current.map((item) => item.key === key ? { ...item, ...update } : item));
+  }
+
+  async function prepareBatch(nextPdfs: File[], nextJsons: File[]) {
+    const requestId = ++latestPreparationRequest.current;
+    latestPreflightRequest.current += 1;
+    setPreflightError("");
+    setIsPreflighting(false);
     setMessage("");
-    if (!file) return;
+    if (nextPdfs.length === 0 && nextJsons.length === 0) {
+      setItems([]);
+      setPhase("idle");
+      return;
+    }
+    if (
+      nextPdfs.length > MAX_EXTRACTION_BATCH_FILES ||
+      nextJsons.length > MAX_EXTRACTION_BATCH_FILES
+    ) {
+      setItems([]);
+      setPhase("error");
+      setMessage(`เลือกได้ไม่เกิน ${MAX_EXTRACTION_BATCH_FILES} PDF และ ${MAX_EXTRACTION_BATCH_FILES} JSON ต่อครั้ง`);
+      return;
+    }
 
     setPhase("validating");
-    try {
-      const extraction = await readExtractionFile(file);
-      setPreview(extraction);
-      setPhase("idle");
-      setMessage(`JSON ถูกต้อง · พบ ${extraction.detected_model_count} Models`);
-    } catch (error) {
-      setPhase("error");
-      setMessage(error instanceof Error ? error.message : "ตรวจ JSON ไม่สำเร็จ");
-    }
+    const parsedJsons: ParsedExtractionBatchFile[] = await Promise.all(
+      nextJsons.map(async (file) => {
+        try {
+          return { error: null, extraction: await readExtractionFile(file), name: file.name };
+        } catch (error) {
+          return {
+            error: error instanceof Error ? error.message : "ตรวจ JSON ไม่สำเร็จ",
+            extraction: null,
+            name: file.name,
+          };
+        }
+      }),
+    );
+    if (requestId !== latestPreparationRequest.current) return;
+
+    const plan = buildExtractionBatchPlan({ jsonFiles: parsedJsons, pdfFiles: nextPdfs });
+    const nextItems = plan.map((item): ExtractionBatchItem => {
+      const pairingError = item.error ?? "";
+      return {
+        error: pairingError,
+        extraction: item.extraction,
+        json: item.jsonIndex === null ? null : (nextJsons[item.jsonIndex] ?? null),
+        key: item.key,
+        pairingError,
+        pdf: item.pdfIndex === null ? null : (nextPdfs[item.pdfIndex] ?? null),
+        preflight: null,
+        status: pairingError ? "invalid" : "ready",
+      };
+    });
+    const readyCount = nextItems.filter((item) => item.status === "ready").length;
+    const invalidCount = nextItems.length - readyCount;
+    setItems(nextItems);
+    setPhase("idle");
+    setMessage(
+      invalidCount === 0
+        ? `จับคู่พร้อมตรวจ ${readyCount} PDF`
+        : `พร้อมตรวจ ${readyCount} PDF · ต้องแก้การจับคู่ ${invalidCount} รายการ`,
+    );
+  }
+
+  function handlePdfChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    setPdfFiles(files);
+    void prepareBatch(files, jsonFiles);
+  }
+
+  function handleJsonChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    setJsonFiles(files);
+    void prepareBatch(pdfFiles, files);
   }
 
   async function handlePreflight() {
-    if (!preview) return;
+    const candidates = items.filter(
+      (item) => !item.pairingError && item.extraction && item.status !== "success",
+    );
+    if (candidates.length === 0) return;
     if (!revisionLabel.trim()) {
       setPreflightError("กรุณาระบุ Revision label ก่อนตรวจรายการ");
       return;
@@ -249,149 +343,152 @@ export function ExternalExtractionImportPanel({
     setIsPreflighting(true);
     setPreflightError("");
     setMessage("");
-    try {
-      const response = await fetch(
-        "/api/v1/admin/datasheets/extracted-imports/preflight",
-        {
-          body: JSON.stringify({ extraction: preview, market, revisionLabel }),
-          headers: { "content-type": "application/json" },
-          method: "POST",
-        },
-      );
-      const result = await readApiResponse<ExtractedImportPreflightResult>(response);
-      if (requestId === latestPreflightRequest.current) {
-        setPreflight(result);
-        setPhase("idle");
+    let readyCount = 0;
+    let blockedCount = 0;
+    for (const item of candidates) {
+      if (requestId !== latestPreflightRequest.current || !item.extraction) break;
+      updateItem(item.key, { error: "", preflight: null, status: "checking" });
+      try {
+        const response = await fetch(
+          "/api/v1/admin/datasheets/extracted-imports/preflight",
+          {
+            body: JSON.stringify({ extraction: item.extraction, market, revisionLabel }),
+            headers: { "content-type": "application/json" },
+            method: "POST",
+          },
+        );
+        const result = await readApiResponse<ExtractedImportPreflightResult>(response);
+        if (requestId !== latestPreflightRequest.current) break;
+        updateItem(item.key, {
+          error: result.canImport ? "" : `ติดปัญหา ${result.summary.blocked} Model`,
+          preflight: result,
+          status: result.canImport ? "ready" : "blocked",
+        });
+        if (result.canImport) readyCount += 1;
+        else blockedCount += 1;
+      } catch (error) {
+        if (requestId !== latestPreflightRequest.current) break;
+        updateItem(item.key, {
+          error: error instanceof Error ? error.message : "ตรวจรายการเดิมไม่สำเร็จ",
+          preflight: null,
+          status: "error",
+        });
+        blockedCount += 1;
       }
-    } catch (error) {
-      if (requestId === latestPreflightRequest.current) {
-        setPreflight(null);
-        setPreflightError(error instanceof Error ? error.message : "ตรวจรายการเดิมไม่สำเร็จ");
-      }
-    } finally {
-      if (requestId === latestPreflightRequest.current) setIsPreflighting(false);
     }
+    if (requestId !== latestPreflightRequest.current) return;
+    setIsPreflighting(false);
+    setPhase("idle");
+    setMessage(`พร้อมนำเข้า ${readyCount} PDF${blockedCount ? ` · ต้องแก้ ${blockedCount} รายการ` : ""}`);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
-
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const pdf = formData.get("datasheet");
-    const json = formData.get("extractionJson");
-    if (!preflight) {
+    const candidates = items.filter(
+      (item) => item.pdf && item.extraction && item.preflight?.canImport && item.status !== "success",
+    );
+    if (candidates.length === 0) {
       setPhase("error");
-      setMessage("กรุณากดตรวจรายการเดิมก่อนสร้าง Draft");
+      setMessage("ยังไม่มีคู่ PDF–JSON ที่ผ่านการตรวจและพร้อมสร้าง Draft");
       return;
     }
-    if (!preflight.canImport) {
-      setPhase("error");
-      setMessage("ยังสร้าง Draft ไม่ได้ กรุณาแก้รายการที่ซ้ำหรือขัดแย้งก่อน");
-      return;
-    }
-    if (!(pdf instanceof File) || pdf.size === 0) {
-      setPhase("error");
-      setMessage("กรุณาเลือก Datasheet PDF ต้นฉบับ");
-      return;
-    }
-    if (!(json instanceof File) || json.size === 0) {
-      setPhase("error");
-      setMessage("กรุณาเลือก JSON ผลลัพธ์จาก EasySolar Prompt");
-      return;
-    }
-    if (pdf.type !== DATASHEET_MEDIA_TYPE || !pdf.name.toLowerCase().endsWith(".pdf")) {
-      setPhase("error");
-      setMessage("Datasheet ต้องเป็น PDF เท่านั้น");
-      return;
-    }
-    if (pdf.size > MAX_DATASHEET_SIZE_BYTES) {
-      setPhase("error");
-      setMessage(`PDF ต้องไม่เกิน ${formatMegabytes(MAX_DATASHEET_SIZE_BYTES)}`);
-      return;
-    }
-
-    try {
-      setPhase("validating");
-      const extraction = await readExtractionFile(json);
-      if (extraction.source_document.filename !== pdf.name) {
-        throw new Error(
-          `PDF ไม่ตรงกับ JSON: JSON ระบุ ${extraction.source_document.filename}`,
+    setPhase("creating");
+    let successCount = 0;
+    let failedCount = 0;
+    let modelCount = 0;
+    for (const item of candidates) {
+      const pdf = item.pdf;
+      const extraction = item.extraction;
+      if (!pdf || !extraction) continue;
+      updateItem(item.key, { error: "", status: "importing" });
+      try {
+        const checksum = await createFileChecksums(pdf);
+        const intentResponse = await fetch(
+          "/api/v1/admin/datasheets/extracted-imports/upload-intents",
+          {
+            body: JSON.stringify({
+              extraction,
+              filename: pdf.name,
+              language,
+              market,
+              mediaType: pdf.type,
+              revisionLabel,
+              sha256Base64: checksum.base64,
+              sha256Hex: checksum.hex,
+              sizeBytes: pdf.size,
+            }),
+            headers: { "content-type": "application/json" },
+            method: "POST",
+          },
         );
+        const intent = await readApiResponse<UploadIntentResponse>(intentResponse);
+        await uploadPdf(intent, pdf);
+        const finalizeResponse = await fetch(
+          `/api/v1/admin/datasheets/${intent.assetId}/finalize`,
+          { method: "POST" },
+        );
+        await readApiResponse<{ message: string; state: string }>(finalizeResponse);
+        updateItem(item.key, { status: "success" });
+        successCount += 1;
+        modelCount += intent.revisions.length;
+      } catch (error) {
+        updateItem(item.key, {
+          error: error instanceof Error ? error.message : "นำเข้าไม่สำเร็จ",
+          status: "error",
+        });
+        failedCount += 1;
       }
-
-      setPhase("hashing");
-      const checksum = await createFileChecksums(pdf);
-      setPhase("creating");
-      const intentResponse = await fetch(
-        "/api/v1/admin/datasheets/extracted-imports/upload-intents",
-        {
-          body: JSON.stringify({
-            extraction,
-            filename: pdf.name,
-            language: formData.get("language"),
-            market: formData.get("market"),
-            mediaType: pdf.type,
-            revisionLabel: formData.get("revisionLabel"),
-            sha256Base64: checksum.base64,
-            sha256Hex: checksum.hex,
-            sizeBytes: pdf.size,
-          }),
-          headers: { "content-type": "application/json" },
-          method: "POST",
-        },
-      );
-      const intent = await readApiResponse<UploadIntentResponse>(intentResponse);
-
-      setPhase("uploading");
-      await uploadPdf(intent, pdf);
-
-      setPhase("finalizing");
-      const finalizeResponse = await fetch(
-        `/api/v1/admin/datasheets/${intent.assetId}/finalize`,
-        { method: "POST" },
-      );
-      await readApiResponse<{ message: string; state: string }>(finalizeResponse);
-
-      setPhase("success");
-      setMessage(
-        `สร้าง Draft ${intent.revisions.length} Models แล้ว · เปิดแต่ละรายการในคิวเพื่อตรวจและบันทึกสเปก`,
-      );
-      setPreview(null);
-      setPreflight(null);
-      setRevisionLabel("");
-      setMarket("TH");
-      form.reset();
-      setLanguage("en");
-      router.refresh();
-    } catch (error) {
-      setPhase("error");
-      setMessage(error instanceof Error ? error.message : "นำเข้าไม่สำเร็จ");
     }
+    setPhase(failedCount === 0 ? "success" : "error");
+    setMessage(
+      failedCount === 0
+        ? `สร้าง Draft ${modelCount} Models จาก ${successCount} PDF แล้ว`
+        : `นำเข้าสำเร็จ ${successCount} PDF · ต้องลองใหม่ ${failedCount} PDF`,
+    );
+    router.refresh();
   }
 
   const isBusy = ["validating", "hashing", "creating", "uploading", "finalizing"].includes(phase);
+  const validPairCount = items.filter((item) => !item.pairingError && item.extraction && item.pdf).length;
+  const preflightableCount = items.filter(
+    (item) => !item.pairingError && item.extraction && item.status !== "success",
+  ).length;
+  const importableCount = items.filter(
+    (item) => item.preflight?.canImport && item.status !== "success",
+  ).length;
+  const successCount = items.filter((item) => item.status === "success").length;
+  const invalidCount = items.filter((item) => item.pairingError).length;
   const phaseLabel = {
-    creating: "กำลังสร้าง Draft Models…",
+    creating: "กำลังสร้าง Draft จากคู่ที่พร้อม…",
     error: "ต้องแก้ไขก่อนลองใหม่",
-    finalizing: "กำลังตรวจไฟล์ใน Object Storage…",
+    finalizing: "กำลังตรวจไฟล์…",
     hashing: "กำลังคำนวณ SHA-256…",
-    idle: "รอ PDF และ JSON ที่สร้างจาก EasySolar Prompt",
+    idle: "รอชุด PDF และ JSON ที่สร้างจาก EasySolar Prompt",
     success: "นำเข้าสำเร็จ",
-    uploading: "กำลังอัปโหลด PDF…",
-    validating: "กำลังตรวจ JSON…",
+    uploading: "กำลังอัปโหลด PDF หลายไฟล์…",
+    validating: "กำลังจับคู่และตรวจ JSON…",
   }[phase];
+
+  const statusLabels: Record<BatchItemStatus, string> = {
+    blocked: "ติดปัญหา",
+    checking: "กำลังตรวจ",
+    error: "ลองใหม่ได้",
+    importing: "กำลังนำเข้า",
+    invalid: "จับคู่ไม่ได้",
+    ready: "พร้อม",
+    success: "สร้าง Draft แล้ว",
+  };
 
   return (
     <section className="datasheet-intake extraction-intake" aria-labelledby="extraction-intake-title">
       <div className="datasheet-intake__head">
         <div>
           <p className="eyebrow eyebrow--dark">EXTERNAL AI EXTRACTION</p>
-          <h2 id="extraction-intake-title">นำเข้า PDF หลาย Model จาก JSON</h2>
+          <h2 id="extraction-intake-title">นำเข้า PDF หลายไฟล์จาก JSON</h2>
           <p>
-            ใช้ Prompt และ Template กลางกับ ChatGPT ภายนอก แล้วนำ PDF ต้นฉบับกับ JSON
-            ผลลัพธ์กลับมาตรวจใน EasySolar ระบบจะสร้างเฉพาะ Draft และไม่ Publish อัตโนมัติ
+            ใช้ Prompt และ Template กลางกับ ChatGPT ภายนอก แล้วเลือก PDF และ JSON หลายไฟล์พร้อมกัน
+            EasySolar จะจับคู่ ตรวจ และสร้างเฉพาะ Draft โดยไม่เรียก AI API และไม่ Publish อัตโนมัติ
           </p>
         </div>
         <span className={`intake-state intake-state--${capabilities.ready ? "ready" : "blocked"}`}>
@@ -402,7 +499,7 @@ export function ExternalExtractionImportPanel({
 
       <div className="extraction-downloads" aria-label="ไฟล์กลางสำหรับใช้งานกับ ChatGPT">
         <a download href="/easysolar-extraction/easysolar-extraction-prompt-v1.txt">
-          <Download size={16} aria-hidden="true" /> Prompt v1.1
+          <Download size={16} aria-hidden="true" /> Prompt v1.2
         </a>
         <a download href="/easysolar-extraction/easysolar-pv-module-extraction-v1.json">
           <Download size={16} aria-hidden="true" /> PV Template v1.1
@@ -459,53 +556,81 @@ export function ExternalExtractionImportPanel({
           </div>
           <div className="extraction-guidance">
             <strong>ก่อนอัปโหลด</strong>
-            <span>ชื่อ PDF ต้องตรงกับ source_document.filename ใน JSON ทุกตัวอักษร</span>
+            <span>เตรียม JSON หนึ่งไฟล์ต่อ PDF · ชื่อ PDF ต้องตรงกับ source_document.filename ทุกตัวอักษร</span>
           </div>
           <label className="datasheet-intake__file">
-            <span>1. Datasheet PDF ต้นฉบับ</span>
-            <input accept="application/pdf,.pdf" name="datasheet" required type="file" />
-            <small>PDF เท่านั้น · ไม่เกิน {formatMegabytes(MAX_DATASHEET_SIZE_BYTES)}</small>
+            <span>1. เลือก Datasheet PDF ทั้งหมด</span>
+            <input accept="application/pdf,.pdf" multiple onChange={handlePdfChange} type="file" />
+            <small>สูงสุด {MAX_EXTRACTION_BATCH_FILES} PDF · ไฟล์ละไม่เกิน {formatMegabytes(MAX_DATASHEET_SIZE_BYTES)}</small>
           </label>
           <label className="datasheet-intake__file">
-            <span>2. JSON ผลลัพธ์จาก EasySolar Prompt</span>
-            <input accept="application/json,.json" name="extractionJson" onChange={handleJsonChange} required type="file" />
-            <small>JSON เท่านั้น · Template และ Prompt version 1.1 · ไม่เกิน 1 MB</small>
+            <span>2. เลือก JSON ผลลัพธ์ทั้งหมด</span>
+            <input accept="application/json,.json" multiple onChange={handleJsonChange} type="file" />
+            <small>สูงสุด {MAX_EXTRACTION_BATCH_FILES} JSON · Template v1.1 · Prompt v1.2 · ไฟล์ละไม่เกิน 1 MB</small>
           </label>
 
-          {preview ? (
-            <div className="extraction-preview" aria-live="polite">
-              <div>
-                <FileJson2 size={19} aria-hidden="true" />
-                <span>
-                  <strong>{preview.manufacturer.value}</strong>
-                  <small>{preview.template_id} · {preview.source_document.page_count} หน้า</small>
-                </span>
+          {items.length > 0 ? (
+            <section className="extraction-batch" aria-labelledby="extraction-batch-title">
+              <div className="extraction-batch__head">
+                <div>
+                  <p className="eyebrow eyebrow--dark">BATCH PAIRING</p>
+                  <h3 id="extraction-batch-title">คู่ PDF–JSON</h3>
+                </div>
+                <dl>
+                  <div><dt>พร้อมจับคู่</dt><dd>{validPairCount}</dd></div>
+                  <div><dt>ต้องแก้</dt><dd>{invalidCount}</dd></div>
+                  <div><dt>สำเร็จ</dt><dd>{successCount}</dd></div>
+                </dl>
               </div>
-              <dl>
-                <div><dt>Models</dt><dd>{preview.detected_model_count}</dd></div>
-                <div><dt>ต้องตรวจ</dt><dd>{countAttentionFields(preview)}</dd></div>
-                <div><dt>คำเตือน</dt><dd>{preview.document_warnings.length}</dd></div>
-              </dl>
-              <p>{preview.models.map((model) => model.exact_model).join(" · ")}</p>
-              <div className="extraction-preview__action">
-                <span>ตรวจ Manufacturer, Model และ Revision กับฐานข้อมูลก่อนสร้าง Draft</span>
+              <div className="extraction-batch__list">
+                {items.map((item) => {
+                  const extraction = item.extraction;
+                  return (
+                    <article data-status={item.status} key={item.key}>
+                      <div className="extraction-batch__files">
+                        <span><FileText size={16} aria-hidden="true" /> {item.pdf?.name ?? extraction?.source_document.filename ?? "ไม่พบ PDF"}</span>
+                        <small><FileJson2 size={14} aria-hidden="true" /> {item.json?.name ?? "ไม่พบ JSON"}</small>
+                      </div>
+                      <div className="extraction-batch__models">
+                        {extraction ? (
+                          <>
+                            <strong>{extraction.manufacturer.value}</strong>
+                            <small>{extraction.models.map((model) => model.exact_model).join(" · ")}</small>
+                          </>
+                        ) : <small>ยังอ่านรายละเอียดไม่ได้</small>}
+                      </div>
+                      <div className="extraction-batch__metrics">
+                        <span>{extraction?.detected_model_count ?? 0} Models</span>
+                        <span>{extraction ? countAttentionFields(extraction) : 0} ต้องตรวจ</span>
+                      </div>
+                      <div className="extraction-batch__result">
+                        <span>{item.status === "checking" || item.status === "importing" ? <LoaderCircle className="spin" size={15} aria-hidden="true" /> : null}{statusLabels[item.status]}</span>
+                        {item.error ? <small>{item.error}</small> : null}
+                        {item.preflight?.canImport ? (
+                          <small>เพิ่ม {item.preflight.summary.newModels} Model · {item.preflight.summary.newRevisions} Revision</small>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <div className="extraction-batch__action">
+                <span>ตรวจ Manufacturer, Model, Market และ Revision ทุกคู่ก่อนสร้าง Draft</span>
                 <button
                   className="button button--outline"
-                  disabled={isPreflighting}
+                  disabled={isBusy || isPreflighting || preflightableCount === 0}
                   onClick={() => void handlePreflight()}
                   type="button"
                 >
-                  {isPreflighting ? "กำลังตรวจ…" : "ตรวจรายการเดิม"}
+                  {isPreflighting ? "กำลังตรวจ…" : `ตรวจรายการ ${preflightableCount} PDF`}
                 </button>
               </div>
-            </div>
+            </section>
           ) : null}
 
           {preflightError ? (
             <p className="extraction-preflight__error" role="alert">{preflightError}</p>
           ) : null}
-
-          {preflight ? <ImportPreflightPreview preflight={preflight} /> : null}
 
           <div className="datasheet-intake__action">
             <div aria-live="polite">
@@ -516,11 +641,11 @@ export function ExternalExtractionImportPanel({
             </div>
             <button
               className="button button--ink"
-              disabled={isBusy || isPreflighting || !preview || !preflight?.canImport}
+              disabled={isBusy || isPreflighting || importableCount === 0}
               type="submit"
             >
-              <FileUp size={17} aria-hidden="true" />
-              {isBusy ? "กำลังดำเนินการ" : `สร้าง Draft ${preview?.detected_model_count ?? ""} Models`}
+              <Files size={17} aria-hidden="true" />
+              {isBusy ? "กำลังดำเนินการ" : `สร้าง Draft จาก ${importableCount} PDF`}
             </button>
           </div>
         </form>
