@@ -51,7 +51,42 @@ describe("external extraction batch pairing", () => {
       pdfFiles: [pdf("one.pdf"), pdf("two.pdf")],
     });
 
-    expect(items.every((item) => item.error?.includes("Exact model ซ้ำ"))).toBe(true);
+    expect(items.every((item) => item.error?.includes("ระบุ PDF เจ้าของรุ่นไม่ได้"))).toBe(true);
+  });
+
+  it("keeps a duplicated model only in the PDF whose filename matches that model", () => {
+    const familyExtraction = (filename: string, models: string[]) => ({
+      ...extraction(filename, models[0]),
+      detected_model_count: models.length,
+      models: models.map((exact_model) => ({ exact_model })),
+    }) as ExtractedSpec;
+    const items = buildExtractionBatchPlan({
+      jsonFiles: [
+        {
+          error: null,
+          extraction: familyExtraction("S5-GR3P5K.pdf", ["S5-GR3P5K", "S5-GR3P10K"]),
+          name: "5k.json",
+          sourceFilename: "S5-GR3P5K.pdf",
+        },
+        {
+          error: null,
+          extraction: familyExtraction("S5-GR3P10K.pdf", ["S5-GR3P5K", "S5-GR3P10K"]),
+          name: "10k.json",
+          sourceFilename: "S5-GR3P10K.pdf",
+        },
+      ],
+      pdfFiles: [pdf("S5-GR3P5K.pdf"), pdf("S5-GR3P10K.pdf")],
+    });
+
+    expect(items.map((item) => item.extraction?.models.map((model) => model.exact_model))).toEqual([
+      ["S5-GR3P5K"],
+      ["S5-GR3P10K"],
+    ]);
+    expect(items.map((item) => item.excludedDuplicateModels)).toEqual([
+      ["S5-GR3P10K"],
+      ["S5-GR3P5K"],
+    ]);
+    expect(items.every((item) => item.error === null)).toBe(true);
   });
 
   it("blocks duplicate JSON declarations for the same PDF", () => {

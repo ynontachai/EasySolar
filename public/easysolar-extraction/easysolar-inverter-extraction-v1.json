@@ -14,6 +14,7 @@
   },
   "identifier_rules": [
     "Prefer a complete exact model stated in the PDF.",
+    "When the PDF filename without .pdf unambiguously matches one explicit model after ignoring spaces and separators, return only that target model and not sibling models from the same family table.",
     "When the PDF states a matching inverter family and rated-power variant but omits the complete identifier, the PDF filename may establish exact_model only if every non-power character, suffix, phase, and regional designation matches unambiguously.",
     "A filename-anchored inverter identifier uses method explicit, cites both filename and PDF evidence, and includes a human-review warning."
   ],

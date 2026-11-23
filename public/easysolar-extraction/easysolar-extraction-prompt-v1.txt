@@ -36,7 +36,9 @@ DOCUMENT READING
 - Do not treat a product family name by itself as an exact model.
 - Detect exact model identifiers exactly as written in the PDF.
 - Preserve punctuation, hyphens, suffixes, capitalization, and regional variants in exact model names.
-- If the PDF explicitly lists multiple models, create a separate model object for each model.
+- If the PDF explicitly lists multiple models, create a separate model object for each model, except for the model-specific filename rule below.
+- When the PDF leaf filename without .pdf matches exactly one explicit model identifier after ignoring only spaces and separators, treat that PDF as model-specific: return only the matching model and its applicable shared or model-column values. Do not return sibling models from the same family table in that JSON file.
+- If the filename matches no explicit model or matches more than one model, do not apply the model-specific filename rule; return every explicitly listed model normally.
 - Expand a model range when every model is explicitly stated or when separate table columns and the approved power-variant composition rule establish every variant.
 - Do not invent model identifiers from an abbreviated family name outside the approved composition rule.
 

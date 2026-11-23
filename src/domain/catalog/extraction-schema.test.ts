@@ -267,6 +267,8 @@ describe("external datasheet extraction schema", () => {
     expect(prompt).toContain("Do not infer inverterType from the model name");
     expect(prompt).toContain("the PDF filename may establish exact_model");
     expect(prompt).toContain("filename-anchored identifier requires human review");
+    expect(prompt).toContain("treat that PDF as model-specific");
+    expect(prompt).toContain("Do not return sibling models");
   });
 
   it("requires prompt v1.2 in both extraction templates", () => {

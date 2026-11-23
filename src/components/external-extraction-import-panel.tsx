@@ -65,6 +65,7 @@ type BatchItemStatus =
 
 interface ExtractionBatchItem {
   error: string;
+  excludedDuplicateModels: string[];
   extraction: ExtractedSpec | null;
   json: File | null;
   key: string;
@@ -321,6 +322,7 @@ export function ExternalExtractionImportPanel({
       const pairingError = item.error ?? "";
       return {
         error: pairingError,
+        excludedDuplicateModels: item.excludedDuplicateModels,
         extraction: item.extraction,
         json: item.jsonIndex === null ? null : (nextJsons[item.jsonIndex] ?? null),
         key: item.key,
@@ -624,6 +626,9 @@ export function ExternalExtractionImportPanel({
                           <>
                             <strong>{extraction.manufacturer.value}</strong>
                             <small>{extraction.models.map((model) => model.exact_model).join(" · ")}</small>
+                            {item.excludedDuplicateModels.length > 0 ? (
+                              <small>ตัดรุ่นซ้ำที่มี PDF เจ้าของแล้ว: {item.excludedDuplicateModels.join(" · ")}</small>
+                            ) : null}
                           </>
                         ) : <small>ยังอ่านรายละเอียดไม่ได้</small>}
                       </div>

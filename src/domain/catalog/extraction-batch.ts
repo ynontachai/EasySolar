@@ -18,6 +18,7 @@ export interface ParsedExtractionBatchFile {
 
 export interface ExtractionBatchPlanItem {
   error: string | null;
+  excludedDuplicateModels: string[];
   extraction: ExtractedSpec | null;
   jsonIndex: number | null;
   key: string;
@@ -26,6 +27,17 @@ export interface ExtractionBatchPlanItem {
 
 function normalizedIdentity(extraction: ExtractedSpec, exactModel: string) {
   return `${extraction.manufacturer.value.trim().toLocaleLowerCase("en-US")}\u0000${exactModel.trim().toLocaleLowerCase("en-US")}`;
+}
+
+function normalizedModelLabel(value: string) {
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase("en-US")
+    .replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+function sourceFilenameMatchesModel(sourceFilename: string, exactModel: string) {
+  return normalizedModelLabel(sourceFilename.replace(/\.pdf$/i, "")) === normalizedModelLabel(exactModel);
 }
 
 export function buildExtractionBatchPlan(input: {
@@ -63,6 +75,7 @@ export function buildExtractionBatchPlan(input: {
       }
       return {
         error: pairingError,
+        excludedDuplicateModels: [],
         extraction: null,
         jsonIndex,
         key: `json:${jsonIndex}:${file.name}`,
@@ -96,6 +109,7 @@ export function buildExtractionBatchPlan(input: {
 
     return {
       error,
+      excludedDuplicateModels: [],
       extraction,
       jsonIndex,
       key: `pair:${jsonIndex}:${sourceName}`,
@@ -111,6 +125,7 @@ export function buildExtractionBatchPlan(input: {
     if (hasNamedJson) return;
     items.push({
       error: `ไม่พบ JSON ที่อ้างถึง ${pdf.name}`,
+      excludedDuplicateModels: [],
       extraction: null,
       jsonIndex: null,
       key: `pdf:${pdfIndex}:${pdf.name}`,
@@ -128,11 +143,46 @@ export function buildExtractionBatchPlan(input: {
       modelOwners.set(identity, owners);
     }
   });
-  for (const ownerIndexes of modelOwners.values()) {
+  for (const [duplicateIdentity, ownerIndexes] of modelOwners) {
     if (ownerIndexes.length < 2) continue;
+    const matchingOwnerIndexes = ownerIndexes.filter((itemIndex) => {
+      const item = items[itemIndex];
+      if (!item?.extraction) return false;
+      const duplicatedModel = item.extraction.models.find(
+        (model) => normalizedIdentity(item.extraction!, model.exact_model) === duplicateIdentity,
+      );
+      return duplicatedModel
+        ? sourceFilenameMatchesModel(item.extraction.source_document.filename, duplicatedModel.exact_model)
+        : false;
+    });
+
+    if (matchingOwnerIndexes.length === 1) {
+      const matchingOwnerIndex = matchingOwnerIndexes[0];
+      for (const itemIndex of ownerIndexes) {
+        if (itemIndex === matchingOwnerIndex) continue;
+        const item = items[itemIndex];
+        if (!item?.extraction) continue;
+        const keptModels = item.extraction.models.filter((model) => {
+          if (normalizedIdentity(item.extraction!, model.exact_model) !== duplicateIdentity) return true;
+          item.excludedDuplicateModels.push(model.exact_model);
+          return false;
+        });
+        if (keptModels.length === 0) {
+          item.error = "ทุกรุ่นใน JSON เป็นรุ่นซ้ำที่มี PDF เจ้าของรุ่นอื่นในชุดนี้";
+          continue;
+        }
+        item.extraction = {
+          ...item.extraction,
+          detected_model_count: keptModels.length,
+          models: keptModels,
+        };
+      }
+      continue;
+    }
+
     for (const itemIndex of ownerIndexes) {
       const item = items[itemIndex];
-      if (item) item.error = "Manufacturer และ Exact model ซ้ำกับ PDF อื่นในชุดนี้";
+      if (item) item.error = "Manufacturer และ Exact model ซ้ำกับ PDF อื่นในชุดนี้ และระบุ PDF เจ้าของรุ่นไม่ได้";
     }
   }
 
