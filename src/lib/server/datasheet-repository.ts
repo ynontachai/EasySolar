@@ -44,6 +44,7 @@ export interface PublishedCatalogItem {
   id: string;
   imageAlt: string | null;
   imageAssetId: string | null;
+  inverterType: string | null;
   manufacturer: string;
   primarySpec: string;
   revisionId: string;
@@ -128,7 +129,8 @@ export async function createDatasheetUploadRecord(
         storage_key,
         sha256,
         language,
-        state
+        state,
+        suggested_inverter_type
       )
       VALUES (
         ${revisionId},
@@ -137,7 +139,8 @@ export async function createDatasheetUploadRecord(
         ${objectKey},
         ${input.sha256Hex},
         ${input.language.toLowerCase()},
-        'draft'
+        'draft',
+        ${input.suggestedInverterType ?? null}
       )
     `;
 
@@ -406,6 +409,7 @@ export async function listPublishedCatalogPage(filters: {
       vmpV: string | null;
       vocV: string | null;
       maxDcVoltageV: string | null;
+      inverterType: string | null;
     }>
   >`
     SELECT
@@ -424,6 +428,7 @@ export async function listPublishedCatalogPage(filters: {
       pv_module_spec.vmp_v::text AS "vmpV",
       inverter_spec.rated_ac_kw::text AS "ratedAcKw",
       inverter_spec.max_dc_voltage_v::text AS "maxDcVoltageV",
+      inverter_spec.inverter_type AS "inverterType",
       COUNT(mppt_tracker.id)::text AS "trackerCount",
       (COUNT(*) OVER())::text AS "totalCount"
     FROM product_model
@@ -469,7 +474,8 @@ export async function listPublishedCatalogPage(filters: {
       pv_module_spec.voc_v,
       pv_module_spec.vmp_v,
       inverter_spec.rated_ac_kw,
-      inverter_spec.max_dc_voltage_v
+      inverter_spec.max_dc_voltage_v,
+      inverter_spec.inverter_type
     ORDER BY manufacturer.name, product_model.exact_model
     ${pagination}
   `;
@@ -487,6 +493,7 @@ export async function listPublishedCatalogPage(filters: {
       id: row.id,
       imageAlt: row.imageAlt,
       imageAssetId: row.imageAssetId,
+      inverterType: row.inverterType,
       manufacturer: row.manufacturer,
       primarySpec: isModule
         ? `${Number(row.pmaxWp)} Wp`

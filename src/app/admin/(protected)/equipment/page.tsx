@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { ShieldAlert } from "lucide-react";
 import { DatasheetUploadPanel } from "@/components/datasheet-upload-panel";
 import { ExternalExtractionImportPanel } from "@/components/external-extraction-import-panel";
+import { InverterZipImportPanel } from "@/components/inverter-zip-import-panel";
 import { ReviewQueueItem } from "@/components/review-queue-item";
 import { ScanQueueStatus } from "@/components/scan-queue-status";
 import { isDatabaseConfigured } from "@/lib/server/db";
@@ -35,7 +36,15 @@ export default async function AdminEquipmentPage() {
         <span className="admin-mode">{canReview ? "REVIEWER" : "INTAKE"}</span>
       </div>
 
-      {canEnterSpec ? <ExternalExtractionImportPanel capabilities={capabilities} /> : null}
+      {canEnterSpec ? (
+        <>
+          <InverterZipImportPanel capabilities={capabilities} />
+          <details className="legacy-datasheet-intake">
+            <summary>นำเข้า PDF พร้อม JSON Extraction</summary>
+            <ExternalExtractionImportPanel capabilities={capabilities} />
+          </details>
+        </>
+      ) : null}
 
       <details className="legacy-datasheet-intake">
         <summary>เพิ่ม Datasheet แบบ 1 Model และกรอกสเปกเอง</summary>

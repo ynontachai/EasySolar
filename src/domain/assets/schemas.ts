@@ -26,6 +26,15 @@ export const datasheetUploadIntentSchema = z.object({
   sizeBytes: z.number().int().positive().max(MAX_DATASHEET_SIZE_BYTES),
   sha256Hex: sha256HexSchema,
   sha256Base64: sha256Base64Schema,
+  suggestedInverterType: z.enum(["string", "hybrid", "micro"]).optional(),
+}).superRefine((value, context) => {
+  if (value.suggestedInverterType && value.category !== "inverter") {
+    context.addIssue({
+      code: "custom",
+      message: "ประเภท Inverter ใช้ได้เฉพาะกับรายการ Inverter",
+      path: ["suggestedInverterType"],
+    });
+  }
 });
 
 export const assetIdSchema = z.string().uuid();

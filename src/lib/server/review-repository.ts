@@ -134,6 +134,7 @@ export async function deleteDraftRevision(input: {
             'storageKey', datasheet_revision.storage_key,
             'sha256', datasheet_revision.sha256,
             'language', datasheet_revision.language,
+            'suggestedInverterType', datasheet_revision.suggested_inverter_type,
             'state', datasheet_revision.state,
             'createdAt', datasheet_revision.created_at
           ),
@@ -587,7 +588,10 @@ export async function getRevisionSpecTarget(revisionId: string): Promise<Revisio
       pv_module_spec.pmax_wp::text AS "pmaxWp",
       pv_module_spec.voc_v::text AS "vocV",
       pv_module_spec.vmp_v::text AS "vmpV",
-      inverter_spec.inverter_type AS "inverterType",
+      COALESCE(
+        inverter_spec.inverter_type,
+        datasheet_revision.suggested_inverter_type
+      ) AS "inverterType",
       inverter_spec.max_dc_power_wp::text AS "maxDcPowerWp",
       inverter_spec.max_dc_voltage_v::text AS "maxDcVoltageV",
       inverter_spec.max_recommended_pv_wp::text AS "maxRecommendedPvWp",

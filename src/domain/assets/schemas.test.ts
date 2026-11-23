@@ -55,6 +55,18 @@ describe("datasheet upload intent", () => {
 
     expect(result.success).toBe(false);
   });
+
+  it("accepts a proposed inverter type only for inverter drafts", () => {
+    expect(datasheetUploadIntentSchema.safeParse({
+      ...validIntent,
+      category: "inverter",
+      suggestedInverterType: "hybrid",
+    }).success).toBe(true);
+    expect(datasheetUploadIntentSchema.safeParse({
+      ...validIntent,
+      suggestedInverterType: "hybrid",
+    }).success).toBe(false);
+  });
 });
 
 describe("scan verdict", () => {
