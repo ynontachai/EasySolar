@@ -237,6 +237,7 @@ describe("external datasheet extraction schema", () => {
         field_key: string;
         value_mapping?: Record<string, string[]>;
       }>;
+      identifier_rules: string[];
       rules: string[];
     };
     const inverterType = template.field_contract.find(
@@ -247,6 +248,7 @@ describe("external datasheet extraction schema", () => {
     expect(inverterType?.value_mapping?.hybrid).toContain("hybrid");
     expect(inverterType?.value_mapping?.micro).toContain("microinverter");
     expect(template.rules.some((rule) => rule.includes("grid-tied") && rule.includes("string"))).toBe(true);
+    expect(template.identifier_rules.some((rule) => rule.includes("filename") && rule.includes("exact_model"))).toBe(true);
 
     const promptPath = resolve(
       process.cwd(),
@@ -263,6 +265,8 @@ describe("external datasheet extraction schema", () => {
     expect(prompt).toContain('hybrid inverter to "hybrid"');
     expect(prompt).toContain('microinverter to "micro"');
     expect(prompt).toContain("Do not infer inverterType from the model name");
+    expect(prompt).toContain("the PDF filename may establish exact_model");
+    expect(prompt).toContain("filename-anchored identifier requires human review");
   });
 
   it("requires prompt v1.2 in both extraction templates", () => {

@@ -13,6 +13,7 @@ export interface ParsedExtractionBatchFile {
   error: string | null;
   extraction: ExtractedSpec | null;
   name: string;
+  sourceFilename: string | null;
 }
 
 export interface ExtractionBatchPlanItem {
@@ -40,7 +41,7 @@ export function buildExtractionBatchPlan(input: {
 
   const sourceCounts = new Map<string, number>();
   for (const file of input.jsonFiles) {
-    const sourceName = file.extraction?.source_document.filename;
+    const sourceName = file.extraction?.source_document.filename ?? file.sourceFilename;
     if (sourceName) sourceCounts.set(sourceName, (sourceCounts.get(sourceName) ?? 0) + 1);
   }
 
@@ -48,12 +49,24 @@ export function buildExtractionBatchPlan(input: {
   const items: ExtractionBatchPlanItem[] = input.jsonFiles.map((file, jsonIndex) => {
     const extraction = file.extraction;
     if (!extraction) {
+      const sourceName = file.sourceFilename;
+      const pdfIndexes = sourceName ? (pdfIndexesByName.get(sourceName) ?? []) : [];
+      const pdfIndex = pdfIndexes.length === 1 ? (pdfIndexes[0] ?? null) : null;
+      if (pdfIndex !== null) matchedPdfIndexes.add(pdfIndex);
+      let pairingError = file.error ?? "JSON ไม่ตรงกับ EasySolar template";
+      if (sourceName && (sourceCounts.get(sourceName) ?? 0) > 1) {
+        pairingError = `มี JSON มากกว่าหนึ่งไฟล์ที่อ้างถึง ${sourceName}`;
+      } else if (sourceName && pdfIndexes.length === 0) {
+        pairingError = `${pairingError} · ไม่พบ PDF ชื่อ ${sourceName}`;
+      } else if (sourceName && pdfIndexes.length > 1) {
+        pairingError = `${pairingError} · มี PDF ชื่อ ${sourceName} ซ้ำในชุดที่เลือก`;
+      }
       return {
-        error: file.error ?? "JSON ไม่ตรงกับ EasySolar template",
+        error: pairingError,
         extraction: null,
         jsonIndex,
         key: `json:${jsonIndex}:${file.name}`,
-        pdfIndex: null,
+        pdfIndex,
       };
     }
 
@@ -93,7 +106,7 @@ export function buildExtractionBatchPlan(input: {
   input.pdfFiles.forEach((pdf, pdfIndex) => {
     if (matchedPdfIndexes.has(pdfIndex)) return;
     const hasNamedJson = input.jsonFiles.some(
-      (file) => file.extraction?.source_document.filename === pdf.name,
+      (file) => (file.extraction?.source_document.filename ?? file.sourceFilename) === pdf.name,
     );
     if (hasNamedJson) return;
     items.push({

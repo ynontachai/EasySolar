@@ -202,9 +202,28 @@ async function readExtractionFile(file: File) {
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const location = issue?.path.length ? ` (${issue.path.join(".")})` : "";
-    throw new Error(`${issue?.message ?? "JSON ไม่ตรงกับ EasySolar template"}${location}`);
+    const sourceFilename = (
+      value &&
+      typeof value === "object" &&
+      "source_document" in value &&
+      value.source_document &&
+      typeof value.source_document === "object" &&
+      "filename" in value.source_document &&
+      typeof value.source_document.filename === "string" &&
+      value.source_document.filename.length <= 255
+    ) ? value.source_document.filename : null;
+    throw new ExtractionFileValidationError(
+      `${issue?.message ?? "JSON ไม่ตรงกับ EasySolar template"}${location}`,
+      sourceFilename,
+    );
   }
   return parsed.data;
+}
+
+class ExtractionFileValidationError extends Error {
+  constructor(message: string, readonly sourceFilename: string | null) {
+    super(message);
+  }
 }
 
 function countAttentionFields(extraction: ExtractedSpec) {
@@ -276,12 +295,21 @@ export function ExternalExtractionImportPanel({
     const parsedJsons: ParsedExtractionBatchFile[] = await Promise.all(
       nextJsons.map(async (file) => {
         try {
-          return { error: null, extraction: await readExtractionFile(file), name: file.name };
+          const extraction = await readExtractionFile(file);
+          return {
+            error: null,
+            extraction,
+            name: file.name,
+            sourceFilename: extraction.source_document.filename,
+          };
         } catch (error) {
           return {
             error: error instanceof Error ? error.message : "ตรวจ JSON ไม่สำเร็จ",
             extraction: null,
             name: file.name,
+            sourceFilename: error instanceof ExtractionFileValidationError
+              ? error.sourceFilename
+              : null,
           };
         }
       }),

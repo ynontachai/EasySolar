@@ -43,6 +43,8 @@ DOCUMENT READING
 MODEL IDENTIFIER PROVENANCE
 
 - Set identifier_provenance.method to "explicit" when the complete exact_model appears in the PDF. Set composition_rule to null and cite the PDF occurrence.
+- For an inverter only, the PDF filename may establish exact_model when the PDF explicitly states a matching product family and rated-power variant, and the complete filename model matches both without changing any non-power character. Use method "explicit", include both the filename evidence and the PDF family/variant evidence, and add a model warning that the filename-anchored identifier requires human review.
+- Do not use the inverter filename as exact_model when the PDF family, rated-power variant, suffix, phase, or regional designation conflicts with it or cannot be matched unambiguously.
 - For an explicit identifier, set anchor_model, anchor_power_wp, and variant_power_wp to null.
 - Set identifier_provenance.method to "composed" only when the template permits the "power_variant_substitution" rule and every condition below is satisfied. Set composition_rule to "power_variant_substitution".
 - The power_variant_substitution rule is permitted only when:

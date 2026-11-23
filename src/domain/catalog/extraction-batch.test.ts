@@ -16,8 +16,8 @@ describe("external extraction batch pairing", () => {
   it("pairs each JSON with the exact PDF filename declared by the extraction", () => {
     const items = buildExtractionBatchPlan({
       jsonFiles: [
-        { error: null, extraction: extraction("one.pdf", "ONE"), name: "one.json" },
-        { error: null, extraction: extraction("two.pdf", "TWO"), name: "two.json" },
+        { error: null, extraction: extraction("one.pdf", "ONE"), name: "one.json", sourceFilename: "one.pdf" },
+        { error: null, extraction: extraction("two.pdf", "TWO"), name: "two.json", sourceFilename: "two.pdf" },
       ],
       pdfFiles: [pdf("two.pdf"), pdf("one.pdf")],
     });
@@ -31,7 +31,7 @@ describe("external extraction batch pairing", () => {
   it("reports PDFs and JSON outputs that have no matching partner", () => {
     const items = buildExtractionBatchPlan({
       jsonFiles: [
-        { error: null, extraction: extraction("missing.pdf"), name: "missing.json" },
+        { error: null, extraction: extraction("missing.pdf"), name: "missing.json", sourceFilename: "missing.pdf" },
       ],
       pdfFiles: [pdf("orphan.pdf")],
     });
@@ -45,8 +45,8 @@ describe("external extraction batch pairing", () => {
   it("blocks duplicate manufacturer and model identities across PDFs", () => {
     const items = buildExtractionBatchPlan({
       jsonFiles: [
-        { error: null, extraction: extraction("one.pdf"), name: "one.json" },
-        { error: null, extraction: extraction("two.pdf"), name: "two.json" },
+        { error: null, extraction: extraction("one.pdf"), name: "one.json", sourceFilename: "one.pdf" },
+        { error: null, extraction: extraction("two.pdf"), name: "two.json", sourceFilename: "two.pdf" },
       ],
       pdfFiles: [pdf("one.pdf"), pdf("two.pdf")],
     });
@@ -57,12 +57,31 @@ describe("external extraction batch pairing", () => {
   it("blocks duplicate JSON declarations for the same PDF", () => {
     const items = buildExtractionBatchPlan({
       jsonFiles: [
-        { error: null, extraction: extraction("one.pdf", "ONE"), name: "one-a.json" },
-        { error: null, extraction: extraction("one.pdf", "TWO"), name: "one-b.json" },
+        { error: null, extraction: extraction("one.pdf", "ONE"), name: "one-a.json", sourceFilename: "one.pdf" },
+        { error: null, extraction: extraction("one.pdf", "TWO"), name: "one-b.json", sourceFilename: "one.pdf" },
       ],
       pdfFiles: [pdf("one.pdf")],
     });
 
     expect(items.every((item) => item.error?.includes("JSON มากกว่าหนึ่งไฟล์"))).toBe(true);
+  });
+
+  it("keeps an invalid JSON paired when its source filename is readable", () => {
+    const items = buildExtractionBatchPlan({
+      jsonFiles: [{
+        error: "detected_model_count ต้องมีอย่างน้อย 1 Model",
+        extraction: null,
+        name: "one.easysolar.json",
+        sourceFilename: "one.pdf",
+      }],
+      pdfFiles: [pdf("one.pdf")],
+    });
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      error: "detected_model_count ต้องมีอย่างน้อย 1 Model",
+      jsonIndex: 0,
+      pdfIndex: 0,
+    });
   });
 });

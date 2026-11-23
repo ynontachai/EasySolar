@@ -12,6 +12,11 @@
     "allow_composed_identifiers": false,
     "allowed_composition_rules": []
   },
+  "identifier_rules": [
+    "Prefer a complete exact model stated in the PDF.",
+    "When the PDF states a matching inverter family and rated-power variant but omits the complete identifier, the PDF filename may establish exact_model only if every non-power character, suffix, phase, and regional designation matches unambiguously.",
+    "A filename-anchored inverter identifier uses method explicit, cites both filename and PDF evidence, and includes a human-review warning."
+  ],
   "field_contract": [
     { "field_key": "inverterType", "label": "Inverter Type", "type": "string", "unit": null, "required": true, "allowed_values": ["string", "hybrid", "micro"], "value_mapping": { "string": ["on-grid", "on grid", "grid-tied", "grid tied", "grid-connected", "grid connected"], "hybrid": ["hybrid"], "micro": ["microinverter", "micro inverter"] } },
     { "field_key": "ratedAcKw", "label": "Rated AC Power", "type": "number", "unit": "kW", "required": true, "aliases": ["Rated Output Power", "Nominal AC Power"], "validation": { "min_exclusive": 0, "max": 10000 } },
