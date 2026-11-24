@@ -105,11 +105,19 @@ function EquipmentPicker({
                 option.secondarySpec,
               ].filter(Boolean).join(" · "),
               label: option.model,
+              path: [
+                option.manufacturer,
+                ...(isInverter
+                  ? [inverterTypeLabels[option.inverterType ?? "string"] ?? option.inverterType ?? "On Grid"]
+                  : []),
+              ],
+              treeDescription: [option.primarySpec, option.secondarySpec].filter(Boolean).join(" · "),
               value: option.value,
             }))}
             placeholder={controlLabel}
             searchPlaceholder="ค้นหายี่ห้อ รุ่น หรือสเปก"
             searchable
+            treeLabel={isInverter ? "Inverter" : "PV Module"}
             value={value}
           />
         </div>

@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, FolderOpen, Search } from "lucide-react";
 
 export interface ThemeSelectOption {
   description?: string;
   label: string;
+  path?: string[];
+  treeDescription?: string;
   value: string;
 }
 
@@ -21,7 +23,40 @@ interface ThemeSelectProps {
   searchPlaceholder?: string;
   searchable?: boolean;
   tone?: "ink" | "paper";
+  treeLabel?: string;
   value: string;
+}
+
+interface ThemeSelectTreeNode {
+  children: ThemeSelectTreeNode[];
+  label: string;
+  options: ThemeSelectOption[];
+}
+
+function createOptionTree(options: ThemeSelectOption[]) {
+  const root: ThemeSelectTreeNode = { children: [], label: "", options: [] };
+
+  for (const option of options) {
+    let parent = root;
+    for (const label of option.path ?? []) {
+      let node = parent.children.find((candidate) => candidate.label === label);
+      if (!node) {
+        node = { children: [], label, options: [] };
+        parent.children.push(node);
+      }
+      parent = node;
+    }
+    parent.options.push(option);
+  }
+
+  return root;
+}
+
+function flattenOptionTree(nodes: ThemeSelectTreeNode[]): ThemeSelectOption[] {
+  return nodes.flatMap((node) => [
+    ...flattenOptionTree(node.children),
+    ...node.options,
+  ]);
 }
 
 export function ThemeSelect({
@@ -36,6 +71,7 @@ export function ThemeSelect({
   searchPlaceholder = "พิมพ์เพื่อค้นหา",
   searchable = false,
   tone = "paper",
+  treeLabel,
   value,
 }: ThemeSelectProps) {
   const generatedId = useId();
@@ -50,11 +86,19 @@ export function ThemeSelect({
     const normalizedQuery = query.trim().toLocaleLowerCase("th");
     if (!normalizedQuery) return options;
     return options.filter((option) =>
-      `${option.label} ${option.description ?? ""}`
+      `${option.path?.join(" ") ?? ""} ${option.label} ${option.description ?? ""} ${option.treeDescription ?? ""}`
         .toLocaleLowerCase("th")
         .includes(normalizedQuery),
     );
   }, [options, query]);
+  const optionTree = useMemo(() => createOptionTree(filteredOptions), [filteredOptions]);
+  const hasTreeOptions = Boolean(treeLabel && filteredOptions.some((option) => option.path?.length));
+  const displayedOptions = useMemo(
+    () => hasTreeOptions
+      ? [...flattenOptionTree(optionTree.children), ...optionTree.options]
+      : filteredOptions,
+    [filteredOptions, hasTreeOptions, optionTree],
+  );
 
   useEffect(() => {
     function closeOnOutsidePointer(event: PointerEvent) {
@@ -75,11 +119,11 @@ export function ThemeSelect({
   }, []);
 
   function moveFocus(direction: 1 | -1) {
-    if (!filteredOptions.length) return;
+    if (!displayedOptions.length) return;
     const activeIndex = optionRefs.current.findIndex((option) => option === document.activeElement);
-    const selectedIndex = filteredOptions.findIndex((option) => option.value === value);
+    const selectedIndex = displayedOptions.findIndex((option) => option.value === value);
     const startIndex = activeIndex >= 0 ? activeIndex : Math.max(selectedIndex, 0);
-    const nextIndex = (startIndex + direction + filteredOptions.length) % filteredOptions.length;
+    const nextIndex = (startIndex + direction + displayedOptions.length) % displayedOptions.length;
     optionRefs.current[nextIndex]?.focus();
   }
 
@@ -90,6 +134,52 @@ export function ThemeSelect({
     requestAnimationFrame(() => {
       rootRef.current?.querySelector<HTMLButtonElement>(".theme-select__trigger")?.focus();
     });
+  }
+  function renderOption(option: ThemeSelectOption, index: number, isTreeOption = false) {
+    return (
+      <button
+        aria-selected={option.value === value}
+        className={`theme-select__option${isTreeOption ? " theme-select__tree-option" : ""}`}
+        key={option.value}
+        onClick={() => choose(option.value)}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            moveFocus(event.key === "ArrowDown" ? 1 : -1);
+          }
+          if (event.key === "Home" || event.key === "End") {
+            event.preventDefault();
+            optionRefs.current[event.key === "Home" ? 0 : displayedOptions.length - 1]?.focus();
+          }
+        }}
+        ref={(element) => { optionRefs.current[index] = element; }}
+        role="option"
+        type="button"
+      >
+        <span>
+          <strong>{option.label}</strong>
+          {(isTreeOption ? option.treeDescription : option.description) ? (
+            <small>{isTreeOption ? option.treeDescription : option.description}</small>
+          ) : null}
+        </span>
+        {option.value === value ? <Check aria-hidden="true" size={17} /> : null}
+      </button>
+    );
+  }
+
+  function renderTreeNodes(nodes: ThemeSelectTreeNode[], optionIndex: { current: number }) {
+    return nodes.map((node) => (
+      <div className="theme-select__tree-branch" key={node.label} role="group" aria-label={node.label}>
+        <div aria-hidden="true" className="theme-select__tree-heading">
+          <FolderOpen aria-hidden="true" size={16} />
+          <strong>{node.label}</strong>
+        </div>
+        <div className="theme-select__tree-children">
+          {renderTreeNodes(node.children, optionIndex)}
+          {node.options.map((option) => renderOption(option, optionIndex.current++, true))}
+        </div>
+      </div>
+    ));
   }
 
   return (
@@ -150,33 +240,22 @@ export function ThemeSelect({
             id={listboxId}
             role="listbox"
           >
-            {filteredOptions.map((option, index) => (
-              <button
-                aria-selected={option.value === value}
-                className="theme-select__option"
-                key={option.value}
-                onClick={() => choose(option.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                    event.preventDefault();
-                    moveFocus(event.key === "ArrowDown" ? 1 : -1);
-                  }
-                  if (event.key === "Home" || event.key === "End") {
-                    event.preventDefault();
-                    optionRefs.current[event.key === "Home" ? 0 : filteredOptions.length - 1]?.focus();
-                  }
-                }}
-                ref={(element) => { optionRefs.current[index] = element; }}
-                role="option"
-                type="button"
-              >
-                <span>
-                  <strong>{option.label}</strong>
-                  {option.description ? <small>{option.description}</small> : null}
-                </span>
-                {option.value === value ? <Check aria-hidden="true" size={17} /> : null}
-              </button>
-            ))}
+            {hasTreeOptions ? (
+              <div className="theme-select__tree-root" role="group" aria-label={treeLabel}>
+                <div aria-hidden="true" className="theme-select__tree-root-heading">
+                  <FolderOpen aria-hidden="true" size={17} />
+                  <strong>{treeLabel}</strong>
+                </div>
+                <div className="theme-select__tree-children">
+                  {renderTreeNodes(optionTree.children, { current: 0 })}
+                  {optionTree.options.map((option, index) => renderOption(
+                    option,
+                    displayedOptions.length - optionTree.options.length + index,
+                    true,
+                  ))}
+                </div>
+              </div>
+            ) : filteredOptions.map((option, index) => renderOption(option, index))}
             {!filteredOptions.length ? <p className="theme-select__empty">{emptyMessage}</p> : null}
           </div>
         </div>

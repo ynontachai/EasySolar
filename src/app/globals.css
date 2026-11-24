@@ -337,6 +337,68 @@ a {
   padding: 18px 12px;
 }
 
+.theme-select__tree-root-heading,
+.theme-select__tree-heading {
+  align-items: center;
+  color: rgba(255, 255, 255, 0.9);
+  display: flex;
+  gap: 8px;
+  min-height: 38px;
+  padding: 7px 10px;
+}
+
+.theme-select__tree-root-heading {
+  color: var(--sun);
+}
+
+.theme-select__tree-root-heading svg,
+.theme-select__tree-heading svg {
+  flex: 0 0 auto;
+}
+
+.theme-select__tree-root-heading strong,
+.theme-select__tree-heading strong {
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.theme-select__tree-children {
+  border-left: 1px solid rgba(255, 255, 255, 0.28);
+  margin-left: 18px;
+  padding-left: 16px;
+}
+
+.theme-select__tree-branch,
+.theme-select__tree-option {
+  position: relative;
+}
+
+.theme-select__tree-branch::before,
+.theme-select__tree-option::before {
+  border-top: 1px solid rgba(255, 255, 255, 0.28);
+  content: "";
+  left: -17px;
+  position: absolute;
+  top: 19px;
+  width: 16px;
+}
+
+.theme-select__tree-option {
+  min-height: 52px;
+}
+
+.theme-select__tree-option::before {
+  top: 26px;
+}
+
+.theme-select__tree-option:hover::before,
+.theme-select__tree-option:focus-visible::before,
+.theme-select__tree-option[aria-selected="true"]::before {
+  border-color: var(--sun);
+}
+
 .header-action {
   align-items: center;
   display: inline-flex;
