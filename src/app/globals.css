@@ -340,11 +340,17 @@ a {
 .theme-select__tree-root-heading,
 .theme-select__tree-heading {
   align-items: center;
+  background: transparent;
+  border: 0;
   color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
   display: flex;
+  font: inherit;
   gap: 8px;
-  min-height: 38px;
+  min-height: 40px;
   padding: 7px 10px;
+  text-align: left;
+  width: 100%;
 }
 
 .theme-select__tree-root-heading {
@@ -354,6 +360,28 @@ a {
 .theme-select__tree-root-heading svg,
 .theme-select__tree-heading svg {
   flex: 0 0 auto;
+}
+
+.theme-select__tree-root-heading:hover,
+.theme-select__tree-root-heading:focus-visible,
+.theme-select__tree-heading:hover,
+.theme-select__tree-heading:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  outline: 1px solid rgba(255, 159, 28, 0.72);
+  outline-offset: -1px;
+}
+
+.theme-select__tree-root-heading[aria-disabled="true"],
+.theme-select__tree-heading[aria-disabled="true"] {
+  cursor: default;
+}
+
+.theme-select__tree-toggle-icon {
+  transition: transform 160ms ease;
+}
+
+[aria-expanded="true"] > .theme-select__tree-toggle-icon {
+  transform: rotate(90deg);
 }
 
 .theme-select__tree-root-heading strong,
@@ -381,7 +409,7 @@ a {
   content: "";
   left: -17px;
   position: absolute;
-  top: 19px;
+  top: 20px;
   width: 16px;
 }
 

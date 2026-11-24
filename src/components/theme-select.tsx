@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, FolderOpen, Search } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Folder, FolderOpen, Search } from "lucide-react";
 
 export interface ThemeSelectOption {
   description?: string;
@@ -52,11 +52,25 @@ function createOptionTree(options: ThemeSelectOption[]) {
   return root;
 }
 
-function flattenOptionTree(nodes: ThemeSelectTreeNode[]): ThemeSelectOption[] {
-  return nodes.flatMap((node) => [
-    ...flattenOptionTree(node.children),
-    ...node.options,
-  ]);
+const TREE_ROOT_KEY = "__theme-select-root__";
+
+function treeNodeKey(path: string[]) {
+  return path.join("\u001f");
+}
+
+function flattenVisibleOptionTree(
+  nodes: ThemeSelectTreeNode[],
+  collapsedNodes: Set<string>,
+  parentPath: string[] = [],
+): ThemeSelectOption[] {
+  return nodes.flatMap((node) => {
+    const path = [...parentPath, node.label];
+    if (collapsedNodes.has(treeNodeKey(path))) return [];
+    return [
+      ...flattenVisibleOptionTree(node.children, collapsedNodes, path),
+      ...node.options,
+    ];
+  });
 }
 
 export function ThemeSelect({
@@ -78,10 +92,12 @@ export function ThemeSelect({
   const controlId = id ?? `theme-select-${generatedId}`;
   const listboxId = `${controlId}-listbox`;
   const rootRef = useRef<HTMLDivElement>(null);
-  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const optionRefs = useRef(new Map<string, HTMLButtonElement>());
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [collapsedNodes, setCollapsedNodes] = useState<Set<string>>(() => new Set());
   const selectedOption = options.find((option) => option.value === value);
+  const isSearching = Boolean(query.trim());
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase("th");
     if (!normalizedQuery) return options;
@@ -92,12 +108,15 @@ export function ThemeSelect({
     );
   }, [options, query]);
   const optionTree = useMemo(() => createOptionTree(filteredOptions), [filteredOptions]);
-  const hasTreeOptions = Boolean(treeLabel && filteredOptions.some((option) => option.path?.length));
+  const hasTreeOptions = Boolean(treeLabel && options.some((option) => option.path?.length));
   const displayedOptions = useMemo(
-    () => hasTreeOptions
-      ? [...flattenOptionTree(optionTree.children), ...optionTree.options]
-      : filteredOptions,
-    [filteredOptions, hasTreeOptions, optionTree],
+    () => {
+      if (!hasTreeOptions) return filteredOptions;
+      if (!isSearching && collapsedNodes.has(TREE_ROOT_KEY)) return [];
+      const hiddenNodes = isSearching ? new Set<string>() : collapsedNodes;
+      return [...flattenVisibleOptionTree(optionTree.children, hiddenNodes), ...optionTree.options];
+    },
+    [collapsedNodes, filteredOptions, hasTreeOptions, isSearching, optionTree],
   );
 
   useEffect(() => {
@@ -120,11 +139,23 @@ export function ThemeSelect({
 
   function moveFocus(direction: 1 | -1) {
     if (!displayedOptions.length) return;
-    const activeIndex = optionRefs.current.findIndex((option) => option === document.activeElement);
+    const activeIndex = displayedOptions.findIndex(
+      (option) => optionRefs.current.get(option.value) === document.activeElement,
+    );
     const selectedIndex = displayedOptions.findIndex((option) => option.value === value);
     const startIndex = activeIndex >= 0 ? activeIndex : Math.max(selectedIndex, 0);
     const nextIndex = (startIndex + direction + displayedOptions.length) % displayedOptions.length;
-    optionRefs.current[nextIndex]?.focus();
+    optionRefs.current.get(displayedOptions[nextIndex].value)?.focus();
+  }
+
+  function toggleNode(key: string) {
+    if (isSearching) return;
+    setCollapsedNodes((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
 
   function choose(nextValue: string) {
@@ -135,7 +166,7 @@ export function ThemeSelect({
       rootRef.current?.querySelector<HTMLButtonElement>(".theme-select__trigger")?.focus();
     });
   }
-  function renderOption(option: ThemeSelectOption, index: number, isTreeOption = false) {
+  function renderOption(option: ThemeSelectOption, isTreeOption = false) {
     return (
       <button
         aria-selected={option.value === value}
@@ -149,11 +180,15 @@ export function ThemeSelect({
           }
           if (event.key === "Home" || event.key === "End") {
             event.preventDefault();
-            optionRefs.current[event.key === "Home" ? 0 : displayedOptions.length - 1]?.focus();
+            const edgeOption = displayedOptions[event.key === "Home" ? 0 : displayedOptions.length - 1];
+            if (edgeOption) optionRefs.current.get(edgeOption.value)?.focus();
           }
         }}
-        ref={(element) => { optionRefs.current[index] = element; }}
-        role="option"
+        ref={(element) => {
+          if (element) optionRefs.current.set(option.value, element);
+          else optionRefs.current.delete(option.value);
+        }}
+        role={isTreeOption ? "treeitem" : "option"}
         type="button"
       >
         <span>
@@ -167,19 +202,35 @@ export function ThemeSelect({
     );
   }
 
-  function renderTreeNodes(nodes: ThemeSelectTreeNode[], optionIndex: { current: number }) {
-    return nodes.map((node) => (
-      <div className="theme-select__tree-branch" key={node.label} role="group" aria-label={node.label}>
-        <div aria-hidden="true" className="theme-select__tree-heading">
-          <FolderOpen aria-hidden="true" size={16} />
-          <strong>{node.label}</strong>
+  function renderTreeNodes(nodes: ThemeSelectTreeNode[], parentPath: string[] = []) {
+    return nodes.map((node) => {
+      const path = [...parentPath, node.label];
+      const key = treeNodeKey(path);
+      const isExpanded = isSearching || !collapsedNodes.has(key);
+      return (
+        <div className="theme-select__tree-branch" key={key}>
+          <button
+            aria-disabled={isSearching || undefined}
+            aria-expanded={isExpanded}
+            aria-selected={false}
+            className="theme-select__tree-heading"
+            onClick={() => toggleNode(key)}
+            role="treeitem"
+            type="button"
+          >
+            <ChevronRight aria-hidden="true" className="theme-select__tree-toggle-icon" size={14} />
+            {isExpanded ? <FolderOpen aria-hidden="true" size={16} /> : <Folder aria-hidden="true" size={16} />}
+            <strong>{node.label}</strong>
+          </button>
+          {isExpanded ? (
+            <div className="theme-select__tree-children" role="group">
+              {renderTreeNodes(node.children, path)}
+              {node.options.map((option) => renderOption(option, true))}
+            </div>
+          ) : null}
         </div>
-        <div className="theme-select__tree-children">
-          {renderTreeNodes(node.children, optionIndex)}
-          {node.options.map((option) => renderOption(option, optionIndex.current++, true))}
-        </div>
-      </div>
-    ));
+      );
+    });
   }
 
   return (
@@ -188,7 +239,7 @@ export function ThemeSelect({
       <button
         aria-controls={listboxId}
         aria-expanded={isOpen}
-        aria-haspopup="listbox"
+        aria-haspopup={hasTreeOptions ? "tree" : "listbox"}
         aria-required={required}
         className="theme-select__trigger"
         data-empty={!selectedOption || undefined}
@@ -238,24 +289,33 @@ export function ThemeSelect({
             aria-labelledby={controlId}
             className="theme-select__list"
             id={listboxId}
-            role="listbox"
+            role={hasTreeOptions ? "tree" : "listbox"}
           >
             {hasTreeOptions ? (
-              <div className="theme-select__tree-root" role="group" aria-label={treeLabel}>
-                <div aria-hidden="true" className="theme-select__tree-root-heading">
-                  <FolderOpen aria-hidden="true" size={17} />
+              <div className="theme-select__tree-root">
+                <button
+                  aria-disabled={isSearching || undefined}
+                  aria-expanded={isSearching || !collapsedNodes.has(TREE_ROOT_KEY)}
+                  aria-selected={false}
+                  className="theme-select__tree-root-heading"
+                  onClick={() => toggleNode(TREE_ROOT_KEY)}
+                  role="treeitem"
+                  type="button"
+                >
+                  <ChevronRight aria-hidden="true" className="theme-select__tree-toggle-icon" size={14} />
+                  {isSearching || !collapsedNodes.has(TREE_ROOT_KEY)
+                    ? <FolderOpen aria-hidden="true" size={17} />
+                    : <Folder aria-hidden="true" size={17} />}
                   <strong>{treeLabel}</strong>
-                </div>
-                <div className="theme-select__tree-children">
-                  {renderTreeNodes(optionTree.children, { current: 0 })}
-                  {optionTree.options.map((option, index) => renderOption(
-                    option,
-                    displayedOptions.length - optionTree.options.length + index,
-                    true,
-                  ))}
-                </div>
+                </button>
+                {isSearching || !collapsedNodes.has(TREE_ROOT_KEY) ? (
+                  <div className="theme-select__tree-children" role="group">
+                    {renderTreeNodes(optionTree.children)}
+                    {optionTree.options.map((option) => renderOption(option, true))}
+                  </div>
+                ) : null}
               </div>
-            ) : filteredOptions.map((option, index) => renderOption(option, index))}
+            ) : filteredOptions.map((option) => renderOption(option))}
             {!filteredOptions.length ? <p className="theme-select__empty">{emptyMessage}</p> : null}
           </div>
         </div>
