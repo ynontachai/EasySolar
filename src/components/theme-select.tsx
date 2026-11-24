@@ -18,6 +18,7 @@ interface ThemeSelectProps {
   options: ThemeSelectOption[];
   placeholder?: string;
   required?: boolean;
+  searchPlaceholder?: string;
   searchable?: boolean;
   tone?: "ink" | "paper";
   value: string;
@@ -32,6 +33,7 @@ export function ThemeSelect({
   options,
   placeholder = "เลือกรายการ",
   required = false,
+  searchPlaceholder = "พิมพ์เพื่อค้นหา",
   searchable = false,
   tone = "paper",
   value,
@@ -136,7 +138,7 @@ export function ThemeSelect({
                 autoComplete="off"
                 autoFocus
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="พิมพ์เพื่อค้นหา"
+                placeholder={searchPlaceholder}
                 type="search"
                 value={query}
               />

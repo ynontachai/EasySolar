@@ -70,85 +70,45 @@ function EquipmentPicker({
   options: CheckerEquipmentOption[];
   value: string;
 }) {
-  const selected = options.find((option) => option.value === value);
   const isInverter = kind === "inverter";
-  const brands = Array.from(new Set(options.map((option) => option.manufacturer)));
-  const selectedBrand = selected?.manufacturer ?? brands[0] ?? "";
-  const optionsForBrand = options.filter(
-    (option) => option.manufacturer === selectedBrand,
-  );
-  const inverterTypeOrder = ["string", "hybrid", "micro"];
-  const typeOptions = isInverter
-    ? Array.from(new Set(optionsForBrand.map((option) => option.inverterType ?? "string")))
-        .sort((left, right) => {
-          const leftIndex = inverterTypeOrder.indexOf(left);
-          const rightIndex = inverterTypeOrder.indexOf(right);
-          return (leftIndex < 0 ? inverterTypeOrder.length : leftIndex) -
-            (rightIndex < 0 ? inverterTypeOrder.length : rightIndex);
-        })
-    : [];
-  const selectedType = selected?.inverterType ?? (isInverter ? "string" : null);
-  const optionsForType = isInverter
-    ? optionsForBrand.filter((option) => (option.inverterType ?? "string") === selectedType)
-    : optionsForBrand;
-  const models = optionsForType.filter(
-    (option) => option.manufacturer === selectedBrand,
-  );
   const inverterTypeLabels: Record<string, string> = {
     hybrid: "Hybrid",
     micro: "Microinverter",
     string: "On Grid",
   };
+  const controlLabel = isInverter
+    ? "ค้นหาและเลือกรุ่นอินเวอร์เตอร์"
+    : "ค้นหาและเลือกรุ่นแผง PV";
 
   return (
     <div className="picker">
       <h2>{label}</h2>
-      <div className={`picker__row${isInverter ? " picker__row--inverter" : ""}`}>
+      <p className="picker__hint">
+        {isInverter
+          ? "ค้นหาได้จากยี่ห้อ ชื่อรุ่น ประเภท หรือกำลังไฟ"
+          : "ค้นหาได้จากยี่ห้อ ชื่อรุ่น หรือกำลังวัตต์ของแผง"}
+      </p>
+      <div className="picker__row">
         <div className="field-group">
-          <label htmlFor={`${idPrefix}-brand`}>เลือกยี่ห้อ</label>
-          <ThemeSelect
-            id={`${idPrefix}-brand`}
-            onValueChange={(brand) =>
-              onChange(
-                options.find((option) => option.manufacturer === brand)?.value ?? value,
-              )
-            }
-            options={brands.map((brand) => ({ label: brand, value: brand }))}
-            value={selectedBrand}
-          />
-        </div>
-        {isInverter ? (
-          <div className="field-group">
-            <label htmlFor={`${idPrefix}-type`}>ประเภทของยี่ห้อนี้</label>
-            <ThemeSelect
-              id={`${idPrefix}-type`}
-              onValueChange={(inverterType) =>
-                onChange(
-                  optionsForBrand.find(
-                    (option) => (option.inverterType ?? "string") === inverterType,
-                  )?.value ?? value,
-                )
-              }
-              options={typeOptions.map((inverterType) => ({
-                label: inverterTypeLabels[inverterType] ?? inverterType,
-                value: inverterType,
-              }))}
-              value={selectedType ?? ""}
-            />
-          </div>
-        ) : null}
-        <div className="field-group">
-          <label htmlFor={`${idPrefix}-model`}>
-            {isInverter ? "เลือกรุ่น / Variant" : "เลือกรุ่น"}
-          </label>
+          <label htmlFor={`${idPrefix}-model`}>{controlLabel}</label>
           <ThemeSelect
             id={`${idPrefix}-model`}
+            emptyMessage="ไม่พบอุปกรณ์ที่ตรงกับคำค้นหา"
             onValueChange={onChange}
-            options={models.map((option) => ({
-              description: `${option.primarySpec} · ${option.secondarySpec}`,
+            options={options.map((option) => ({
+              description: [
+                option.manufacturer,
+                isInverter
+                  ? inverterTypeLabels[option.inverterType ?? "string"] ?? option.inverterType
+                  : null,
+                option.primarySpec,
+                option.secondarySpec,
+              ].filter(Boolean).join(" · "),
               label: option.model,
               value: option.value,
             }))}
+            placeholder={controlLabel}
+            searchPlaceholder="ค้นหายี่ห้อ รุ่น หรือสเปก"
             searchable
             value={value}
           />

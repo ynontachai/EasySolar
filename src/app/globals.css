@@ -9267,24 +9267,43 @@ a {
 
 .picker h2 {
   font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.picker__hint {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.55;
   margin: 0 0 14px;
 }
 
 .picker__row {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
 }
 
-.picker__row--inverter {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.picker__row .field-group {
+  margin-bottom: 0;
 }
 
-@media (max-width: 900px) and (min-width: 761px) {
-  .picker__row,
-  .picker__row--inverter {
-    grid-template-columns: 1fr;
-  }
+.picker__row .theme-select__trigger {
+  min-height: 68px;
+  padding: 10px 14px;
+}
+
+.picker__row .theme-select__value strong,
+.picker__row .theme-select__option strong {
+  font-size: 14px;
+}
+
+.picker__row .theme-select__value small,
+.picker__row .theme-select__option small {
+  line-height: 1.45;
+}
+
+.picker__row .theme-select__list {
+  max-height: min(380px, 52vh);
 }
 
 .calc__status p {

@@ -13,13 +13,17 @@ for (const viewport of viewports) {
 
     await expect(page.getByRole("heading", { level: 1 })).toContainText("จับคู่แผงโซลาร์");
     await expect(page.locator("#calculator")).toBeVisible();
-    await expect(page.getByText("ประเภทของยี่ห้อนี้", { exact: true })).toBeVisible();
     await expect(page.locator("#inverter-model")).toContainText("10 kW");
     await expect(page.locator(".picker").first().locator(".field-group > label")).toHaveText([
-      "เลือกยี่ห้อ",
-      "ประเภทของยี่ห้อนี้",
-      "เลือกรุ่น / Variant",
+      "ค้นหาและเลือกรุ่นอินเวอร์เตอร์",
     ]);
+    await expect(page.locator(".picker").nth(1).locator(".field-group > label")).toHaveText([
+      "ค้นหาและเลือกรุ่นแผง PV",
+    ]);
+    await page.locator("#inverter-model").click();
+    await expect(page.locator("#inverter-model-listbox")).toBeVisible();
+    await expect(page.getByPlaceholder("ค้นหายี่ห้อ รุ่น หรือสเปก")).toBeFocused();
+    await page.keyboard.press("Escape");
     await expect(page.getByRole("heading", { name: /รูปแบบการต่อที่เหมาะสม.*DC\/AC 1\.20–1\.50/ })).toBeVisible();
     await expect(page.getByRole("heading", { name: "MPPT 1 / MPPT 2", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: /ออกแบบการต่อแบบ Custom/ })).toBeVisible();
