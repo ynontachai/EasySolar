@@ -167,6 +167,7 @@ describe("verify and publish gates", () => {
 
   it("requires the inverter power field that is actually present", () => {
     const confirmedFields = [
+      "phaseCount",
       "ratedAcKw",
       "maxDcVoltageV",
       "mpptRange",
@@ -270,9 +271,11 @@ describe("inverter spec schema", () => {
     mpptMinV: "200",
   };
   const valid = {
+    batteryVoltageClass: "none",
     inverterType: "string",
     maxDcPowerWp: "15000",
     maxDcVoltageV: "1100",
+    phaseCount: "1",
     ratedAcKw: "10",
     sourcePages: {
       maxDcPowerWp: "1",
@@ -281,6 +284,7 @@ describe("inverter spec schema", () => {
       mpptRange: "1",
       mpptShortCircuitCurrent: "1",
       mpptTopology: "1",
+      phaseCount: "1",
       ratedAcKw: "1",
       startupVoltageV: "1",
     },
@@ -290,6 +294,21 @@ describe("inverter spec schema", () => {
 
   it("accepts a complete spec", () => {
     expect(inverterSpecInputSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("requires LV or HV with a source page for Hybrid", () => {
+    expect(inverterSpecInputSchema.safeParse({
+      ...valid,
+      inverterType: "hybrid",
+      batteryVoltageClass: "none",
+    }).success).toBe(false);
+
+    expect(inverterSpecInputSchema.safeParse({
+      ...valid,
+      inverterType: "hybrid",
+      batteryVoltageClass: "hv",
+      sourcePages: { ...valid.sourcePages, batteryVoltageClass: "3" },
+    }).success).toBe(true);
   });
 
   it("rejects an MPPT range with min above max", () => {

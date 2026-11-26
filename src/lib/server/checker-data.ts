@@ -16,6 +16,7 @@ function toDemoOption(
 ): CheckerEquipmentOption {
   const isPvModule = "pmaxWp" in item;
   return {
+    batteryVoltageClass: null,
     datasheetPath: null,
     imageAlt: null,
     imageUrl: null,
@@ -23,6 +24,7 @@ function toDemoOption(
     isDemo: true,
     manufacturer: item.manufacturer,
     model: item.model,
+    phaseCount: isPvModule ? null : 1,
     primarySpec: isPvModule ? `${item.pmaxWp} Wp` : `${item.ratedAcKw} kW`,
     revisionLabel: "Demo",
     secondarySpec: isPvModule
@@ -40,6 +42,7 @@ export async function loadCheckerData() {
     process.env.NODE_ENV !== "production" ||
     (process.env.CI === "true" && process.env.EASYSOLAR_E2E_ALLOW_DEMO === "true");
   const toOption = (item: (typeof published)[number]): CheckerEquipmentOption => ({
+    batteryVoltageClass: item.batteryVoltageClass,
     datasheetPath: item.downloadPath,
     imageAlt: item.imageAlt,
     imageUrl: item.imageAssetId ? `/api/v1/product-media/${item.imageAssetId}` : null,
@@ -47,6 +50,7 @@ export async function loadCheckerData() {
     isDemo: false,
     manufacturer: item.manufacturer,
     model: item.exactModel,
+    phaseCount: item.phaseCount,
     primarySpec: item.primarySpec,
     revisionLabel: item.revisionLabel,
     secondarySpec: item.secondarySpec,

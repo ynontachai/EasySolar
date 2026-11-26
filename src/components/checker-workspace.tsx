@@ -12,6 +12,7 @@ import { CustomConnectionDesigner } from "@/components/custom-connection-designe
 import { ThemeSelect } from "@/components/theme-select";
 
 export interface CheckerEquipmentOption {
+  batteryVoltageClass: "lv" | "hv" | null;
   datasheetPath: string | null;
   imageAlt: string | null;
   imageUrl: string | null;
@@ -19,6 +20,7 @@ export interface CheckerEquipmentOption {
   isDemo: boolean;
   manufacturer: string;
   model: string;
+  phaseCount: 1 | 3 | null;
   primarySpec: string;
   revisionLabel: string;
   secondarySpec: string;
@@ -39,6 +41,12 @@ interface SpecRow {
   source?: "DATASHEET" | "DERIVED" | "USER_OVERRIDE" | "SYSTEM_OVERRIDE" | "MISSING";
   value: string;
 }
+
+const inverterTypeLabels: Record<string, string> = {
+  hybrid: "Hybrid",
+  micro: "Microinverter",
+  string: "On Grid",
+};
 
 function StatusMark({ status }: { status: RuleStatus }) {
   const isPass = status === "PASS";
@@ -71,11 +79,6 @@ function EquipmentPicker({
   value: string;
 }) {
   const isInverter = kind === "inverter";
-  const inverterTypeLabels: Record<string, string> = {
-    hybrid: "Hybrid",
-    micro: "Microinverter",
-    string: "On Grid",
-  };
   const controlLabel = isInverter
     ? "ค้นหาและเลือกรุ่นอินเวอร์เตอร์"
     : "ค้นหาและเลือกรุ่นแผง PV";
@@ -121,6 +124,107 @@ function EquipmentPicker({
             value={value}
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function InverterPicker({
+  onChange,
+  options,
+  value,
+}: {
+  onChange: (value: string) => void;
+  options: CheckerEquipmentOption[];
+  value: string;
+}) {
+  const selectedOption = options.find((option) => option.value === value) ?? options[0];
+  const selectedManufacturer = selectedOption?.manufacturer ?? "";
+  const selectedType = selectedOption?.inverterType ?? "";
+  const manufacturers = [...new Set(options.map((option) => option.manufacturer))];
+  const types = [...new Set(
+    options
+      .filter((option) => option.manufacturer === selectedManufacturer)
+      .map((option) => option.inverterType)
+      .filter((type): type is string => Boolean(type)),
+  )];
+  const models = options.filter(
+    (option) =>
+      option.manufacturer === selectedManufacturer && option.inverterType === selectedType,
+  );
+
+  function selectFirstModel(manufacturer: string, inverterType: string) {
+    const firstModel = options.find(
+      (option) =>
+        option.manufacturer === manufacturer && option.inverterType === inverterType,
+    );
+    if (firstModel) onChange(firstModel.value);
+  }
+
+  function selectManufacturer(manufacturer: string) {
+    const availableTypes = options
+      .filter((option) => option.manufacturer === manufacturer)
+      .map((option) => option.inverterType)
+      .filter((type): type is string => Boolean(type));
+    const nextType = availableTypes.includes(selectedType) ? selectedType : availableTypes[0];
+    if (nextType) selectFirstModel(manufacturer, nextType);
+  }
+
+  return (
+    <div className="picker picker--inverter">
+      <h2>ข้อมูลอินเวอร์เตอร์</h2>
+      <p className="picker__hint">เลือกตามลำดับเพื่อค้นหารุ่นได้เร็วขึ้น</p>
+      <div className="inverter-picker__filters">
+        <div className="field-group">
+          <label htmlFor="inverter-manufacturer">ยี่ห้อ</label>
+          <ThemeSelect
+            id="inverter-manufacturer"
+            onValueChange={selectManufacturer}
+            options={manufacturers.map((manufacturer) => ({
+              label: manufacturer,
+              value: manufacturer,
+            }))}
+            placeholder="เลือกยี่ห้อ"
+            value={selectedManufacturer}
+          />
+        </div>
+        <div className="field-group">
+          <label htmlFor="inverter-type">ประเภท</label>
+          <ThemeSelect
+            id="inverter-type"
+            onValueChange={(nextType) => selectFirstModel(selectedManufacturer, nextType)}
+            options={types.map((type) => ({
+              label: inverterTypeLabels[type] ?? type,
+              value: type,
+            }))}
+            placeholder="เลือกประเภท"
+            value={selectedType}
+          />
+        </div>
+      </div>
+      <div className="field-group inverter-picker__model">
+        <label htmlFor="inverter-model">รุ่น</label>
+        <ThemeSelect
+          emptyMessage="ไม่พบรุ่นที่ตรงกับยี่ห้อและประเภทที่เลือก"
+          id="inverter-model"
+          onValueChange={onChange}
+          options={models.map((option) => ({
+            description: [
+              option.primarySpec,
+              option.phaseCount ? `${option.phaseCount} Phase` : "ไม่ระบุ Phase",
+              option.inverterType === "hybrid"
+                ? option.batteryVoltageClass?.toUpperCase() ?? "ไม่ระบุ LV/HV"
+                : "ไม่ใช้แบตเตอรี่",
+            ].join(" · "),
+            label: option.model,
+            value: option.value,
+          }))}
+          placeholder="เลือกรุ่น"
+          searchPlaceholder="ค้นหารุ่นหรือสเปก"
+          searchable
+          value={value}
+        />
+        <p className="field-help">รุ่นที่แสดงตรงกับยี่ห้อและประเภทที่เลือก</p>
       </div>
     </div>
   );
@@ -394,10 +498,7 @@ export function CheckerWorkspace({
   return (
     <div className="calc">
       <div className="calc__pickers">
-        <EquipmentPicker
-          idPrefix="inverter"
-          kind="inverter"
-          label="ข้อมูลอินเวอร์เตอร์"
+        <InverterPicker
           onChange={(value) => {
             setInverter(value);
             clearOverrides();

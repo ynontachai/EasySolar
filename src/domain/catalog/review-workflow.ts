@@ -57,6 +57,8 @@ export const pvCriticalFields = [
 ] as const;
 
 export const inverterCriticalFields = [
+  "phaseCount",
+  "batteryVoltageClass",
   "ratedAcKw",
   "maxDcVoltageV",
   "mpptRange",
@@ -70,6 +72,7 @@ export interface ReviewRequirementContext {
   betaVmpSource?: "datasheet" | "derived" | null;
   hasMaxDcPower?: boolean;
   hasMaxRecommendedPv?: boolean;
+  inverterType?: "string" | "hybrid" | "micro" | null;
 }
 
 export function reviewRequirementsFor(
@@ -96,9 +99,12 @@ export function reviewRequirementsFor(
     context.hasMaxDcPower ? "maxDcPowerWp" : null,
     context.hasMaxRecommendedPv ? "maxRecommendedPvWp" : null,
   ].filter((field): field is string => field !== null);
+  const identityFields = inverterCriticalFields.filter(
+    (field) => field !== "batteryVoltageClass" || context.inverterType === "hybrid",
+  );
   return {
-    criticalFields: [...inverterCriticalFields, ...powerFields],
-    sourceRequiredFields: [...inverterCriticalFields, ...powerFields],
+    criticalFields: [...identityFields, ...powerFields],
+    sourceRequiredFields: [...identityFields, ...powerFields],
   };
 }
 

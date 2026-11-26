@@ -172,20 +172,26 @@ export const trackerInputSchema = z
 
 export const inverterSpecInputSchema = z
   .object({
+    batteryVoltageClass: z.enum(["lv", "hv", "none"], { message: "กรุณาเลือกระดับแรงดันแบตเตอรี่" }),
     inverterType: z.enum(["string", "hybrid", "micro"], { message: "กรุณาเลือกประเภท Inverter" }),
     maxDcPowerWp: optionalNumber("Max DC power", 0, 10_000_000),
     maxDcVoltageV: requiredNumber("Max DC voltage", 0, 5000),
     maxRecommendedPvWp: optionalNumber("Max recommended PV", 0, 10_000_000),
+    phaseCount: z
+      .enum(["1", "3"], { message: "กรุณาเลือกจำนวน Phase" })
+      .transform((value) => Number(value) as 1 | 3),
     ratedAcKw: requiredNumber("Rated AC", 0, 10_000),
     sourcePages: z.object({
       maxDcVoltageV: sourcePage("Max DC voltage"),
       maxDcPowerWp: optionalSourcePage,
       maxRecommendedPvWp: optionalSourcePage,
+      batteryVoltageClass: optionalSourcePage,
       mpptOperatingCurrent: sourcePage("MPPT operating current"),
       mpptRange: sourcePage("MPPT voltage range"),
       mpptShortCircuitCurrent: sourcePage("MPPT short-circuit current"),
       mpptTopology: sourcePage("จำนวน MPPT / String input"),
       ratedAcKw: sourcePage("Rated AC"),
+      phaseCount: sourcePage("จำนวน Phase"),
       startupVoltageV: sourcePage("Startup voltage"),
     }),
     sourceUrl,
@@ -193,6 +199,15 @@ export const inverterSpecInputSchema = z
     trackers: z.array(trackerInputSchema).min(1, "ต้องมี MPPT อย่างน้อย 1 ตัว").max(12),
   })
   .superRefine((value, context) => {
+    if (value.inverterType === "hybrid" && value.batteryVoltageClass === "none") {
+      context.addIssue({ code: "custom", message: "Hybrid ต้องระบุว่าเป็นแบตเตอรี่ LV หรือ HV", path: ["batteryVoltageClass"] });
+    }
+    if (value.inverterType !== "hybrid" && value.batteryVoltageClass !== "none") {
+      context.addIssue({ code: "custom", message: "LV/HV ใช้กับ Hybrid เท่านั้น", path: ["batteryVoltageClass"] });
+    }
+    if (value.inverterType === "hybrid" && !value.sourcePages.batteryVoltageClass) {
+      context.addIssue({ code: "custom", message: "กรุณาระบุหน้าอ้างอิงของระดับแรงดันแบตเตอรี่", path: ["sourcePages", "batteryVoltageClass"] });
+    }
     if (value.maxDcPowerWp === null && value.maxRecommendedPvWp === null) {
       context.addIssue({ code: "custom", message: "ต้องมี Max DC power หรือ Max recommended PV อย่างน้อยหนึ่งค่า", path: ["maxDcPowerWp"] });
     }
@@ -202,7 +217,11 @@ export const inverterSpecInputSchema = z
     if (value.maxRecommendedPvWp !== null && !value.sourcePages.maxRecommendedPvWp) {
       context.addIssue({ code: "custom", message: "กรุณาระบุหน้าอ้างอิงของ Max recommended PV", path: ["sourcePages", "maxRecommendedPvWp"] });
     }
-  });
+  })
+  .transform((value) => ({
+    ...value,
+    batteryVoltageClass: value.batteryVoltageClass === "none" ? null : value.batteryVoltageClass,
+  }));
 
 export type PvSpecInput = z.infer<typeof pvSpecInputSchema>;
 export type InverterSpecInput = z.infer<typeof inverterSpecInputSchema>;

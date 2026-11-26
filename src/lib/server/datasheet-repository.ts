@@ -38,6 +38,7 @@ export interface PendingScanAsset {
 
 export interface PublishedCatalogItem {
   assetState: AssetState | null;
+  batteryVoltageClass: "lv" | "hv" | null;
   category: "pv_module" | "inverter";
   downloadPath: string | null;
   exactModel: string;
@@ -46,6 +47,7 @@ export interface PublishedCatalogItem {
   imageAssetId: string | null;
   inverterType: string | null;
   manufacturer: string;
+  phaseCount: 1 | 3 | null;
   primarySpec: string;
   revisionId: string;
   revisionLabel: string;
@@ -393,12 +395,14 @@ export async function listPublishedCatalogPage(filters: {
   const rows = await sql<
     Array<{
       assetState: AssetState | null;
+      batteryVoltageClass: "lv" | "hv" | null;
       category: "pv_module" | "inverter";
       exactModel: string;
       id: string;
       imageAlt: string | null;
       imageAssetId: string | null;
       manufacturer: string;
+      phaseCount: number | null;
       pmaxWp: string | null;
       ratedAcKw: string | null;
       revisionId: string;
@@ -429,6 +433,8 @@ export async function listPublishedCatalogPage(filters: {
       inverter_spec.rated_ac_kw::text AS "ratedAcKw",
       inverter_spec.max_dc_voltage_v::text AS "maxDcVoltageV",
       inverter_spec.inverter_type AS "inverterType",
+      inverter_spec.phase_count AS "phaseCount",
+      inverter_spec.battery_voltage_class AS "batteryVoltageClass",
       COUNT(mppt_tracker.id)::text AS "trackerCount",
       (COUNT(*) OVER())::text AS "totalCount"
     FROM product_model
@@ -475,7 +481,9 @@ export async function listPublishedCatalogPage(filters: {
       pv_module_spec.vmp_v,
       inverter_spec.rated_ac_kw,
       inverter_spec.max_dc_voltage_v,
-      inverter_spec.inverter_type
+      inverter_spec.inverter_type,
+      inverter_spec.phase_count,
+      inverter_spec.battery_voltage_class
     ORDER BY manufacturer.name, product_model.exact_model
     ${pagination}
   `;
@@ -484,6 +492,7 @@ export async function listPublishedCatalogPage(filters: {
     const isModule = row.category === "pv_module";
     return {
       assetState: row.assetState,
+      batteryVoltageClass: row.batteryVoltageClass,
       category: row.category,
       downloadPath:
         row.assetState === "available"
@@ -495,6 +504,7 @@ export async function listPublishedCatalogPage(filters: {
       imageAssetId: row.imageAssetId,
       inverterType: row.inverterType,
       manufacturer: row.manufacturer,
+      phaseCount: row.phaseCount === 1 ? 1 as const : row.phaseCount === 3 ? 3 as const : null,
       primarySpec: isModule
         ? `${Number(row.pmaxWp)} Wp`
         : `${Number(row.ratedAcKw)} kW`,

@@ -47,15 +47,19 @@ function inverter(model, ratedAcKw, maxDcVoltageV, trackers, options) {
     category: "inverter",
     model,
     spec: {
+      batteryVoltageClass: options.batteryVoltageClass ?? null,
       inverterType: options.inverterType,
       maxDcPowerWp: options.maxDcPowerWp ?? null,
       maxDcVoltageV,
       maxRecommendedPvWp: options.maxRecommendedPvWp ?? null,
+      phaseCount: options.phaseCount,
       ratedAcKw,
       sourcePages: {
         ...(options.maxDcPowerWp ? { maxDcPowerWp: SOURCE_PAGE } : {}),
         ...(options.maxRecommendedPvWp ? { maxRecommendedPvWp: SOURCE_PAGE } : {}),
         maxDcVoltageV: SOURCE_PAGE,
+        phaseCount: SOURCE_PAGE,
+        ...(options.batteryVoltageClass ? { batteryVoltageClass: SOURCE_PAGE } : {}),
         mpptOperatingCurrent: SOURCE_PAGE,
         mpptRange: SOURCE_PAGE,
         mpptShortCircuitCurrent: SOURCE_PAGE,
@@ -123,66 +127,66 @@ const specs = [
   }),
 
   inverter("SUN2000-3KTL-M1", 3, 1100, repeatedTrackers(2, 1, 11, 15, 140, 980), {
-    inverterType: "hybrid", maxRecommendedPvWp: 4500, startupVoltageV: 200,
+    inverterType: "hybrid", phaseCount: 3, batteryVoltageClass: "hv", maxRecommendedPvWp: 4500, startupVoltageV: 200,
   }),
   inverter("SUN2000-4KTL-M1", 4, 1100, repeatedTrackers(2, 1, 11, 15, 140, 980), {
-    inverterType: "hybrid", maxRecommendedPvWp: 6000, startupVoltageV: 200,
+    inverterType: "hybrid", phaseCount: 3, batteryVoltageClass: "hv", maxRecommendedPvWp: 6000, startupVoltageV: 200,
   }),
   inverter("SUN2000-5KTL-M1", 5, 1100, repeatedTrackers(2, 1, 11, 15, 140, 980), {
-    inverterType: "hybrid", maxRecommendedPvWp: 7500, startupVoltageV: 200,
+    inverterType: "hybrid", phaseCount: 3, batteryVoltageClass: "hv", maxRecommendedPvWp: 7500, startupVoltageV: 200,
   }),
   inverter("SUN2000-6KTL-M1", 6, 1100, repeatedTrackers(2, 1, 11, 15, 140, 980), {
-    inverterType: "hybrid", maxRecommendedPvWp: 9000, startupVoltageV: 200,
+    inverterType: "hybrid", phaseCount: 3, batteryVoltageClass: "hv", maxRecommendedPvWp: 9000, startupVoltageV: 200,
   }),
   inverter("SUN2000-8KTL-M1", 8, 1100, repeatedTrackers(2, 1, 11, 15, 140, 980), {
-    inverterType: "hybrid", maxRecommendedPvWp: 12000, startupVoltageV: 200,
+    inverterType: "hybrid", phaseCount: 3, batteryVoltageClass: "hv", maxRecommendedPvWp: 12000, startupVoltageV: 200,
   }),
   inverter("SUN2000-10KTL-M1", 10, 1100, repeatedTrackers(2, 1, 11, 15, 140, 980), {
-    inverterType: "hybrid", maxRecommendedPvWp: 15000, startupVoltageV: 200,
+    inverterType: "hybrid", phaseCount: 3, batteryVoltageClass: "hv", maxRecommendedPvWp: 15000, startupVoltageV: 200,
   }),
   inverter("SUN2000-8K-LC0", 8, 600, repeatedTrackers(3, 1, 16, 20, 40, 560), {
-    inverterType: "hybrid", maxRecommendedPvWp: 12000, startupVoltageV: 50,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "hv", maxRecommendedPvWp: 12000, startupVoltageV: 50,
   }),
   inverter("SUN2000-10K-LC0", 10, 600, repeatedTrackers(3, 1, 16, 20, 40, 560), {
-    inverterType: "hybrid", maxRecommendedPvWp: 15000, startupVoltageV: 50,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "hv", maxRecommendedPvWp: 15000, startupVoltageV: 50,
   }),
 
   inverter("SUN-3.6K-SG05LP1-EU", 3.6, 500, repeatedTrackers(2, 1, 13, 17, 150, 425), {
-    inverterType: "hybrid", maxDcPowerWp: 4680, startupVoltageV: 125,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "lv", maxDcPowerWp: 4680, startupVoltageV: 125,
   }),
   inverter("SUN-5K-SG05LP1-EU", 5, 500, repeatedTrackers(2, 1, 13, 17, 150, 425), {
-    inverterType: "hybrid", maxDcPowerWp: 6500, startupVoltageV: 125,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "lv", maxDcPowerWp: 6500, startupVoltageV: 125,
   }),
   inverter("SUN-6K-SG05LP1-EU", 6, 500, repeatedTrackers(2, 1, 13, 17, 150, 425), {
-    inverterType: "hybrid", maxDcPowerWp: 7800, startupVoltageV: 125,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "lv", maxDcPowerWp: 7800, startupVoltageV: 125,
   }),
   inverter("SUN-7.6K-SG05LP1-EU", 7.6, 500, repeatedTrackers(2, 2, 26, 34, 150, 425), {
-    inverterType: "hybrid", maxDcPowerWp: 9880, startupVoltageV: 125,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "lv", maxDcPowerWp: 9880, startupVoltageV: 125,
   }),
   inverter("SUN-8K-SG05LP1-EU", 8, 500, repeatedTrackers(2, 2, 26, 34, 150, 425), {
-    inverterType: "hybrid", maxDcPowerWp: 10400, startupVoltageV: 125,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "lv", maxDcPowerWp: 10400, startupVoltageV: 125,
   }),
   inverter("SUN-7.6K-SG02LP1-EU-AM2", 7.6, 500, repeatedTrackers(2, 2, 26, 44, 150, 425), {
-    inverterType: "hybrid", maxDcPowerWp: 12160, maxRecommendedPvWp: 15200, startupVoltageV: 125,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "lv", maxDcPowerWp: 12160, maxRecommendedPvWp: 15200, startupVoltageV: 125,
   }),
   inverter("SUN-8K-SG02LP1-EU-AM2", 8, 500, repeatedTrackers(2, 2, 26, 44, 150, 425), {
-    inverterType: "hybrid", maxDcPowerWp: 12800, maxRecommendedPvWp: 16000, startupVoltageV: 125,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "lv", maxDcPowerWp: 12800, maxRecommendedPvWp: 16000, startupVoltageV: 125,
   }),
   inverter("SUN-10K-SG02LP1-EU-AM3", 10, 500, repeatedTrackers(3, 2, 26, 44, 150, 425), {
-    inverterType: "hybrid", maxDcPowerWp: 16000, maxRecommendedPvWp: 20000, startupVoltageV: 125,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "lv", maxDcPowerWp: 16000, maxRecommendedPvWp: 20000, startupVoltageV: 125,
   }),
   inverter("SUN-12K-SG02LP1-EU-AM3", 12, 500, repeatedTrackers(3, 2, 26, 44, 150, 425), {
-    inverterType: "hybrid", maxDcPowerWp: 19200, maxRecommendedPvWp: 24000, startupVoltageV: 125,
+    inverterType: "hybrid", phaseCount: 1, batteryVoltageClass: "lv", maxDcPowerWp: 19200, maxRecommendedPvWp: 24000, startupVoltageV: 125,
   }),
 
   inverter("S6-GR1P3K-M", 3, 550, repeatedTrackers(1, 1, 14, 22, 80, 500), {
-    inverterType: "string", maxRecommendedPvWp: 4500, startupVoltageV: 90,
+    inverterType: "string", phaseCount: 1, maxRecommendedPvWp: 4500, startupVoltageV: 90,
   }),
   inverter("S6-GR1P5K", 5, 600, repeatedTrackers(2, 1, 14, 22, 90, 520), {
-    inverterType: "string", maxRecommendedPvWp: 7500, startupVoltageV: 120,
+    inverterType: "string", phaseCount: 1, maxRecommendedPvWp: 7500, startupVoltageV: 120,
   }),
   inverter("S5-GR1P10K", 10, 600, repeatedTrackers(3, 1, 14, 22, 100, 500), {
-    inverterType: "string", maxRecommendedPvWp: 15000, startupVoltageV: 120,
+    inverterType: "string", phaseCount: 1, maxRecommendedPvWp: 15000, startupVoltageV: 120,
   }),
 ];
 
@@ -317,11 +321,13 @@ for (const item of targets) {
     } else {
       await insertOrThrow(
         client.from("inverter_spec").insert({
+          battery_voltage_class: item.spec.batteryVoltageClass,
           datasheet_revision_id: item.revisionId,
           inverter_type: item.spec.inverterType,
           max_dc_power_wp: item.spec.maxDcPowerWp,
           max_dc_voltage_v: item.spec.maxDcVoltageV,
           max_recommended_pv_wp: item.spec.maxRecommendedPvWp,
+          phase_count: item.spec.phaseCount,
           rated_ac_kw: item.spec.ratedAcKw,
           startup_voltage_v: item.spec.startupVoltageV,
         }),

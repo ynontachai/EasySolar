@@ -54,6 +54,7 @@ export async function listReviewQueue(): Promise<ReviewQueueRow[]> {
     betaVmpSource: "datasheet" | "derived" | null;
     hasMaxDcPower: boolean;
     hasMaxRecommendedPv: boolean;
+    inverterType: "string" | "hybrid" | "micro" | null;
   }>>`
     SELECT
       datasheet_revision.id::text AS "revisionId",
@@ -72,6 +73,7 @@ export async function listReviewQueue(): Promise<ReviewQueueRow[]> {
       ) AS "betaVmpSource",
       (inverter_spec.max_dc_power_wp IS NOT NULL) AS "hasMaxDcPower",
       (inverter_spec.max_recommended_pv_wp IS NOT NULL) AS "hasMaxRecommendedPv",
+      inverter_spec.inverter_type AS "inverterType",
       (COALESCE(pv_module_spec.bifaciality_factor, 0) > 0) AS "isBifacial"
     FROM datasheet_revision
     JOIN product_model ON product_model.id = datasheet_revision.product_model_id
@@ -92,6 +94,7 @@ export async function listReviewQueue(): Promise<ReviewQueueRow[]> {
       betaVmpSource: row.betaVmpSource,
       hasMaxDcPower: row.hasMaxDcPower,
       hasMaxRecommendedPv: row.hasMaxRecommendedPv,
+      inverterType: row.inverterType,
     };
     return {
       ...row,
@@ -287,6 +290,7 @@ export async function applyReviewAction(input: {
         hasSpec: boolean;
         hasMaxDcPower: boolean;
         hasMaxRecommendedPv: boolean;
+        inverterType: "string" | "hybrid" | "micro" | null;
         isBifacial: boolean;
         productModelId: string;
         sourcePages: Record<string, string | undefined>;
@@ -316,6 +320,11 @@ export async function applyReviewAction(input: {
           SELECT 1 FROM inverter_spec
           WHERE datasheet_revision_id = datasheet_revision.id AND max_recommended_pv_wp IS NOT NULL
         ) AS "hasMaxRecommendedPv",
+        (
+          SELECT inverter_type
+          FROM inverter_spec
+          WHERE datasheet_revision_id = datasheet_revision.id
+        ) AS "inverterType",
         EXISTS (
           SELECT 1 FROM pv_module_spec
           WHERE datasheet_revision_id = datasheet_revision.id
@@ -395,6 +404,7 @@ export async function applyReviewAction(input: {
           betaVmpSource: revision.betaVmpSource,
           hasMaxDcPower: revision.hasMaxDcPower,
           hasMaxRecommendedPv: revision.hasMaxRecommendedPv,
+          inverterType: revision.inverterType,
         },
         sourcePages: revision.sourcePages,
         state: revision.state,
@@ -509,11 +519,13 @@ const specValueKeys = [
   "iscA",
   "impA",
   "inverterType",
+  "batteryVoltageClass",
   "maxDcPowerWp",
   "maxDcVoltageV",
   "maxRecommendedPvWp",
   "maxSystemVoltageV",
   "pmaxWp",
+  "phaseCount",
   "ratedAcKw",
   "startupVoltageV",
   "vmpV",
@@ -562,6 +574,8 @@ export async function getRevisionSpecTarget(revisionId: string): Promise<Revisio
       ratedAcKw: string | null;
       startupVoltageV: string | null;
       inverterType: string | null;
+      batteryVoltageClass: string | null;
+      phaseCount: string | null;
       vmpV: string | null;
       vocV: string | null;
     }>
@@ -592,9 +606,11 @@ export async function getRevisionSpecTarget(revisionId: string): Promise<Revisio
         inverter_spec.inverter_type,
         datasheet_revision.suggested_inverter_type
       ) AS "inverterType",
+      inverter_spec.battery_voltage_class AS "batteryVoltageClass",
       inverter_spec.max_dc_power_wp::text AS "maxDcPowerWp",
       inverter_spec.max_dc_voltage_v::text AS "maxDcVoltageV",
       inverter_spec.max_recommended_pv_wp::text AS "maxRecommendedPvWp",
+      inverter_spec.phase_count::text AS "phaseCount",
       inverter_spec.rated_ac_kw::text AS "ratedAcKw",
       inverter_spec.startup_voltage_v::text AS "startupVoltageV"
     FROM datasheet_revision
@@ -747,7 +763,9 @@ export async function enterRevisionSpec(input: EnterSpecInput) {
           max_recommended_pv_wp,
           max_dc_power_wp,
           startup_voltage_v,
-          inverter_type
+          inverter_type,
+          phase_count,
+          battery_voltage_class
         )
         VALUES (
           ${input.revisionId}::uuid,
@@ -756,7 +774,9 @@ export async function enterRevisionSpec(input: EnterSpecInput) {
           ${spec.maxRecommendedPvWp},
           ${spec.maxDcPowerWp},
           ${spec.startupVoltageV},
-          ${spec.inverterType}
+          ${spec.inverterType},
+          ${spec.phaseCount},
+          ${spec.batteryVoltageClass}
         )
       `;
       for (const [index, tracker] of spec.trackers.entries()) {

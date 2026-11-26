@@ -104,6 +104,10 @@ export function RevisionSpecForm({ target }: { target: RevisionSpecTarget }) {
   const [betaVmpSource, setBetaVmpSource] = useState(
     values.betaVmpSource ?? (values.betaVmpPercentPerC ? "datasheet" : "missing"),
   );
+  const [inverterType, setInverterType] = useState(values.inverterType ?? "");
+  const [batteryVoltageClass, setBatteryVoltageClass] = useState(
+    values.batteryVoltageClass ?? "none",
+  );
 
   const initialTrackers = target.trackers.length
     ? target.trackers.map((tracker, index) => ({ id: index, values: tracker }))
@@ -220,13 +224,66 @@ export function RevisionSpecForm({ target }: { target: RevisionSpecTarget }) {
             <legend>ค่าหลัก (ต้องมีหน้าอ้างอิง)</legend>
             <label>
               <span>ประเภท *</span>
-              <select defaultValue={values.inverterType ?? ""} name="inverterType">
+              <select
+                name="inverterType"
+                onChange={(event) => {
+                  const nextType = event.target.value;
+                  setInverterType(nextType);
+                  if (nextType !== "hybrid") setBatteryVoltageClass("none");
+                }}
+                value={inverterType}
+              >
                 <option value="">เลือกประเภท</option>
                 <option value="string">String</option>
                 <option value="hybrid">Hybrid</option>
                 <option value="micro">Micro</option>
               </select>
             </label>
+            <div className="spec-form__row">
+              <label>
+                <span>จำนวน Phase *</span>
+                <select defaultValue={values.phaseCount ?? ""} name="phaseCount">
+                  <option value="">เลือกจำนวน Phase</option>
+                  <option value="1">1 Phase</option>
+                  <option value="3">3 Phase</option>
+                </select>
+              </label>
+              <label>
+                <span>หน้า *</span>
+                <input
+                  defaultValue={values["sourcePages.phaseCount"]}
+                  maxLength={40}
+                  name="sourcePages.phaseCount"
+                  type="text"
+                />
+              </label>
+            </div>
+            <div className="spec-form__row">
+              <label>
+                <span>แรงดันแบตเตอรี่ {inverterType === "hybrid" ? "*" : ""}</span>
+                <select
+                  name="batteryVoltageClass"
+                  onChange={(event) => setBatteryVoltageClass(event.target.value)}
+                  value={batteryVoltageClass}
+                >
+                  <option value="none">
+                    {inverterType === "hybrid" ? "เลือก LV หรือ HV" : "ไม่เกี่ยวข้อง"}
+                  </option>
+                  <option value="lv">LV · Low Voltage</option>
+                  <option value="hv">HV · High Voltage</option>
+                </select>
+              </label>
+              <label>
+                <span>หน้า {inverterType === "hybrid" ? "*" : ""}</span>
+                <input
+                  defaultValue={values["sourcePages.batteryVoltageClass"]}
+                  disabled={inverterType !== "hybrid"}
+                  maxLength={40}
+                  name="sourcePages.batteryVoltageClass"
+                  type="text"
+                />
+              </label>
+            </div>
             {inverterCriticalFields.map((field) => (
               <ValueWithPage
                 defaultValue={values[field.name]}

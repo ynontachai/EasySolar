@@ -17,6 +17,7 @@ const initialState: ReviewActionState = { message: "", status: "idle" };
 
 const fieldLabels: Record<string, string> = {
   alphaIscPercentPerC: "αIsc (%/°C)",
+  batteryVoltageClass: "ระดับแรงดันแบตเตอรี่ LV/HV",
   betaVmpDerivation: "วิธี derive βVmp",
   betaVmpPercentPerC: "βVmp (%/°C)",
   betaVocPercentPerC: "βVoc (%/°C)",
@@ -32,6 +33,7 @@ const fieldLabels: Record<string, string> = {
   maxRecommendedPvWp: "Max recommended PV",
   maxSystemVoltageV: "Max system voltage",
   pmaxWp: "Pmax",
+  phaseCount: "จำนวน Phase",
   ratedAcKw: "Rated AC",
   startupVoltageV: "Startup voltage",
   vmpV: "Vmp",

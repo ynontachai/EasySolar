@@ -192,10 +192,12 @@ const pvFormFields = [
 ] as const;
 
 const inverterFormFields = [
+  "batteryVoltageClass",
   "inverterType",
   "maxDcPowerWp",
   "maxDcVoltageV",
   "maxRecommendedPvWp",
+  "phaseCount",
   "ratedAcKw",
   "sourceUrl",
   "startupVoltageV",
@@ -203,7 +205,7 @@ const inverterFormFields = [
 
 const sourcePageFields = {
   pv_module: ["alphaIscPercentPerC", "betaVmpPercentPerC", "betaVocPercentPerC", "gammaPmaxPercentPerC", "impA", "iscA", "maxSystemVoltageV", "pmaxWp", "vmpV", "vocV"],
-  inverter: ["maxDcPowerWp", "maxDcVoltageV", "maxRecommendedPvWp", "mpptOperatingCurrent", "mpptRange", "mpptShortCircuitCurrent", "mpptTopology", "ratedAcKw", "startupVoltageV"],
+  inverter: ["batteryVoltageClass", "maxDcPowerWp", "maxDcVoltageV", "maxRecommendedPvWp", "mpptOperatingCurrent", "mpptRange", "mpptShortCircuitCurrent", "mpptTopology", "phaseCount", "ratedAcKw", "startupVoltageV"],
 } as const;
 
 const trackerFormFields = [
